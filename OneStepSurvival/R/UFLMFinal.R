@@ -30,7 +30,7 @@
 #' @importFrom stats qlogis
 #' @importFrom resample colVars
 #####
-#' @export
+
 OneStep2 <- R6::R6Class("OneStep2",
                     private = list(
                       varsInit = list(),
@@ -1373,7 +1373,7 @@ OneStep2 <- R6::R6Class("OneStep2",
 
 
 
-#' @export
+
 Estimator = R6::R6Class("Estimator",
                     private = list(
                       hazards_failure = NULL,
@@ -1450,17 +1450,17 @@ Estimator = R6::R6Class("Estimator",
                     )
 )
 
-#' @export
+
 expit = function(x){
   return(exp(x)/(1+exp(x)))
 }
 
-#' @export
+
 logit = function(x){
   return(log(x/(1-x)))
 }
 
-#' @export
+
 compute_simultaneous_ci <- function(eic_fit) {
   rownames(eic_fit) = NULL
   colnames(eic_fit) = NULL
@@ -1477,7 +1477,7 @@ compute_simultaneous_ci <- function(eic_fit) {
   return(sqrt(variance_marginal) / sqrt(n) * q)
 }
 
-#' @export
+
 compute_q <- function(corr, B = 1e3, alpha = 0.05) {
   dim <- nrow(corr)
   z <- apply(
