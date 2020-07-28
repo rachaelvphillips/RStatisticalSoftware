@@ -53,7 +53,7 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
     return(keep - max(index_to_keep))
   }
   basis_list = basis_list[keep]
-  print(paste0("Current basis size is ", length(basis_list)))
+  print(paste0("Current basis size is ", length(index_to_keep) + length(basis_list)))
 
   return( basis_list)
 }
@@ -157,7 +157,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,max_dim, X,y, screen_
   if(max_dim==1 | ncol(X)==1){
     return(list(list(), list()))
   }
-  print("here")
+
   getBasis = function(vec){
     lst = list()
     lapply(vec, function(l){
@@ -199,7 +199,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,max_dim, X,y, screen_
   two_way_combos = two_way_combos[,throw,drop=F]
   t = proc.time()
   if(screen_each_level ){
-    print("here")
+
     keep = screen_basis(c(reduced_basis_list,way),X,y,1:length(reduced_basis_list), T)
     two_way_combos = two_way_combos[,keep, drop=F]
     way = way[keep]
