@@ -9,6 +9,8 @@ fit_hal(
   Y,
   X_unpenalized = NULL,
   max_degree = 3,
+  smoothness_orders = NULL,
+  include_order_zero = F,
   fit_type = c("glmnet", "lassi"),
   n_folds = 10,
   foldid = NULL,

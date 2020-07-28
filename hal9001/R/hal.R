@@ -95,6 +95,8 @@ fit_hal <- function(X,
                     Y,
                     X_unpenalized = NULL,
                     max_degree = 3,
+                    smoothness_orders = NULL,
+                    include_order_zero = F,
                     fit_type = c("glmnet", "lassi"),
                     n_folds = 10,
                     foldid = NULL,
@@ -159,12 +161,19 @@ fit_hal <- function(X,
     }
   }
 
+  if(is.null(smoothness_orders)){
+    smoothness_orders = rep(0,ncol(X))
+  }
+  else{
+    #recycle vector if needed.
+    smoothness_orders = suppressWarnings(smoothness_orders + rep(0,ncol(X)))
+  }
   # bookkeeping: get start time of duplicate removal procedure
   time_start <- proc.time()
 
   # make design matrix for HAL
   if (is.null(basis_list)) {
-    basis_list <- enumerate_basis(X, max_degree)
+    basis_list <- enumerate_basis(X, max_degree, smoothness_orders, include_order_zero)
   }
 
   # generate a vector of col lists corresponding to the bases generated
