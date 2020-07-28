@@ -180,6 +180,7 @@ fit_hal <- function(X,
     if(screen_basis_main_terms){
 
       basis_list <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
+      old_basis_list <- basis_list
       basis_list_one_way <- screen_basis(basis_list,X,Y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
       basis_list <- get_higher_basis(basis_list_one_way, max_degree, X, y,screen_each_level = screen_basis_interactions)
     }
@@ -205,9 +206,15 @@ fit_hal <- function(X,
   time_design_matrix <- proc.time()
 
   # catalog and eliminate duplicates
-  copy_map <- make_copy_map(x_basis)
-  unique_columns <- as.numeric(names(copy_map))
-  x_basis <- x_basis[, unique_columns]
+  if(is.null(smoothness_orders) & all(smoothness_orders==0)){
+    copy_map <- make_copy_map(x_basis)
+    unique_columns <- as.numeric(names(copy_map))
+    x_basis <- x_basis[, unique_columns]
+  }
+  else{
+    copy_map = NULL
+  }
+
 
   # the HAL basis are subject to L1 penalty
   penalty_factor <- rep(1, ncol(x_basis))
@@ -344,7 +351,8 @@ fit_hal <- function(X,
       } else {
         NULL
       },
-    unpenalized_covariates = unpenalized_covariates
+    unpenalized_covariates = unpenalized_covariates,
+    old_basis_list=old_basis_list
   )
   class(fit) <- "hal9001"
   return(fit)
