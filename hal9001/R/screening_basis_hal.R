@@ -1,13 +1,6 @@
 
 
-# basis = enumerate_basis(X, 1,rep(0,4), T)
-#
-# screen_basis(basis, X, y)
-# get_higher_basis(basis, 4, X,y, screen_each_level = F)
-#
-#
 
-#' @export
 screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = "gaussian" ){
   print(paste0("Current basis size is ", length(basis_list)))
   X = as.matrix(X)
@@ -65,7 +58,6 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
   return( basis_list)
 }
 
-#' @export
 merge_basis = function(reduced_basis_list1,reduced_basis_list2,X){
   if(length(reduced_basis_list1)==0 | length(reduced_basis_list2)){
     return(NULL)
@@ -114,7 +106,7 @@ merge_basis = function(reduced_basis_list1,reduced_basis_list2,X){
 
 }
 
-#' @export
+
 get_higher_basis= function(reduced_basis_list,max_dim, X, y,screen_each_level = F, max_num_basis = Inf){
   if(length(reduced_basis_list)==0){
     return(NULL)
@@ -160,7 +152,7 @@ get_higher_basis= function(reduced_basis_list,max_dim, X, y,screen_each_level = 
   return(final)
 }
 
-#' @export
+
 get_higher_basis_up_to_three = function(reduced_basis_list,max_dim, X,y, screen_each_level){
   if(max_dim==1 | ncol(X)==1){
     return(list(list(), list()))
