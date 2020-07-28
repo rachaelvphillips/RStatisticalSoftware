@@ -175,7 +175,7 @@ fit_hal <- function(X,
   time_start <- proc.time()
 
   # make design matrix for HAL
-
+  old_basis_list = NULL
   if (is.null(basis_list)) {
     if(screen_basis_main_terms){
 
