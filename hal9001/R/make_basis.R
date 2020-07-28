@@ -15,7 +15,15 @@ basis_list_cols <- function(cols, x, orderMap) {
   # first, subset only to columns of interest
   x_sub <- x[, cols, drop = FALSE]
   # call Rcpp routine to produce the list of basis functions
+
   basis_list <- make_basis_list(x_sub, cols, orderMap)
+  higher_order_index = intersect(cols, which(orderMap >=2))
+  if(length(higher_order_index)>0){
+    first_index = min(higher_order_index)
+    newOrderMap = orderMap
+    newOrderMap[first_index] = newOrderMap[first_index] -1
+    basis_list <- c(basis_list, basis_list_cols(cols, x, newOrderMap))
+  }
   # output
   return(basis_list)
 }
@@ -101,6 +109,10 @@ enumerate_basis <- function(x, max_degree = NULL, orderMap = rep(0, ncol(x))){
   # generate all basis functions up to the specified degree
   all_bases <- lapply(degrees, function(degree) basis_of_degree(x, degree, orderMap))
   basis_list <- unlist(all_bases, recursive = FALSE)
+
+
+
+
 
   # output
   return(basis_list)
