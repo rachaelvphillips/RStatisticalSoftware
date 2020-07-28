@@ -40,7 +40,7 @@ BasisMap enumerate_basis(const NumericMatrix& X_sub,
 //' @param X_sub A subset of the columns of X, the original design matrix.
 //' @param cols An index of the columns that were reduced to by sub-setting.
 // [[Rcpp::export]]
-List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, const NumericVector& orderMap){
+List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, const NumericVector& order_map){
 
   BasisMap bmap = enumerate_basis(X_sub, cols);
   List basis_list(bmap.size());
@@ -57,7 +57,7 @@ List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, cons
 
     NumericVector order (subCols.length());
     for(int i=0; i < subCols.length(); i++){
-      order[i] = orderMap[subCols[i]-1];
+      order[i] = order_map[subCols[i]-1];
     }
 
     List basis = List::create(
@@ -122,8 +122,7 @@ double meets_basis(const NumericMatrix& X, const int row_num,
 void evaluate_basis(const List& basis, const NumericMatrix& X, SpMat& x_basis,
                     int basis_col) {
   int n = X.rows();
-  double observedVal;
-  double cutoff;
+
 
   //split basis into x[1] x[-1]
   //find sub-bases

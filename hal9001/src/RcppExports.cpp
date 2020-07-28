@@ -44,15 +44,15 @@ BEGIN_RCPP
 END_RCPP
 }
 // make_basis_list
-List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, const NumericVector& orderMap);
-RcppExport SEXP _hal9001_make_basis_list(SEXP X_subSEXP, SEXP colsSEXP, SEXP orderMapSEXP) {
+List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, const NumericVector& order_map);
+RcppExport SEXP _hal9001_make_basis_list(SEXP X_subSEXP, SEXP colsSEXP, SEXP order_mapSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericMatrix& >::type X_sub(X_subSEXP);
     Rcpp::traits::input_parameter< const NumericVector& >::type cols(colsSEXP);
-    Rcpp::traits::input_parameter< const NumericVector& >::type orderMap(orderMapSEXP);
-    rcpp_result_gen = Rcpp::wrap(make_basis_list(X_sub, cols, orderMap));
+    Rcpp::traits::input_parameter< const NumericVector& >::type order_map(order_mapSEXP);
+    rcpp_result_gen = Rcpp::wrap(make_basis_list(X_sub, cols, order_map));
     return rcpp_result_gen;
 END_RCPP
 }

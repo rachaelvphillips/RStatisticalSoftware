@@ -7,7 +7,7 @@
 enumerate_basis(
   x,
   max_degree = NULL,
-  orderMap = rep(0, ncol(x)),
+  order_map = rep(0, ncol(x)),
   include_zero_order = F
 )
 }
