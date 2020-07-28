@@ -110,7 +110,7 @@ fit_hal <- function(X,
                     id = NULL,
                     offset = NULL,
                     cv_select = TRUE,
-                    screen_basis_main_terms = T,
+                    screen_basis_main_terms = F,
                     screen_basis_interactions = F,
                     ...,
                     yolo = TRUE) {
