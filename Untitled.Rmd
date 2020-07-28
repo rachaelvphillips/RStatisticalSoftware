@@ -5,11 +5,12 @@ output: html_document
 
 
 ```{r}
-library(OneStepSurvival)
+getwd()
 
 ```
 
 ```{r}
-devtools::install_github("Larsvanderlaan/RStatisticalSoftware/OneStepSurvival")
-#devtools::install("OneStepSurvival")
+library(devtools)
+library(roxygen2)
+create("Halgene")
 ```
