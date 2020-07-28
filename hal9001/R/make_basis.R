@@ -26,7 +26,7 @@ basis_list_cols <- function(cols, x, orderMap, include_zero_order) {
   }
   higher_order_index = intersect(cols, which(orderMap > k_deg))
   if(length(higher_order_index)>0){
-    first_index = min(higher_order_index)
+    first_index = higher_order_index[[1]]
     newOrderMap = orderMap
     newOrderMap[first_index] = newOrderMap[first_index] -1
     basis_list <- c(basis_list, basis_list_cols(cols, x, newOrderMap, include_zero_order))
