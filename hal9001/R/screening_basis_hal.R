@@ -48,7 +48,7 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
   keep = setdiff(keep,index_to_keep)
 
 
-  print(paste0("Screening reduced basis set by ", len - length(keep)))
+  print(paste0("Amount of higher order basis functions added:",length(keep)))
   if(return_index){
     print(paste0("Current basis size is ", length(index_to_keep) + length(keep)))
 
