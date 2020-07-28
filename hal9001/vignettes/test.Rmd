@@ -22,7 +22,7 @@ y = rowSums(X) + rnorm(n)
 
 f=fit_hal(X,y,screen_basis_main_terms=T,family = "gaussian", cv_select = T, return_x_basis = T)
 
-f$basis_list
+
 ```
 
 

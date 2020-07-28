@@ -53,8 +53,8 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
     return(keep - max(index_to_keep))
   }
   basis_list = basis_list[keep]
+  print(paste0("Current basis size is ", length(basis_list)))
 
-  print(length(basis_list))
   return( basis_list)
 }
 
