@@ -1,0 +1,29 @@
+---
+title: "test"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r,include=FALSE}
+remotes::install_github("Larsvanderlaan/RStatisticalSoftware/hal9001")
+
+```
+
+```{r}
+library(hal9001)
+n=150
+X = matrix(cbind(rnorm(n),rnorm(n),rnorm(n)), nrow=n)
+
+y = rowSums(X) + rnorm(n)
+
+f=fit_hal(X,y,screen_basis_main_terms=T,family = "gaussian", cv_select = T, return_x_basis = T)
+
+f$basis_list
+```
+
+
+
