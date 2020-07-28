@@ -15,13 +15,15 @@ remotes::install_github("Larsvanderlaan/RStatisticalSoftware/hal9001")
 
 ```{r}
 library(hal9001)
-n=150
-X = matrix(cbind(rnorm(n),rnorm(n),rnorm(n)), nrow=n)
+n=300
+X = matrix(cbind(runif(n,0,5),runif(n,-2,5)), nrow=n)
 
-y = rowSums(X) + rnorm(n)
+y = rowSums(X)^3 -5 
 
-f=fit_hal(X,y,screen_basis_main_terms=T,family = "gaussian", cv_select = T, return_x_basis = T)
+f=fit_hal(X,y,screen_basis_main_terms=T,family = "gaussian", cv_select = T,  smoothness_orders = 2, include_order_zero = F)
 
+plot(predict(f, new_data = X),y)
+#plot(X,predict(f, new_data = X))
 
 ```
 

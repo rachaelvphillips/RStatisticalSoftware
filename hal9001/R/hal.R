@@ -177,11 +177,18 @@ fit_hal <- function(X,
   # make design matrix for HAL
   old_basis_list = NULL
   if (is.null(basis_list)) {
-    if(screen_basis_main_terms){
+    if(screen_basis_main_terms | screen_basis_interactions){
+      if(screen_basis_main_terms){
+        basis_list <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
+        old_basis_list <- basis_list
+        basis_list_one_way <- screen_basis(basis_list,X,Y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
 
-      basis_list <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
-      old_basis_list <- basis_list
-      basis_list_one_way <- screen_basis(basis_list,X,Y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
+      }
+      else{
+        basis_list_one_way <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
+
+      }
+
       basis_list <- get_higher_basis(basis_list_one_way, max_degree, X, y,screen_each_level = screen_basis_interactions)
     }
     else{
