@@ -29,7 +29,7 @@ basis_list_cols <- function(cols, x, orderMap, include_zero_order) {
     first_index = min(higher_order_index)
     newOrderMap = orderMap
     newOrderMap[first_index] = newOrderMap[first_index] -1
-    basis_list <- c(basis_list, basis_list_cols(cols, x, newOrderMap))
+    basis_list <- c(basis_list, basis_list_cols(cols, x, newOrderMap, include_zero_order))
   }
   # output
   return(basis_list)
