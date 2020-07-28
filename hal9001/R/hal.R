@@ -110,6 +110,8 @@ fit_hal <- function(X,
                     id = NULL,
                     offset = NULL,
                     cv_select = TRUE,
+                    screen_basis_main_terms = T,
+                    screen_basis_interactions = F,
                     ...,
                     yolo = TRUE) {
   # check arguments and catch function call
@@ -173,8 +175,18 @@ fit_hal <- function(X,
   time_start <- proc.time()
 
   # make design matrix for HAL
+
   if (is.null(basis_list)) {
-    basis_list <- enumerate_basis(X, max_degree, smoothness_orders, include_order_zero)
+    if(screen_basis_main_terms){
+      basis_list <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
+      basis_list_one_way <- screen_basis(basis_list,X,y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
+      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X, y,screen_each_level = screen_basis_interactions)
+    }
+    else{
+      basis_list <- enumerate_basis(X, max_degree, smoothness_orders, include_order_zero)
+
+    }
+
   }
 
   # generate a vector of col lists corresponding to the bases generated
