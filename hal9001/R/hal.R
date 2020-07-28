@@ -178,7 +178,7 @@ fit_hal <- function(X,
 
   if (is.null(basis_list)) {
     if(screen_basis_main_terms){
-      print("no")
+
       basis_list <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
       basis_list_one_way <- screen_basis(basis_list,X,Y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
       basis_list <- get_higher_basis(basis_list_one_way, max_degree, X, y,screen_each_level = screen_basis_interactions)
@@ -190,7 +190,7 @@ fit_hal <- function(X,
 
   }
 
-print("done")
+
   # generate a vector of col lists corresponding to the bases generated
   col_lists <- unique(lapply(basis_list, `[[`, "cols"))
   col_names <- colnames(X)
@@ -203,7 +203,7 @@ print("done")
 
   x_basis <- make_design_matrix(X, basis_list)
   time_design_matrix <- proc.time()
-  print(x_basis)
+
   # catalog and eliminate duplicates
   copy_map <- make_copy_map(x_basis)
   unique_columns <- as.numeric(names(copy_map))
