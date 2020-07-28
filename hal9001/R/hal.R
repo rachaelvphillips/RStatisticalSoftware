@@ -97,6 +97,7 @@ fit_hal <- function(X,
                     max_degree = 3,
                     smoothness_orders = NULL,
                     include_order_zero = F,
+                    bins = 500,
                     fit_type = c("glmnet", "lassi"),
                     n_folds = 10,
                     foldid = NULL,
@@ -177,22 +178,23 @@ fit_hal <- function(X,
   # make design matrix for HAL
   old_basis_list = NULL
   if (is.null(basis_list)) {
+    X_quant = quantizer(X, bins)
     if(screen_basis_main_terms | screen_basis_interactions){
       if(screen_basis_main_terms){
-        basis_list <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
+        basis_list <- enumerate_basis(X_quant, 1, smoothness_orders, include_order_zero)
         old_basis_list <- basis_list
-        basis_list_one_way <- screen_basis(basis_list,X,Y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
+        basis_list_one_way <- screen_basis(basis_list,X_quant,Y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = family )
 
       }
       else{
-        basis_list_one_way <- enumerate_basis(X, 1, smoothness_orders, include_order_zero)
+        basis_list_one_way <- enumerate_basis(X_quant, 1, smoothness_orders, include_order_zero)
 
       }
 
-      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X, y,screen_each_level = screen_basis_interactions)
+      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X_quant, y,screen_each_level = screen_basis_interactions)
     }
     else{
-      basis_list <- enumerate_basis(X, max_degree, smoothness_orders, include_order_zero)
+      basis_list <- enumerate_basis(X_quant, max_degree, smoothness_orders, include_order_zero)
 
     }
 

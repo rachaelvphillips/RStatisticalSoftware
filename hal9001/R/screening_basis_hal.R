@@ -1,4 +1,21 @@
 
+quantizer = function(X, bins){
+  if(is.null(bins)){
+    return(X)
+  }
+  X = as.matrix(X)
+
+  convertColumn = function(x){
+    quants = seq(0,1,1/bins)
+    q=quantile(x,quants)
+
+    nearest <- findInterval(x, q)
+    x <- q[nearest]
+    return(x)
+  }
+  quantizer = function(X){as.matrix(apply(X, MARGIN = 2, FUN =convertColumn))}
+  return(quantizer(X))
+}
 
 
 screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, lower.limits = -Inf, upper.limits = Inf, screen_at_which_lambda = NULL, family = "gaussian" ){
@@ -48,7 +65,7 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
   keep = setdiff(keep,index_to_keep)
 
 
-  print(paste0("Amount of higher order basis functions added:",length(keep)))
+  print(paste0("Amount of higher order basis functions added: ",length(keep)))
   if(return_index){
     print(paste0("Current basis size is ", length(index_to_keep) + length(keep)))
 
