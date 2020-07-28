@@ -8,7 +8,15 @@
 #' @import  sl3
 #' @import  glmnet
 #' @import  hal9001
+#' @import  biglasso
+#' @import  bigstatsr
+#' @import  bigmemory
+#' @import  qvalue
 #' @export
+#'
+#'
+#' library(data.table)
+
 HALnet <- R6Class("HALnet", private = list(
   .params = NULL,
   .learners_spec = NULL,
