@@ -44,7 +44,7 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
     keep= union(keep, c(2,1))
   }
 
-  len  = ifelse(is.null(index_to_keep), length(basis_list),length(index_to_keep))
+  len  = length(basis_list)
   keep = setdiff(keep,index_to_keep)
 
 
