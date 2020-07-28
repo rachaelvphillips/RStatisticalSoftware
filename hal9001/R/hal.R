@@ -161,12 +161,13 @@ fit_hal <- function(X,
     }
   }
 
-  if(is.null(smoothness_orders)){
+  #Set smoothness levels for each covariate.
+  if(is.null(smoothness_orders)| !is.numeric(smoothness_orders)){
     smoothness_orders = rep(0,ncol(X))
   }
   else{
     #recycle vector if needed.
-    smoothness_orders = suppressWarnings(smoothness_orders + rep(0,ncol(X)))
+    smoothness_orders = suppressWarnings(round(smoothness_orders) + rep(0,ncol(X)))
   }
   # bookkeeping: get start time of duplicate removal procedure
   time_start <- proc.time()
