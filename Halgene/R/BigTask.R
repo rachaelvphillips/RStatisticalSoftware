@@ -23,8 +23,7 @@
 #'
 
 #
-library(assertthat)
-library(sl3)
+
 sl3_BigTask <- R6Class(
   classname = "sl3_BigTask",
   portable = TRUE,
