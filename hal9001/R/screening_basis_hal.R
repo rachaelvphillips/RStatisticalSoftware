@@ -50,6 +50,8 @@ screen_basis = function(basis_list,X,y, index_to_keep = NULL, return_index = F, 
 
   print(paste0("Screening reduced basis set by ", len - length(keep)))
   if(return_index){
+    print(paste0("Current basis size is ", length(index_to_keep) + length(keep)))
+
     return(keep - max(index_to_keep))
   }
   basis_list = basis_list[keep]
@@ -125,7 +127,7 @@ get_higher_basis= function(reduced_basis_list,max_dim, X, y,screen_each_level = 
 
   if(max_dim <=3){
     result = (c(final,basis_lists[[2]]))
-    if(length(result) > max_num_basis){
+    if(F){
 
       return(final)
     }
@@ -199,10 +201,11 @@ get_higher_basis_up_to_three = function(reduced_basis_list,max_dim, X,y, screen_
   two_way_combos = two_way_combos[,throw,drop=F]
   t = proc.time()
   if(screen_each_level ){
-
+    print(length(way))
     keep = screen_basis(c(reduced_basis_list,way),X,y,1:length(reduced_basis_list), T)
     two_way_combos = two_way_combos[,keep, drop=F]
     way = way[keep]
+    print(length(way))
   }
 
   if(max_dim==2 | ncol(X)==2){
