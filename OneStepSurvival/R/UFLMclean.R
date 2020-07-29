@@ -296,7 +296,7 @@ OneStep <- R6::R6Class("OneStep",
                             }
                             else if(A_cf == "diff"){
                               print("hh")
-                              private$historyNormDiff = c(private$historyNormDiff, private$norm(colMeans(self$computeEICMat("diff"), private$weightsDiff)))
+                              private$historyNormDiff = c(private$historyNormDiff, private$norm(colMeans(self$computeEICMat("diff")), private$weightsDiff))
                               private$historyRiskDiff = c(private$historyRiskDiff, self$getRisk())
                               private$historyPsiDiff = rbind(private$historyPsiDiff, self$computeEstimates("diff"))
                             }
