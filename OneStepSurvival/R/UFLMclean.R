@@ -2,26 +2,14 @@
 
 
 
-
+# OneStep estimator
 #####
-# @param T_tilde Vector of failure/censoring times
-# @param Delta Indicator of whether event was failure
-# @param A Vector of binary treatment assignments
-# @param W Matrix of baseline covariates
-# @param t_max Maximum time point to consider
-# @param n Size of sample
-# @param dNt Matrix (empirical hazard) where dNt[n, t] = 1(Delta_n ==1 & t = T_tilde)
-#meaning that it encodes whether individual n had a failure at time t.
-# @param aliveMat Matrix like above except 1 at time t if the individual is still alive (). Used to compute Risk quickly.
-# @param targetPoints Vector of times which to target
-# @param estimator Estimator object that stores current hazard/survival estimates
-# @param originalEstimator Estimator that contains the intitial superlearner fits
-# @param delta initial step size for onestep algorithm
-# @param weights Weights for the norm of the EIC we wish to solve
-# @param targetFunc Custom parameter of survival curve to target
-# @param gradient Gradient of targetFunc to be used in delta method
-#
-#
+#' @param T_tilde Vector of failure/censoring times
+#' @param Delta Indicator of whether event was failure
+#' @param A Vector of binary treatment assignments
+#' @param W Matrix of baseline covariates
+#' @param t_max Maximum time point to consider
+
 #' @importFrom R6 R6Class
 #' @importFrom ggplot2 ggplot
 #' @importFrom glmnet glmnet
