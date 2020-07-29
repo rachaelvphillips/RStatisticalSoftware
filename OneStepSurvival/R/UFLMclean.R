@@ -308,7 +308,7 @@ OneStep2 <- R6::R6Class("OneStep2",
 
                           },
                           getEICMat = function(A_cf, full = F, A = "obs"){
-                            return(self$computeEICMat(A_cf = A_cf, full = full, A = A)
+                            return(self$computeEICMat(A_cf = A_cf, full = full, A = A))
                             if(full == T){
                               return(self$computeEICMat(A_cf = A_cf, full = full, A = A))
                             }
