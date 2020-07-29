@@ -510,7 +510,7 @@ OneStep <- R6::R6Class("OneStep",
                             }
                             if(A_cf == "diff"){
 
-                              return(self$getCleverMatSpeed(1, t_tgt, A) - self$getCleverMatSpeed(0, t_Tgt, A))
+                              return(self$getCleverMatSpeed(1, t_tgt, A) - self$getCleverMatSpeed(0, t_tgt, A))
                             }
                             est = private$estimator
 
