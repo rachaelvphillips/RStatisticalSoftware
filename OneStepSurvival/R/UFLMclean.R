@@ -36,7 +36,7 @@ OneStep <- R6::R6Class("OneStep",
                           varsInit = list(),
                           debug = list(),
                           T_tilde = NULL,
-                          Delta= NULL,
+                          Delta= 0.00005,
                           A= NULL,
                           W= NULL,
                           t_max= NULL,
@@ -295,7 +295,7 @@ OneStep <- R6::R6Class("OneStep",
                               private$historyPsi0 = rbind(private$historyPsi0, self$computeEstimates(0))
                             }
                             else if(A_cf == "diff"){
-                              print("hh")
+
                               private$historyNormDiff = c(private$historyNormDiff, private$norm(colMeans(self$computeEICMat("diff")), private$weightsDiff))
                               private$historyRiskDiff = c(private$historyRiskDiff, self$getRisk())
                               private$historyPsiDiff = rbind(private$historyPsiDiff, self$computeEstimates("diff"))
@@ -593,7 +593,7 @@ OneStep <- R6::R6Class("OneStep",
                           #Performs one iteration of OneStep targeting the parameter S_1 - S_0 directly.
                           updateDiff = function(){
                             delta = private$delta
-
+                            print(delta)
 
                             ptm <- proc.time()
 
@@ -610,6 +610,7 @@ OneStep <- R6::R6Class("OneStep",
                             weights = private$weightsDiff
                             if(is.null(weights)){
                               private$weightsDiff = inv_EIC_var/sum(inv_EIC_var)
+                              weights = private$weightsDiff
                             }
 
 
@@ -936,7 +937,7 @@ OneStep <- R6::R6Class("OneStep",
                           },
                           #Update function that performs a maximum amount of iterations given by iter with initial delta value delta.
                           #A_cf specifies whether to target S_1, S_0, their difference, or the custom parameter.
-                          update = function(iter = 10, delta = NULL, A_cf = NULL){
+                          update = function(iter = 100, delta = NULL, A_cf = NULL){
                             if(!is.null(delta)){
                               private$delta = delta
                             }
@@ -950,11 +951,9 @@ OneStep <- R6::R6Class("OneStep",
                               if(A_cf =="diff"){
                                 self$updateDiff()
                               }
-                              else if(A_cf == "custom"){
-                                self$updateCustom()
-                              }
+
                               else{
-                                x = self$updateOnce(A_cf=A_cf)
+                                x = self$updateOnce(A_cf=A_cf, maxDelta = tmp)
                               }
 
                               #if(!is.matrix(x)  & is.character(x) & x=="redo"){
@@ -967,13 +966,11 @@ OneStep <- R6::R6Class("OneStep",
                               replicate(iter,helper(A_cf = 0, 2))
 
                             }
-                            else if(A_cf ==1 | A_cf ==0){
+                            else if(A_cf ==1 | A_cf ==0 | A_cf == "diff"){
                               replicate(iter,helper(A_cf = A_cf, 2))
 
                             }
-                            else if(A_cf == "custom"){
-                              replicate(iter,helper(A_cf = "custom", 2))
-                            }
+
 
 
 
@@ -1128,6 +1125,7 @@ OneStep <- R6::R6Class("OneStep",
                           getHistory = function(){
                             dg = data.frame()
                             df = data.frame()
+                            dh = data.frame()
                             if(length(private$historyNorm0)>0){
                               dg = data.frame(cbind((private$historyNorm0), (private$historyRisk0)))
 
