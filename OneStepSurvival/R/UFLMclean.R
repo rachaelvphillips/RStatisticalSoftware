@@ -66,11 +66,14 @@ OneStep <- R6::R6Class("OneStep",
                           historyNorm1 = c(),
                           historyRisk1 = c(),
                           historyNorm0 = c(),
+                          historyNormDiff = c(),
                           historyRisk0 = c(),
+                          historyRiskDiff = c(),
                           historyRisk = c(),
                           historyNorm = c(),
                           historyPsi1 = c(),
                           historyPsi0 = c(),
+                          historyPsiDiff = c(),
                           historys= NULL,
                           converged = c(F,F),
                           lastRisk=Inf,
@@ -290,6 +293,11 @@ OneStep <- R6::R6Class("OneStep",
                               private$historyNorm0 = c(private$historyNorm0, self$getEICNorm(0))
                               private$historyRisk0 = c(private$historyRisk0, self$getRisk())
                               private$historyPsi0 = rbind(private$historyPsi0, self$computeEstimates(0))
+                            }
+                            else if(A_cf == "diff"){
+                              private$historyNormDiff = c(private$historyNormDiff, private$norm(colMeans(self$computeEICMat("diff"), private$weightsDiff)))
+                              private$historyRiskDiff = c(private$historyRiskDiff, self$getRisk())
+                              private$historyPsiDiff = rbind(private$historyPsiDiff, self$computeEstimates("diff"))
                             }
                           },
                           setEICMeanNormFast = function(A_cf){
@@ -613,7 +621,7 @@ OneStep <- R6::R6Class("OneStep",
 
 
                             EIC_norm = private$norm(EIC_mean, weights)
-                            print(paste("hi",weights,EIC_norm,curRisk))
+
 
 
 
@@ -687,7 +695,9 @@ OneStep <- R6::R6Class("OneStep",
                             private$estimator$update(haz = as.matrix(new_haz_1), 1)
 
                             newRisk=self$computeRisk()
-
+                            self$recalculate()
+                            self$updateHistory(1)
+                            self$updateHistory(0)
                             if(newRisk > curRisk){
                               print("Warning: Risk increased!")
 
@@ -1129,11 +1139,17 @@ OneStep <- R6::R6Class("OneStep",
                               colnames(df) = c("EIC_norms_1",  "Risks_1")
                               rownames(df) = 1:length(df[,1])-1
                             }
+                            if(length(private$historyNormDiff)>0){
+                              df = data.frame(cbind((private$historyNormDiff), (private$historyRiskDiff)))
+
+                              colnames(df) = c("EIC_norms_Diff",  "Risks_Diff")
+                              rownames(df) = 1:length(df[,1])-1
+                            }
 
 
 
 
-                            return(list(dg,df, data.frame(private$historyPsi1 ), data.frame(private$historyPsi0)))
+                            return(list(dg,df, data.frame(private$historyPsi1 ), data.frame(private$historyPsi0), data.frame(private$historyPsiDiff)))
                           },
                           plot = function(A_cf, x_lab = "Time after beggining monotherapy (months)", y_lab = "Probability of survival", main = "Counterfactual survival curves for time until death for PD1 vs PDL1 treatments.", fill_lab = "Treatment"){
                             if(A_cf == "diff"){
