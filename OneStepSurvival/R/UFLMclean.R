@@ -173,7 +173,7 @@ OneStep <- R6::R6Class("OneStep",
                             private$create_dNt()
                             private$create_alive()
                             private$create_EIC_indicator()
-                            private$cleverMatLongLst = list(matrix(0, nrow = private$n*t_max, ncol = length(targetPoints)),matrix(0, nrow = private$n*t_max, ncol = length(targetPoints)))
+                            #private$cleverMatLongLst = list(matrix(0, nrow = private$n*t_max, ncol = length(targetPoints)),matrix(0, nrow = private$n*t_max, ncol = length(targetPoints)))
                           },
                           setDelta = function(delta){
                             private$delta = delta
