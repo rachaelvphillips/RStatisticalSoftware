@@ -152,7 +152,7 @@ fit_hal <- function(X = NULL,
         X = formula$X
       }
       if(is.null(Y)){
-        Y = formula$y
+        Y = formula$Y
       }
       basis_list = formula$basis_list
       upper.limits = formula$upper.limits

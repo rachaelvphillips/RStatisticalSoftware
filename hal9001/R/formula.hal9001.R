@@ -105,7 +105,7 @@ formula_hal9001 <- function(form, data, smoothness_orders = NULL, include_zero_o
   form_obj$upper.limits = upper.limits
   form_obj$lower.limits = lower.limits
   form_obj$X = as.matrix(X_orig)
-  form_obj$y = as.vector(y)
+  form_obj$Y = as.vector(y)
   class(form_obj) <- "formula_hal9001"
   return(form_obj)
 }
