@@ -269,7 +269,7 @@ fit_hal <- function(X = NULL,
   time_design_matrix <- proc.time()
 
   # catalog and eliminate duplicates
-  #Weird behavior for non binary
+  # Weird behavior for non binary
   if(is.null(smoothness_orders) | all(smoothness_orders==0)){
     copy_map <- make_copy_map(x_basis)
     unique_columns <- as.numeric(names(copy_map))
