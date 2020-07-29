@@ -105,6 +105,10 @@ basis_of_degree  <- function(x, degree, order_map, include_zero_order) {
 #' @return A \code{list} of basis functions generated for all covariates and
 #'  interaction thereof up to a pre-specified degree.
 enumerate_basis <- function(x, max_degree = NULL, order_map = rep(0, ncol(x)), include_zero_order = F){
+  #Make sure order map consists of integers in [0,10]
+  order_map = round(order_map)
+  order_map[order_map<0] = order_map
+  order_map[order_map>10] = 10
   # if degree is not specified, set it as the full dimensionality of input x
   if (is.null(max_degree)) {
     max_degree <- ncol(x)
