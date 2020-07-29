@@ -31,7 +31,7 @@
 #' @importFrom resample colVars
 #####
 
-OneStep2 <- R6::R6Class("OneStep2",
+OneStep2Old <- R6::R6Class("OneStep2",
                     private = list(
                       varsInit = list(),
                       debug = list(),
