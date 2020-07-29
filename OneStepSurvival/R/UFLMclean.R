@@ -295,6 +295,7 @@ OneStep <- R6::R6Class("OneStep",
                               private$historyPsi0 = rbind(private$historyPsi0, self$computeEstimates(0))
                             }
                             else if(A_cf == "diff"){
+                              print("hh")
                               private$historyNormDiff = c(private$historyNormDiff, private$norm(colMeans(self$computeEICMat("diff"), private$weightsDiff)))
                               private$historyRiskDiff = c(private$historyRiskDiff, self$getRisk())
                               private$historyPsiDiff = rbind(private$historyPsiDiff, self$computeEstimates("diff"))
@@ -696,8 +697,8 @@ OneStep <- R6::R6Class("OneStep",
 
                             newRisk=self$computeRisk()
                             self$recalculate()
-                            self$updateHistory(1)
-                            self$updateHistory(0)
+                            self$updateHistory("diff")
+
                             if(newRisk > curRisk){
                               print("Warning: Risk increased!")
 
@@ -1140,16 +1141,16 @@ OneStep <- R6::R6Class("OneStep",
                               rownames(df) = 1:length(df[,1])-1
                             }
                             if(length(private$historyNormDiff)>0){
-                              df = data.frame(cbind((private$historyNormDiff), (private$historyRiskDiff)))
+                              dh = data.frame(cbind((private$historyNormDiff), (private$historyRiskDiff)))
 
-                              colnames(df) = c("EIC_norms_Diff",  "Risks_Diff")
-                              rownames(df) = 1:length(df[,1])-1
+                              colnames(dh) = c("EIC_norms_Diff",  "Risks_Diff")
+                              rownames(dh) = 1:length(df[,1])-1
                             }
 
 
 
 
-                            return(list(dg,df, data.frame(private$historyPsi1 ), data.frame(private$historyPsi0), data.frame(private$historyPsiDiff)))
+                            return(list(dg,df, dh, data.frame(private$historyPsi1 ), data.frame(private$historyPsi0), data.frame(private$historyPsiDiff)))
                           },
                           plot = function(A_cf, x_lab = "Time after beggining monotherapy (months)", y_lab = "Probability of survival", main = "Counterfactual survival curves for time until death for PD1 vs PDL1 treatments.", fill_lab = "Treatment"){
                             if(A_cf == "diff"){
