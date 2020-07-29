@@ -27,9 +27,9 @@ basis_list_cols <- function(cols, x, order_map, include_zero_order) {
   higher_order_index = intersect(cols, which(order_map > k_deg))
   if(length(higher_order_index)>0){
     first_index = higher_order_index[[1]]
-    neworder_map = order_map
-    neworder_map[first_index] = neworder_map[first_index] -1
-    basis_list <- c(basis_list, basis_list_cols(cols, x, neworder_map, include_zero_order))
+    new_order_map = order_map
+    new_order_map[first_index] = new_order_map[first_index] -1
+    basis_list <- c(basis_list, basis_list_cols(cols, x, new_order_map, include_zero_order))
   }
   # output
   return(basis_list)

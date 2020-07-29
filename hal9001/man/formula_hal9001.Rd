@@ -28,10 +28,10 @@ Each term represents a single main-term/interaction to be included in the model.
  Similarly, "y ~ .^2" will generate all basis functions up to degree 2 for all variables in \code{data}.
  More generally, "y ~ .^max_degree" will construct all basis functions up to degree max_degree.
  One can combine all the notions above. For example,
- "y ~ h(x,w,z) + ." and "y ~ h(x,w,z) + ." will generate all one-way (resp. up to two-way) basis functions
+ "y ~ h(x,w,z) + ." and "y ~ h(x,w,z) + .^2" will generate all one-way (resp. up to two-way) basis functions
  and additionally all the three-way interaction basis functions between variables w,x,z.
 The letters h, i, d specify functional restrictions of each term:
-h represents no constraints on the term,
+h specifies no constraints on the term,
 i specifies that the term should be enforced to be monotonely increasing,
 d specifies that the term should be enforced to be monotonely decreasing.,}
 
