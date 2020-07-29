@@ -40,7 +40,7 @@ BasisMap enumerate_basis(const NumericMatrix& X_sub,
 //' @param X_sub A subset of the columns of X, the original design matrix.
 //' @param cols An index of the columns that were reduced to by sub-setting.
 // [[Rcpp::export]]
-List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, const NumericVector& order_map){
+List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, const IntegerVector& order_map){
 
   BasisMap bmap = enumerate_basis(X_sub, cols);
   List basis_list(bmap.size());
@@ -55,7 +55,7 @@ List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, cons
     // basis["cutoffs"]=it->first;
     NumericVector subCols = it->second;
 
-    NumericVector order (subCols.length());
+    IntegerVector order (subCols.length());
     for(int i=0; i < subCols.length(); i++){
       order[i] = order_map[subCols[i]-1];
     }
@@ -84,14 +84,14 @@ List make_basis_list(const NumericMatrix& X_sub, const NumericVector& cols, cons
 //'
 // [[Rcpp::export]]
 double meets_basis(const NumericMatrix& X, const int row_num,
-                   const IntegerVector& cols, const NumericVector& cutoffs,  const NumericVector orders) {
+                   const IntegerVector& cols, const NumericVector& cutoffs,  const IntegerVector& orders) {
   int p = cols.length();
   double value = 1;
 
 
   for (int i = 0; i<p; i++) {
     double obs = X(row_num,cols[i] - 1); // using 1-indexing for basis columns
-    double order =  orders[i];
+    int order =  orders[i];
     double cutoff = cutoffs[i];
     if(!(obs > cutoff)) {
       return(0);
@@ -129,7 +129,7 @@ void evaluate_basis(const List& basis, const NumericMatrix& X, SpMat& x_basis,
   //intersect
   IntegerVector cols = as<IntegerVector>(basis["cols"]);
   NumericVector cutoffs = as<NumericVector>(basis["cutoffs"]);
-  NumericVector orders =  as<NumericVector>(basis["orders"]);
+  IntegerVector orders =  as<IntegerVector>(basis["orders"]);
   for (int row_num = 0; row_num < n; row_num++) {
     double value = meets_basis(X, row_num, cols, cutoffs,  orders);
     if (value!=0) {

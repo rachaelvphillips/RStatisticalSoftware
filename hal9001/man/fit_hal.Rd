@@ -5,8 +5,8 @@
 \title{HAL: The Highly Adaptive Lasso}
 \usage{
 fit_hal(
-  X,
-  Y,
+  X = NULL,
+  Y = NULL,
   X_unpenalized = NULL,
   max_degree = 3,
   smoothness_orders = NULL,
@@ -27,6 +27,7 @@ fit_hal(
   cv_select = TRUE,
   screen_basis_main_terms = F,
   screen_basis_interactions = F,
+  formula = NULL,
   ...,
   yolo = TRUE
 )

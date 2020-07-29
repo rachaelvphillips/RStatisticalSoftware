@@ -1,0 +1,21 @@
+---
+title: "formula"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+X = cbind(c(1:50),c(1:50),c(1:50))
+colnames(X) = c("y", "x", "z")
+
+
+form = formula_hal9001("y ~ .",smoothness_orders=1,X, bins = 5)
+
+
+form
+
+```

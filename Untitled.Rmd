@@ -5,12 +5,12 @@ output: html_document
 
 
 ```{r}
-getwd()
+devtools::document("hal9001")
 
 ```
 
 ```{r}
 library(devtools)
 library(roxygen2)
-create("Halgene")
+
 ```

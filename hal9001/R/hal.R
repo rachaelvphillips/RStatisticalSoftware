@@ -91,8 +91,8 @@
 #' }
 #'
 #' @export
-fit_hal <- function(X,
-                    Y,
+fit_hal <- function(X = NULL,
+                    Y = NULL,
                     X_unpenalized = NULL,
                     max_degree = 3,
                     smoothness_orders = NULL,
@@ -113,6 +113,7 @@ fit_hal <- function(X,
                     cv_select = TRUE,
                     screen_basis_main_terms = F,
                     screen_basis_interactions = F,
+                    formula = NULL,
                     ...,
                     yolo = TRUE) {
   # check arguments and catch function call
@@ -145,6 +146,23 @@ fit_hal <- function(X,
     )
   )
 
+  if(!is.null(formula)){
+    if(class(formula)=="formula_hal9001"){
+      if(is.null(X)){
+        X = formula$X
+      }
+      if(is.null(Y)){
+        Y = formula$y
+      }
+      basis_list = formula$basis_list
+      upper.limits = formula$upper.limits
+      lower.limits = formula$lower.limits
+    }
+
+  } else{
+    upper.limits = Inf
+    lower.limits = -Inf
+  }
   # cast X to matrix -- and don't start the timer until after
   if (!is.matrix(X)) {
     X <- as.matrix(X)
@@ -166,7 +184,7 @@ fit_hal <- function(X,
 
   #Set smoothness levels for each covariate.
   if(is.null(smoothness_orders)| !is.numeric(smoothness_orders)){
-    smoothness_orders = rep(0,ncol(X))
+    smoothness_orders = round(rep(0,ncol(X)))
   }
   else{
     #recycle vector if needed.
@@ -285,6 +303,8 @@ fit_hal <- function(X,
         family = family,
         lambda = lambda,
         penalty.factor = penalty_factor,
+        upper.limits = upper.limits,
+        lower.limits = lower.limits,
         ...
       )
       lambda_star <- hal_lasso$lambda
@@ -298,6 +318,8 @@ fit_hal <- function(X,
         lambda = lambda,
         foldid = foldid,
         penalty.factor = penalty_factor,
+        upper.limits = upper.limits,
+        lower.limits = lower.limits,
         ...
       )
       if (use_min) {
@@ -362,7 +384,9 @@ fit_hal <- function(X,
         NULL
       },
     unpenalized_covariates = unpenalized_covariates,
-    old_basis_list=old_basis_list
+    old_basis_list=old_basis_list,
+    formula = formula
+
   )
   class(fit) <- "hal9001"
   return(fit)
