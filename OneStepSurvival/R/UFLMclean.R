@@ -1144,7 +1144,7 @@ OneStep <- R6::R6Class("OneStep",
                               dh = data.frame(cbind((private$historyNormDiff), (private$historyRiskDiff)))
 
                               colnames(dh) = c("EIC_norms_Diff",  "Risks_Diff")
-                              rownames(dh) = 1:length(df[,1])-1
+                              rownames(dh) = 1:length(dh[,1])-1
                             }
 
 
