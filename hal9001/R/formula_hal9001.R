@@ -44,6 +44,8 @@ formula_hal9001 <-
       smoothness_orders = round(rep(0, ncol(data) -1))
     } else{
       #recycle vector if needed.
+      smoothness_orders[smoothness_orders<0] = 0
+      smoothness_orders[smoothness_orders>10] = 10
       smoothness_orders = suppressWarnings(round(smoothness_orders) + rep(0, ncol(data)-1))
     }
     order_map = smoothness_orders
