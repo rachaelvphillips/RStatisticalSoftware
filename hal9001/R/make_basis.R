@@ -25,10 +25,10 @@ basis_list_cols <- function(cols, x, order_map, include_zero_order) {
     k_deg = 1
   }
   higher_order_index = intersect(cols, which(order_map > k_deg))
-  if(length(higher_order_index)>0){
+  if(length(higher_order_index) > 0){
     first_index = higher_order_index[[1]]
     new_order_map = order_map
-    new_order_map[first_index] = new_order_map[first_index] -1
+    new_order_map[first_index] = new_order_map[first_index] - 1
     basis_list <- c(basis_list, basis_list_cols(cols, x, new_order_map, include_zero_order))
   }
   # output
@@ -60,7 +60,7 @@ basis_of_degree  <- function(x, degree, order_map, include_zero_order) {
 
   # compute combinations of columns and generate a list of basis functions
   all_cols <- utils::combn(p, degree)
-  all_basis_lists <- apply(all_cols, 2, basis_list_cols, x=x, order_map = order_map, include_zero_order = include_zero_order)
+  all_basis_lists <- apply(all_cols, 2, basis_list_cols, x = x, order_map = order_map, include_zero_order = include_zero_order)
   basis_list <- unlist(all_basis_lists, recursive = FALSE)
 
   # output
