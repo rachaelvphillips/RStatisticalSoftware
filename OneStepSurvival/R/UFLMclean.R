@@ -308,7 +308,7 @@ OneStep2 <- R6::R6Class("OneStep2",
 
                           },
                           getEICMat = function(A_cf, full = F, A = "obs"){
-
+                            return(self$computeEICMat(A_cf = A_cf, full = full, A = A)
                             if(full == T){
                               return(self$computeEICMat(A_cf = A_cf, full = full, A = A))
                             }
@@ -459,6 +459,7 @@ OneStep2 <- R6::R6Class("OneStep2",
 
                           },
                           computeCleverMatWide = function(A_cf, A="obs"){
+
                             return(as.matrix(do.call(cbind,lapply(1:private$t_max, self$getCleverMat, A_cf = A_cf, A = A))))
                           },
 
@@ -488,6 +489,19 @@ OneStep2 <- R6::R6Class("OneStep2",
                           #Returns matrix of clever covariates at a specific target time
                           #Different than above. But using this is faster when constructing the long cleverMat matrix.
                           getCleverMatSpeed = function(A_cf, t_tgt,A=A){
+                            if(A_cf == "custom"){
+                              S1 = self$computeEstimates(1)
+                              S0 =  self$computeEstimates(0)
+                              preds = matrix(c(S0,S1), ncol =2)
+                              grad = apply(X=preds,MARGIN=1, FUN=self$computeGradient)
+                              C0 = self$getCleverMatSpeed(A_cf=0,t_tgt=t_tgt, A=A)*grad[1,]
+                              C1 = self$getCleverMatSpeed(A_cf=1,t_tgt=t_tgt, A=A)*grad[2,]
+                              return(C0+C1)
+                            }
+                            if(A_cf == "diff"){
+
+                              return(self$getCleverMatSpeed(1,, t_tgt, A) - self$getCleverMatSpeed(0, t_Tgt, A))
+                            }
                             est = private$estimator
 
 
