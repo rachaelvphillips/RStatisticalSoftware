@@ -9,15 +9,17 @@ formula_hal9001(
   data,
   smoothness_orders = NULL,
   include_zero_order = F,
-  bins = NULL
+  bins = NULL,
+  generate_lower_degrees = F,
+  exclusive_dot = F
 )
 }
 \arguments{
 \item{formula}{A character string specifying the hal9001 model.
 The format should be of the form "y ~ h(x) + i(w) + d(z) + h(x,w) + h(x,w,z) + .^2"
 where "y" is the outcome and "w,x,y,z" are variables in \code{data}.
-Each term represents a single main-term/interaction to be included in the model.
- For example, h(x), i(x), and d(x) signify that all
+Each term represents a main-term/interaction to be included in the model.
+ For example, h(x), i(x), and d(x) each signify that all
  one-way/main term basis functions of the variable x should be included.
  h(x,w), i(x,w), d(x,w) specifies that all interaction (two-way) basis functions between x and w
  should be included in the model. Similarly, h(x,w,z), i(x,w,z), d(x,w,z) specifies
@@ -43,13 +45,27 @@ Note it should be of length 1 or length ncol(data)-1. Vector recycling will be e
 \item{include_zero_order}{Same as \code{include_zero_order} in function \code{fit_hal}}
 
 \item{bins}{Same as \code{bins} in function \code{fit_hal}}
+
+\item{generate_lower_degrees}{Boolean indicator for whether all lower interaction/main term basis functions should be generated for each
+specified term. If true then "y~h(x,w)" behaves similar to "y~x*w" in \code{formula},
+and if false then it behaves similar to "y~x:y" in \code{formula}.}
+
+\item{exclusive_dot}{Boolean indicator for whether the "." and ".^max_degree" arguments in the formula
+should be treated as exclusive or inclusive the variables already specified in the formula.
+For example, if "y ~ h(x,w) + ." should the "." be interpreted as: add all one-way basis functions
+for the variables remaining in \code{data} not yet specified in the formula (i.e. excluding x,w),
+or: add all one-way basis functions for all variables in the model (including x,w).
+As an example. if \code{exclusive_dot} is false then "y ~ h(x) + .^2" and "y ~ .^2" specify the same formula, i.e. generate all basis functions up to degree 2.
+However, if \code{exclusive_dot} is true, then "y ~ h(x) + .^2"  encodes a different formula than "y ~ .^2".
+Specifically, it means to generate one way basis functions for 'x' and then all basis functions
+up to degree 2 for other variables excluding 'x' in \code{data}. As a result, no interactions will be added for the variable 'x'.}
 }
 \description{
 HAL formula: Formula for specifying functional form of HAL
 }
 \details{
 The function allows users to specify the functional form/model of
-hal9001 similar to \code{\link[glm]{glm}}. The user can specify which interactions to include,
+hal9001 similar to in \code{\link[glm]{glm}}. The user can specify which interactions to include,
 monotonicity constraints, and smoothness constraints.
 The returned formula object can be fed directly into \code{fit_hal}
 and the fit can be run with minimal (no) user input.

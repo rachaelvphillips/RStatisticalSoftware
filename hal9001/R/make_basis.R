@@ -17,7 +17,7 @@ basis_list_cols <- function(cols, x, order_map, include_zero_order) {
   # call Rcpp routine to produce the list of basis functions
 
   basis_list <- make_basis_list(x_sub, cols, order_map)
-  #Also recursively generate lower order smooth basis functions (not)
+  #Also recursively generate lower order smooth basis functions
   if(include_zero_order){
     k_deg = 0
   }

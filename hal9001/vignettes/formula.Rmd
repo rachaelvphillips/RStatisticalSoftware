@@ -8,21 +8,36 @@ knitr::opts_chunk$set(echo = TRUE)
 devtools::document()
 ```
 
-
 ```{r}
+process_star = function(term){
+      pieces = str_split(term, "[*]")[[1]]
 
+      combs = lapply(1: length(pieces), function(i){
+        combos = combn(pieces, i)
+        combos = lapply(1:ncol(combos), function(j){combos[,j]})
+        
+        return(combos)
+       })
+      
+      combs = unlist(combs, recursive = F)
+      print(combs)
+      combs = sapply(combs, function(term){paste0(term, collapse = ":")})
+      return(combs)
+}
+v=process_star("h(x)*h(y)*h(z)")
+
+v
 ```
 
 ```{r}
 
-X = cbind(c(1:50),c(1:50),c(1:50))
-colnames(X) = c("y", "x", "z")
+X = cbind(c(1:50),c(1:50),c(1:50), c(1:50))
+colnames(X) = c("y", "x", "z", "w")
 
 
-form = formula_hal9001("y ~ .^2  ",smoothness_orders=0,X, bins = 4)
+form = formula_hal9001("y ~ h(x)*h(w) ", smoothness_orders=0, X, bins = 4, exclusive_dot = F, generate_lower_degrees = F)
 
 form
-
 ```
 
 
