@@ -35,7 +35,19 @@ Each term represents a main-term/interaction to be included in the model.
 The letters h, i, d specify functional restrictions of each term:
 h specifies no constraints on the term,
 i specifies that the term should be enforced to be monotonely increasing,
-d specifies that the term should be enforced to be monotonely decreasing.,}
+d specifies that the term should be enforced to be monotonely decreasing.
+Familar operations such as the ":, `*` , -" are also supported:
+ ":" is a concatnation operator which maps h(x):h(w) -> h(x,w) or h(x):h(w):h(z) -> h(x,w,z)
+ `*` concatenates and then generates all lower order terms/interactions. For example, h(x)*h(w) -> h(x) + h(w) + h(x,w)
+ or h(x)`*`h(w)`*`h(z) -> h(x) + h(w) + h(z) + h(x,w) + h(x,z) + h(z,w) + h(x,w,z).
+ "-" subtracts/removes the term from the formula. For example, h(x) + h(w) - h(w) -> h(x).
+ Note that the above operations are sensitive to the constraint prefix "h, i, d".
+ For ambigiuous operations such as i(x):h(w), the left most prefix will be used. So i(x):h(w) -> i(x,w) and i(x):h(w):h(z) -> i(x,w,z).
+ The above logic will be applied recursively to `*` so that i(x)`*`h(w)`*`d(z) -> i(x) + h(w) + d(z) + i(x,w) + i(x,z) + h(w,z) + i(x,w,z).
+ Another useful operation is the wild-card "." operation which when used in a specified term will generate
+ all valid terms where the value of "." is iterated over the data matrix. For example,
+ h(x,.) -> h(x,w) + h(x,z) and h(.,.) -> h(x,w) + h(x,z) + h(w,z) and h(x,w,.) -> h(x,w,z) (assuming the covariates are only (x,w,z)).
+ All these operations are compatible with one another, e.g. h(.)*h(x), h(.):h(x)  and h(x) - h(.) are valid and behave as expected.}
 
 \item{data}{A data.frame or named matrix containing the outcome and covariates specified in the formula.}
 
