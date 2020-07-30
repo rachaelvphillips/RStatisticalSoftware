@@ -15,7 +15,7 @@ X = cbind(c(1:50),c(1:50),c(1:50), c(1:50))
 colnames(X) = c("y", "x", "z", "w")
 
 
-form = formula_hal9001("y ~ h(x):h(w)", smoothness_orders=0, X, bins = 4, exclusive_dot = F, generate_lower_degrees = F)
+form = formula_hal9001("y ~ i(.,.)", smoothness_orders=0, X, bins = 4, exclusive_dot = F, generate_lower_degrees = T)
 form
 
 ```
