@@ -6,21 +6,39 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 devtools::document()
+
 ```
 
+
+```{r}
+n = 100
+X = cbind(runif(n,0,10), runif(n,0,10), runif(n,0,10))
+
+colnames(X) = c("x", "w", "z")
+Y = X[,1]^2 + X[,2] - 3*X[,3]
+data =cbind(Y,X)
+colnames(data) = c("y", colnames(X))
+
+form = formula_hal("y ~ .", smoothness_orders=1, data, bins = 4, exclusive_dot = F, generate_lower_degrees = F)
+
+form
+
+```
 
 
 
 ```{r}
+fit = fit(form)
 
-X = cbind(c(1:50),c(1:50),c(1:50), c(1:50))
-colnames(X) = c("y", "x", "z", "w")
-
-
-form = formula_hal9001("y ~ h(x) - h(.)", smoothness_orders=0, X, bins = 4, exclusive_dot = F, generate_lower_degrees = F)
-form
-
+lst = importance(fit,  "x")
+lst
 ```
+
+
+
+
+
+
 
 
 

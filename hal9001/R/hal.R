@@ -183,7 +183,9 @@ fit_hal <- function(X = NULL,
   )
 
   if(!is.null(formula)){
+
     if(class(formula)=="formula_hal9001"){
+
       if(is.null(X)){
         X = formula$X
       }
@@ -193,6 +195,8 @@ fit_hal <- function(X = NULL,
       basis_list = formula$basis_list
       upper.limits = formula$upper.limits
       lower.limits = formula$lower.limits
+      smoothness_orders = formula$smoothness_orders
+
     }
 
   } else{
@@ -271,6 +275,7 @@ fit_hal <- function(X = NULL,
   # catalog and eliminate duplicates
   # Weird behavior for non binary
   if(is.null(smoothness_orders) | all(smoothness_orders==0)){
+    print(" nooo")
     copy_map <- make_copy_map(x_basis)
     unique_columns <- as.numeric(names(copy_map))
     x_basis <- x_basis[, unique_columns]
@@ -384,6 +389,7 @@ fit_hal <- function(X = NULL,
     lasso = time_lasso - time_rm_duplicates,
     total = time_final - time_start
   )
+
 
   # construct output object via lazy S3 list
   # NOTE: hal_lasso and glmnet_lasso slots seem to contain the same information
