@@ -21,12 +21,12 @@ X = cbind(runif(n,0,10), runif(n,0,10), runif(n,0,10))
 colnames(X) = c("x", "w", "z")
 Y = X[,1]^2 + X[,2] - 3*X[,3]
 data =cbind(Y,X)
-colnames(data) = c("y", colnames(X))
+colnames(data) = c("Age", colnames(X))
 ```
 
 
 ```{r}
-form = formula_hal("y ~  h(x)", smoothness_orders=1, data, bins = 4)
+form = formula_hal("Age ~  h(x,w)", smoothness_orders=1, data, bins = 4)
 
 form
 

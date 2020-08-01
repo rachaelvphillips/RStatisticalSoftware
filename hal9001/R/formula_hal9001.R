@@ -455,26 +455,27 @@ formula_hal <-
     basis_list = list()
 
     # Generate basis functions
-    for (i in 1:length(interactions_index)) {
 
+    add_basis = function(i){
       if (length(interactions_index) == 0)
         break
       new_basis = basis_list_cols(interactions_index[[i]], X, order_map, include_zero_order)
       if (monotone_type[i] == "i") {
-        lower.limits = c(lower.limits, rep(0, length(new_basis)))
-        upper.limits = c(upper.limits, rep(Inf, length(new_basis)))
+        lower.limits <<- c(lower.limits, rep(0, length(new_basis)))
+        upper.limits<<-c(upper.limits, rep(Inf, length(new_basis)))
       }
       else if (monotone_type[i] == "d") {
-        lower.limits = c(lower.limits, rep(-Inf, length(new_basis)))
-        upper.limits = c(upper.limits, rep(0, length(new_basis)))
+        lower.limits<<-c(lower.limits, rep(-Inf, length(new_basis)))
+        upper.limits<<-c(upper.limits, rep(0, length(new_basis)))
       }
       else{
-        lower.limits = c(lower.limits, rep(-Inf, length(new_basis)))
-        upper.limits = c(upper.limits, rep(Inf, length(new_basis)))
+        lower.limits<<-c(lower.limits, rep(-Inf, length(new_basis)))
+        upper.limits<<-c(upper.limits, rep(Inf, length(new_basis)))
       }
-      basis_list = c(basis_list, new_basis)
+      basis_list<<-c(basis_list, new_basis)
     }
-    print(length(basis_list))
+    lapply(1:length(interactions_index), add_basis)
+    print("k")
     # add the . and .^max_degree basis functions
     basis_listrest = unlist(
       lapply(
