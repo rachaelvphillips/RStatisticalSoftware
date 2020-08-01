@@ -9,6 +9,10 @@ devtools::document()
 
 ```
 
+```{r}
+
+devtools::install_github("Larsvanderlaan/RStatisticalSoftware/hal9001")
+```
 
 ```{r}
 n = 100
@@ -18,20 +22,58 @@ colnames(X) = c("x", "w", "z")
 Y = X[,1]^2 + X[,2] - 3*X[,3]
 data =cbind(Y,X)
 colnames(data) = c("y", colnames(X))
+```
 
-form = formula_hal("y ~ .", smoothness_orders=1, data, bins = 4, exclusive_dot = F, generate_lower_degrees = F)
+
+```{r}
+form = formula_hal("y ~  h(x)", smoothness_orders=1, data, bins = 4)
 
 form
+
 
 ```
 
 
+```{r}
+
+b=as.vector(py$beta)
+c=Matrix::sparseMatrix(c(1,2), c(1,2), x=b)
+c
+r_to_py(c)
+```
+
+```{python}
+print(r.c)
+import proxmin as p
+import numpy as np
+from scipy.sparse import csc_matrix
+item = p.prox_soft([1,-2,3],step=1, thresh = 0.5)
+
+
+y = np.array([1,5,2,6,7,4,3])
+x = np.array(y/2)
+x1 = np.array([1,1,1,1,1,1,1])
+beta = csc_matrix([1.0, 0.1])
+pred = lambda beta: beta[0]*x + beta[1]*x1
+grad = lambda beta: np.array([-np.mean((y - pred(beta.data))*x), -np.mean((y - pred(beta.data))*x1)])
+
+def step(x, it):
+    return 0.01
+
+def prox_soft(X, step):
+
+    return p.prox_soft(X, step, 0.1)
+
+print(p.adaprox(beta, grad, step, prox = prox_soft))
+print(beta)
+
+```
 
 ```{r}
+
 fit = fit(form)
 
-lst = importance(fit,  "x")
-lst
+summary(fit, vim = T, plot_vim = T)
 ```
 
 

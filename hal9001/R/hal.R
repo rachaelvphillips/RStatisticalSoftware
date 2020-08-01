@@ -200,9 +200,11 @@ fit_hal <- function(X = NULL,
     }
 
   } else{
+    formula = list(formula = paste0("Y ~ .^", max_degree), X = X, Y = Y, smoothness_orders = smoothness_orders)
     upper.limits = Inf
     lower.limits = -Inf
   }
+
   # cast X to matrix -- and don't start the timer until after
   if (!is.matrix(X)) {
     X <- as.matrix(X)

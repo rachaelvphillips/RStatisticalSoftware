@@ -57,7 +57,7 @@
 #' should be treated as exclusive or inclusive the variables already specified in the formula.
 #' For example, if "y ~ h(x,w) + ." should the "." be interpreted as: add all one-way basis functions
 #' for the variables remaining in \code{data} not yet specified in the formula (i.e. excluding x,w),
-#' or: add all one-way basis functions for all variables in the model (including x,w).
+#' or: add all one-way basis functions for all variables in the data (including x,w).
 #' As an example. if \code{exclusive_dot} is false then "y ~ h(x) + .^2" and "y ~ .^2" specify the same formula, i.e. generate all basis functions up to degree 2.
 #' However, if \code{exclusive_dot} is true, then "y ~ h(x) + .^2"  encodes a different formula than "y ~ .^2".
 #' Specifically, it means to generate one way basis functions for 'x' and then all basis functions
@@ -72,8 +72,7 @@
 #' Thus, the custom groups operate exactly as "." except the possible values are restricted to a specific group.
 #'
 #'
-#' @import stringr
-#'  @import ggplot2
+
 #' @export
 
 
@@ -320,7 +319,9 @@ formula_hal <-
 
       return((ind))
     }
+
     interactions_index = lapply(interactions, get_index)
+
     interactions_index = interactions_index[unlist(lapply(interactions_index, function(v) {
       length(v) != 0
     }))]
@@ -455,6 +456,7 @@ formula_hal <-
 
     # Generate basis functions
     for (i in 1:length(interactions_index)) {
+
       if (length(interactions_index) == 0)
         break
       new_basis = basis_list_cols(interactions_index[[i]], X, order_map, include_zero_order)
@@ -472,7 +474,7 @@ formula_hal <-
       }
       basis_list = c(basis_list, new_basis)
     }
-
+    print(length(basis_list))
     # add the . and .^max_degree basis functions
     basis_listrest = unlist(
       lapply(
@@ -544,8 +546,8 @@ fit <- function(x){
   UseMethod("fit",x)
 
 }
-fit.formula_hal9001 = function(formula, ...){
-  fit_hal(formula = formula, yolo=F, ...)
+fit.formula_hal9001 = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
+  fit_hal(formula = formula, family = family, yolo=F, ...)
 }
 
 
@@ -582,11 +584,75 @@ importance <- function(fit, covariate, X = NULL, intervene_on = NULL){
   output$plot = plot
   output$beta_projection = coefs[2]
   output$intercept_projection = coefs[1]
+  output$preds = preds
   return(output)
 }
 
 
 
+summary.hal9001 <- function(fit, lambda_index = NULL, vim = F, plot_vim = F){
+  formula =  fit$formula
+  preds = predict(fit, new_data = formula$X)
+  coefs = fit$coefs
+  if(is.matrix(preds)){
+    preds = as.vector(preds[,lambda_index])
+    coefs = as.vector(coefs[,lambda_index])
+  }
+  X = formula$X
+  Y = formula$Y
+  output = list()
+  if(fit$family == "gaussian"){
+    output$MSE = mean((Y - preds)^2)
+    output$bias = mean(Y - preds)
+    output$abs_bias = mean(abs(Y - preds))
+  }
+  else if(fit$family == "binomial"){
+    output$loglik = (sum(log(preds[Y==0])) + sum(log(preds[Y==1])))/length(Y)
+    output$bias = mean(Y - preds)
+  }
+  output$`R^2` = cor(Y, preds)^2
+  keep = which(coefs!=0)
+  basis_chosen = fit$basis_list[keep]
+  coefs = coefs[keep]
+  col_map = lapply(basis_chosen, function(basis) {basis$cols})
+  main_term_index = which(sapply(col_map, function(cols){length(cols)==1}))
+  col_map_main = as.vector(unlist(col_map[main_term_index]))
+  coefs = coefs[main_term_index]
+  cols_uniq = unique(col_map_main)
+  output$selected_covariates = colnames(X)[cols_uniq]
+  mat = matrix(nrow = ifelse(vim, 4, 1), ncol = length(cols_uniq))
+  colnames(mat) = colnames(X)[cols_uniq]
+  if(vim){
+    rownames(mat) =c("covariate-specific l1 norm","covariate-specific TV", "beta: E[Y|x]~x", "intercept: E[Y|x]~x")
+  }
+  else{
+    rownames(mat) = c("covariate-specific l1 norm")
+  }
+  index = 1
+  for(col in cols_uniq){
 
+    inds = which(col_map_main==col)
+    coefs_for_col = coefs[inds]
+    mat[1,index] = sum(abs(coefs_for_col))
+    index = index + 1
+  }
+  if(vim){
+    vim_measures = lapply(colnames(mat), importance, fit = fit)
+    beta = sapply(vim_measures, function(elem){elem$beta_projection})
+    intercept = sapply(vim_measures, function(elem){elem$intercept_projection})
+    predss = sapply(vim_measures, function(elem){sum(abs(diff(elem$preds)))})
+
+    if(plot_vim){
+      plots = sapply(vim_measures, function(elem){print(elem$plot)})
+    }
+    mat[2,] = predss
+    mat[3,] = beta
+    mat[4,] = intercept
+
+  }
+  output$variable_importance = (mat)
+
+  return(output)
+}
 
 
