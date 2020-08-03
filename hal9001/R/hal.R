@@ -148,6 +148,8 @@ fit_hal <- function(X = NULL,
                     id = NULL,
                     offset = NULL,
                     cv_select = TRUE,
+                    upper.limits = Inf,
+                    lower.limits = -Inf,
 
 
                     ...,
@@ -201,8 +203,7 @@ fit_hal <- function(X = NULL,
 
   } else{
     formula = list(formula = paste0("Y ~ .^", max_degree), X = X, Y = Y, smoothness_orders = smoothness_orders)
-    upper.limits = Inf
-    lower.limits = -Inf
+
   }
 
   # cast X to matrix -- and don't start the timer until after

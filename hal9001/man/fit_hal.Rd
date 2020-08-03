@@ -28,6 +28,8 @@ fit_hal(
   id = NULL,
   offset = NULL,
   cv_select = TRUE,
+  upper.limits = Inf,
+  lower.limits = -Inf,
   ...,
   yolo = TRUE
 )

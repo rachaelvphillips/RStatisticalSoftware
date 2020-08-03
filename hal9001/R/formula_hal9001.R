@@ -458,8 +458,8 @@ formula_hal <-
 
     add_basis = function(i){
       if (length(interactions_index) == 0)
-        break
-      new_basis = basis_list_cols(interactions_index[[i]], X, order_map, include_zero_order)
+        return()
+      new_basis = basis_list_cols_order(interactions_index[[i]], X, order_map, include_zero_order, F)
       if (monotone_type[i] == "i") {
         lower.limits <<- c(lower.limits, rep(0, length(new_basis)))
         upper.limits<<-c(upper.limits, rep(Inf, length(new_basis)))
@@ -475,15 +475,16 @@ formula_hal <-
       basis_list<<-c(basis_list, new_basis)
     }
     lapply(1:length(interactions_index), add_basis)
-    print("k")
+
     # add the . and .^max_degree basis functions
     basis_listrest = unlist(
       lapply(
         dot_argument_combos,
-        basis_list_cols,
+        basis_list_cols_order,
         X,
         order_map,
-        include_zero_order
+        include_zero_order,
+        F
       ),
       recursive = F
     )
