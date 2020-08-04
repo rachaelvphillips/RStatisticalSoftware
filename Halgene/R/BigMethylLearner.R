@@ -75,13 +75,13 @@ HALnet <- R6Class("HALnet", private = list(
     # lambda_selectors_stack = private$list_to_stack(lapply(1:length(lambda_path), make_lambda_selector))
     # hal_learner = make_learner(Pipeline, hal_matrix_learner, lambda_selectors_stack)
       #The above isnt needed if we use Stackfixed.R
-     hal_learner = c(hal_matrix_learner, hal_matrix_learner3)
+     hal_learner = c(hal_matrix_learner)
     cv_hal_learner =  make_learner(Lrnr_hal9001, max_degree = 2, yolo=F,cv_select=T,lower.limits=lower.limits)
     hal_learners = make_learner(Pipeline, make_learner(Lrnr_discretizer, bins = bins), private$list_to_stack(c(hal_learner, cv_hal_learner)))
 
 
     Halgrad_lrnr = make_learner(Lrnr_HALgrad)
-    private$.learners_spec$meta_learners = list(hal_learners, Halgrad_lrnr,make_learner(Lrnr_glm))
+    private$.learners_spec$meta_learners = list(hal_learners, Halgrad_lrnr)
 
 
   },
@@ -393,7 +393,7 @@ public = list(
 
   },
   cv_risk = function(){
-    self$learners_spec$sl3_superlearner$learner_fits$`CV_Pipeline(BigLrnr_screener_corP_0.1_5_3e+05->Pipeline(BigLrnr_biglasso_1->Stack))`$cv_risk(loss_squared_error)
+    self$learners_spec$sl3_superlearner$learner_fits[[1]]$cv_risk(loss_squared_error)
 
   },
   validate = function(task = NULL, CV_pred = F){
