@@ -16,7 +16,7 @@
 #' @export
 #'
 #'
-#' library(data.table)
+
 
 HALnet <- R6Class("HALnet", private = list(
   .params = NULL,
