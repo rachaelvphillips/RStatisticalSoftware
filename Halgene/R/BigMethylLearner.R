@@ -12,6 +12,7 @@
 #' @import  bigstatsr
 #' @import  bigmemory
 #' @import  qvalue
+#' @import  sl3
 #' @export
 #'
 #'

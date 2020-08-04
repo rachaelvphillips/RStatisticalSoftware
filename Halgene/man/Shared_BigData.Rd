@@ -26,6 +26,7 @@ Mostly to deal with alloc.col shallow copies, but also nice to have a bit more a
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-new"></a>}}
+\if{latex}{\out{\hypertarget{method-new}{}}}
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Shared_BigData$new(data, bm, force_copy = TRUE, ...)}\if{html}{\out{</div>}}
@@ -34,6 +35,7 @@ Mostly to deal with alloc.col shallow copies, but also nice to have a bit more a
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-get_data"></a>}}
+\if{latex}{\out{\hypertarget{method-get_data}{}}}
 \subsection{Method \code{get_data()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Shared_BigData$get_data(rows = NULL, columns)}\if{html}{\out{</div>}}
@@ -42,6 +44,7 @@ Mostly to deal with alloc.col shallow copies, but also nice to have a bit more a
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-add_columns"></a>}}
+\if{latex}{\out{\hypertarget{method-add_columns}{}}}
 \subsection{Method \code{add_columns()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Shared_BigData$add_columns(
@@ -54,6 +57,7 @@ Mostly to deal with alloc.col shallow copies, but also nice to have a bit more a
 }
 \if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-clone"></a>}}
+\if{latex}{\out{\hypertarget{method-clone}{}}}
 \subsection{Method \code{clone()}}{
 The objects of this class are cloneable with this method.
 \subsection{Usage}{

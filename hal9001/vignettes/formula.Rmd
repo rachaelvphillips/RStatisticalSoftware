@@ -24,7 +24,7 @@ colnames(data) = c("y", colnames(X))
 
 
 ```{r}
-form = formula_hal("y ~  .", smoothness_orders=2, data, bins = 3)
+form = formula_hal("y ~  .^2", smoothness_orders=1, data, bins = 3)
 
 form
 

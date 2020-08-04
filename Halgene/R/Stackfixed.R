@@ -23,7 +23,7 @@
 #'   \item{\code{...}}{Parameters should be individual \code{Learner}s.}
 #' }
 #'
-#' @template common_parameters
+
 #
 Stack <- R6Class(
   classname = "Stack",
@@ -54,9 +54,9 @@ Stack <- R6Class(
       }
       private$.learner_names <- learner_names
       params <- list(learners = learners)
-      
+
       learners_trained <- sapply(learners, `[[`, "is_trained")
-      
+
       if (all(learners_trained)) {
         # we've been passed a list of existing fits so we're already fit
         private$.fit_object <- list(
@@ -66,7 +66,7 @@ Stack <- R6Class(
         )
         private$.training_task <- learners[[1]]$training_task
       }
-      
+
       super$initialize(params = params)
     },
     print = function() {
@@ -82,7 +82,7 @@ Stack <- R6Class(
       private$.fit_object$is_error <- is_error
     }
   ),
-  
+
   active = list(
     name = function() {
       # learners = self$params$learners
@@ -96,11 +96,11 @@ Stack <- R6Class(
       return(result)
     }
   ),
-  
+
   private = list(
     # modified names of learners
     .learner_names = NULL,
-    
+
     .train_sublearners = function(task) {
       # generate training subtasks
       learners <- self$params$learners
@@ -122,7 +122,7 @@ Stack <- R6Class(
       })
       learner_errors <- trained_sublearners[is_error]
       errored_learners <- self$params$learners[is_error]
-      
+
       for (i in seq_along(errored_learners)) {
         message <- learner_errors[[i]]
         learner <- errored_learners[[i]]
@@ -134,10 +134,10 @@ Stack <- R6Class(
       if (all(is_error)) {
         stop("All learners in stack have failed")
       }
-      
+
       learner_names <- private$.learner_names[!is_error]
       names(trained_sublearners) <- learner_names
-      
+
       fit_object <- list(
         learner_fits = trained_sublearners,
         learner_errors = learner_errors, is_error = is_error
@@ -151,36 +151,36 @@ Stack <- R6Class(
       learner_names <- private$.learner_names[!is_error]
       n_to_pred <- task$nrow
       n_learners <- length(learner_names)
-      
-      
-      
-      
+
+
+
+
       ## Cannot use := to add columns to a null data.table (no columns),
       ## hence we have to first seed an initial column, then delete it later
       learner_preds <- data.table::data.table(
         ..delete = rep(NA, n_to_pred)
       )
-      
-      
-      
+
+
+
       for (i in seq_along(learner_fits)) {
         current_fit <- learner_fits[[i]]
-        
+
         current_preds <- rep(NA, n_to_pred)
         try({
           current_preds <- current_fit$base_predict(task)
         })
-        
-        
+
+
         pred_names <- private$.name_preds(learner_names[i], current_preds)
-        
-        
+
+
         set(learner_preds, j = pred_names, value = as.data.table(current_preds))
         invisible(NULL)
       }
-      
+
       learner_preds$..delete <- NULL
-      
+
       return(learner_preds)
     },
     .name_preds = function(learner_name, preds) {
@@ -194,7 +194,7 @@ Stack <- R6Class(
         current_names <- paste0(current_names, "_", prednames)
         stopifnot(length(current_names) == safe_dim(preds)[2])
       }
-      
+
       return(current_names)
     }
   )
