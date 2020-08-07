@@ -19,7 +19,7 @@ Lrnr_screener_dist_cor <- R6Class(
   inherit = Lrnr_base, portable = TRUE,
   class = TRUE,
   public = list(
-    initialize = function(method = "backward_selection", num_to_select =30, cutoff = 0.01, verbose = F,...) {
+    initialize = function(method = "backward_selection", num_to_select =30, cutoff = 0.01, min_proportion_reduce =0, verbose = F,exact_algorithm = F,...) {
       params <- args_to_list()
       super$initialize(params = params, ...)
     }
@@ -39,15 +39,16 @@ Lrnr_screener_dist_cor <- R6Class(
       verb = params$verbose
       fast_analysis = F
       cutoff = params$cutoff
-
+      min_proportion_reduce = params$min_proportion_reduce
+      exact_algorithm = params$exact_algorithm
       if(method == "forward_selection"){
 
 
-        output = dcor_screen(as.data.frame(task$X), task$Y, num_to_select, search_set = 1:ncol(task$X), fast_analysis = F, perform_batch_forward_selection_based_filtering = F, perform_clustered_backward_selection = F, exact_algorithm = F, filter_search_set_to = 10000,  compute_pdcor_by_n_forward = 50, compute_pdcor_by_n_backward = 50, algorithm = method,  max_iterations = ifelse(algorithm=="forward_selection",  num_to_select, 25), 1,  dcor_retain_top_n = 1, pdcor_retain_top_n=1, rejection_dcor_cutoff = ifelse(ncol(task$X) >= 2*num_to_select, cutoff, 0), rejection_pdcor_cutoff =  ifelse(ncol(task$X) >= 2*num_to_select, cutoff, 0), increase_cutoff_by = 0, min_proportion_reduce = ifelse(ncol(task$X)>200,0.05,0), backward_selection_maximum_cluster_size= ifelse(fast_analysis,5,3), forward_selection_maximum_number_clusters = round(num_to_select/2), reduce_by_n_clusters = 1, cluster_by_dcor = F, recompute_clusters  = T, verbose = verb)
+        output = dcor_screen(as.data.frame(task$X), task$Y, num_to_select, search_set = 1:ncol(task$X), fast_analysis = F, perform_batch_forward_selection_based_filtering = F, perform_clustered_backward_selection = F, exact_algorithm = exact_algorithm, filter_search_set_to = 10000,  compute_pdcor_by_n_forward = 50, compute_pdcor_by_n_backward = 50, algorithm = method,  max_iterations = ifelse(algorithm=="forward_selection",  num_to_select, 25), 1,  dcor_retain_top_n = 1, pdcor_retain_top_n=1, rejection_dcor_cutoff = ifelse(ncol(task$X) >= 2*num_to_select, cutoff, 0), rejection_pdcor_cutoff =  ifelse(ncol(task$X) >= 2*num_to_select, cutoff, 0), increase_cutoff_by = 0, min_proportion_reduce = min_proportion_reduce, backward_selection_maximum_cluster_size= ifelse(fast_analysis,5,3), forward_selection_maximum_number_clusters = round(num_to_select/2), reduce_by_n_clusters = 1, cluster_by_dcor = F, recompute_clusters  = T, verbose = verb)
         }
         else if(method == "backward_selection"){
 
-          output  = dcor_screen(as.data.frame(task$X), task$Y, num_to_select, search_set = 1:ncol(task$X), fast_analysis = F, perform_batch_forward_selection_based_filtering = T, perform_clustered_backward_selection = T, exact_algorithm = F, filter_search_set_to = 10000,  compute_pdcor_by_n_forward = 50, compute_pdcor_by_n_backward = 50, algorithm = "backward_selection", max_iterations = ifelse(algorithm=="forward_selection",  num_to_select, 25), selection_batch_size = 1,  dcor_retain_top_n = 5, pdcor_retain_top_n=1, rejection_dcor_cutoff = cutoff, rejection_pdcor_cutoff = cutoff, increase_cutoff_by = 0, min_proportion_reduce = ifelse(fast_analysis,0.05, ifelse(ncol(task$X) >= 2*num_to_select, 0.05, 0)), backward_selection_maximum_cluster_size= ifelse(fast_analysis,5,3), forward_selection_maximum_number_clusters = round(num_to_select/2), reduce_by_n_clusters = 1, cluster_by_dcor = F, recompute_clusters  = T, verbose = verb)
+          output  = dcor_screen(as.data.frame(task$X), task$Y, num_to_select, search_set = 1:ncol(task$X), fast_analysis = F, perform_batch_forward_selection_based_filtering = T, perform_clustered_backward_selection = T, exact_algorithm = exact_algorithm, filter_search_set_to = 10000,  compute_pdcor_by_n_forward = 50, compute_pdcor_by_n_backward = 50, algorithm = "backward_selection", max_iterations = ifelse(algorithm=="forward_selection",  num_to_select, 25), selection_batch_size = 1,  dcor_retain_top_n = 5, pdcor_retain_top_n=1, rejection_dcor_cutoff = cutoff, rejection_pdcor_cutoff = cutoff, increase_cutoff_by = 0, min_proportion_reduce = min_proportion_reduce, backward_selection_maximum_cluster_size= ifelse(fast_analysis,5,3), forward_selection_maximum_number_clusters = round(num_to_select/2), reduce_by_n_clusters = 1, cluster_by_dcor = F, recompute_clusters  = T, verbose = verb)
           }
       selected = output$final_selected_names
       fit_object = list()

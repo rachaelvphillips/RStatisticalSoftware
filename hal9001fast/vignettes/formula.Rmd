@@ -1,0 +1,52 @@
+---
+title: "formula"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+devtools::document()
+
+```
+
+
+
+
+```{r}
+n = 10
+X = cbind(rbinom(n,1,0.5))
+
+colnames(X) = c("x")
+Y = X[,1]^2 
+data =cbind(Y,X)
+colnames(data) = c("y", colnames(X))
+```
+
+
+```{r}
+form = formula_hal("y ~  h(x)", smoothness_orders = , data, bins = NULL)
+
+form
+
+
+```
+
+
+
+
+
+```{r}
+n=10
+x = runif(n,0,1)
+z = runif(n,0,1)
+y = 
+```
+
+
+
+
+
+
+
+
+
