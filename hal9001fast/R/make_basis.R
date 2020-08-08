@@ -135,6 +135,9 @@ basis_of_degree  <- function(x, degree, order_map, include_zero_order, include_l
 #' @return A \code{list} of basis functions generated for all covariates and
 #'  interaction thereof up to a pre-specified degree.
 enumerate_basis <- function(x, max_degree = NULL, order_map = rep(0, ncol(x)), include_zero_order = F, include_lower_order = F){
+  if(!is.matrix(x)){
+    x <- as.matrix(x)
+  }
   #Make sure order map consists of integers in [0,10]
   order_map = round(order_map)
   order_map[order_map<0] = 0
@@ -150,11 +153,19 @@ enumerate_basis <- function(x, max_degree = NULL, order_map = rep(0, ncol(x)), i
   # generate all basis functions up to the specified degree
   all_bases <- lapply(degrees, function(degree) basis_of_degree(x, degree, order_map, include_zero_order, include_lower_order))
   all_bases <- unlist(all_bases, recursive = FALSE)
-  if(max_degree >1){
-    edge_basis <- lapply(1:max_degree, function(degree) basis_of_degree(matrix(apply(x,2,min),nrow=1), degree, order_map, include_zero_order, include_lower_order = T))
-    edge_basis <-  unlist(edge_basis, recursive = FALSE)
-    all_bases <- c(edge_basis, all_bases)
+  edge_basis = c()
+  if(any(order_map>0)){
+    if(max_degree >1 ){
+      edge_basis <- unlist(lapply(2:max_degree, function(degree) basis_of_degree(matrix(apply(x,2,min),nrow=1), degree, order_map, include_zero_order, include_lower_order = T)),recursive = F)
+    }
+    edge_basis <- union(edge_basis, basis_of_degree(matrix(apply(x,2,min),nrow=1), 1, sapply(order_map-1,max,1) , include_zero_order, include_lower_order = T))
   }
+
+
+
+
+  all_bases <- union(edge_basis, all_bases)
+
 
   basis_list <- all_bases
 

@@ -10,49 +10,100 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 devtools::document()
-
 ```
 
 
+```{r}
+library(qlcMatrix)
+n=1000
+X = as.matrix(cbind(replicate(10, runif(n,1,2))))
+X = data.frame(X)
+trueY = 2*(rowMeans(X[,1:10,drop=F]))^2
+Y = trueY  + rnorm(n,0,1.2)
+X=as.matrix(X)
+blst = enumerate_basis(X,2)
+x_bas = make_design_matrix(X,blst)
+```
 
+
+```{r}
+t=proc.time()
+#f=corSparse(x_bas,Matrix(Y,ncol=1,sparse=T))
+t-proc.time()
+
+t=proc.time()
+#g=apply(x_bas,2,function(x,y){if(sd(x)==0){return(0)}; cor(x,y)},Y)
+t-proc.time()
+
+
+cor.test(x_bas[,1],Y)
+y=Y
+t_stat = sapply(cor(x_bas[,1],Y), function(c){c/sqrt((1-c^2)/(length(y)-2))})
+  pvals = sapply(t_stat, function(t){2*pt(t, length(y)-2, lower=T)})
+  
+  t_stat
+  pvals
+```
 
 
 
 ```{r}
 library(sl3)
-n=2000
-X = as.matrix(cbind(replicate(30, runif(n,1,2))))
+n=5000
+X = as.matrix(cbind(replicate(10, runif(n,1,2))))
 X = data.frame(X)
-Y = 2*rowMeans((X[,1:10,drop=F]))^3 + rowMeans(X[,10:15,drop=F]-1)^2 + rnorm(n,0,1)
+trueY = 2*(rowMeans(X[,1:10,drop=F]))^2
+Y = trueY  + rnorm(n,0,1.2)
 
 data = data.frame(cbind(X,Y))
 colnames(data) = c(colnames(X), "y")
 task = make_sl3_Task(data, covariates = colnames(X), outcome = "y")
 
-lrnr <- make_learner(Lrnr_hal9001fast, max_degree =3, cv_select = T,bins=200,  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F)
+lrnr <- make_learner(Lrnr_hal9001fast, max_degree = 3, cv_select = F,bins=500,  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F, smoothness_orders=1, max_total_basis = 200000)
+tmp = lrnr$train(task)
+lambda = tmp$fit_object$fit$lambda_star
+lrnr <- make_learner(Lrnr_hal9001fast, max_degree = 3, cv_select = F,bins=500,  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F, lambda = lambda, smoothness_orders = 1)
 #lrnr <- lrnr$train(task)
-
+cv_hal = make_learner(Pipeline, Lrnr_cv$new(lrnr), Lrnr_cv_selector$new())
 ```
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+```{r, include=F}
+library(delayed)
+library(sl3)
+library(origami)
+
+cv_hal = delayed_learner_train(cv_hal, task)
+sched <- Scheduler$new(cv_hal, FutureJob, nworkers = 4, verbose = T)
+cv_fit <- sched$compute()
+cv_fit
+```
 
 ```{r}
 
-f = formula_hal("y~.",data, bins = 10)
-print(f,T)
+preds= cv_fit$predict()
+mean((preds -trueY)^2)
+mean((preds - Y )^2)
+plot(preds,trueY )
+plot(preds,Y)
+plot(Y,trueY)
 ```
 
 
 
-
-
-
-
-```{r}
-lrnr$fit_object$fit$basis_list
-```
 
 ```{r}
 s=energy::dcorT.test(Y,Y)

@@ -1,13 +1,19 @@
 
-
+#' @importFrom qlcMatrix corSparse
 #' @export
 screen_basis_by_cor = function(basis_list, X, y, cutoff = 0.2, keep = c()){
-  x_basis = make_design_matrix(X, basis_list)
-  pvals = (apply(x_basis,2,function(x,y){
 
-    if(sd(x)==0){return(1)}
-    return(cor.test(x,y)$p.value)
-  },y=Y))
+  x_basis = make_design_matrix(X, basis_list)
+  cors = qlcMatrix::corSparse(x_basis,Matrix(y,ncol=1,sparse=T))
+  cors[is.na(cors)] = 0
+
+  t_stat = sapply(cors, function(c){c/sqrt((1-c^2)/(length(y)-2))})
+  pvals = sapply(t_stat, function(t){2*pt(-abs(t), length(y)-2)})
+
+  # pvals = (apply(x_basis,2,function(x,y){
+  #   if(sd(x)==0){return(1)}
+  #   return(cor.test(x,y)$p.value)
+  # },y=y))
   print(quantile(pvals))
   keep = union(which(pvals <=cutoff), keep)
   return(list(basis_list[keep],x_basis[,keep] ))
@@ -46,7 +52,9 @@ screen_basis = function(basis_list,
                         screen_at_which_lambda = NULL,
                         family = "gaussian") {
   print(paste0("Current basis size is ", length(basis_list)))
+
   X = as.matrix(X)
+
   screen_by_cor_out = screen_basis_by_cor(basis_list,X,y, keep = index_to_keep)
   x_basis = screen_by_cor_out[[2]]
   basis_list = screen_by_cor_out[[1]]
@@ -105,7 +113,7 @@ screen_basis = function(basis_list,
   keep = setdiff(keep, index_to_keep)
 
 
-  print(paste0("Amount of higher order basis functions added: ", length(keep)))
+  print(paste0("Amount of basis functions retained: ", length(keep)))
   if (return_index) {
     print(paste0(
       "Current basis size is ",
@@ -180,7 +188,7 @@ get_higher_basis = function(reduced_basis_list,
                             X,
                             y,
                             screen_each_level = F,
-                            max_num_basis = Inf) {
+                            max_num_two_way = Inf) {
   if (length(reduced_basis_list) == 0) {
     return(NULL)
   }
@@ -188,7 +196,7 @@ get_higher_basis = function(reduced_basis_list,
     return(reduced_basis_list)
   }
 
-  basis_lists = get_higher_basis_up_to_three(reduced_basis_list, max_dim, X, y, screen_each_level, max_num_basis)
+  basis_lists = get_higher_basis_up_to_three(reduced_basis_list, max_dim, X, y, screen_each_level, max_num_two_way)
 
 
 
@@ -202,6 +210,7 @@ get_higher_basis = function(reduced_basis_list,
       return(final)
     }
     else{
+
       return(result)
     }
   }
@@ -274,12 +283,19 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
   way = way[throw]
   two_way_combos = two_way_combos[, throw, drop = F]
   t = proc.time()
-  print(paste0("twoways: ", length(way)))
-  if(length(way) >max_basis){
-    screen_each_level=T
+  print(paste0("twoways (pre cor screening): ", length(way)))
+
+  way = screen_basis_by_cor(way,X,y,0.2)[[1]]
+  print(paste0("twoways (after cor screening): ", length(way)))
+
+  if(length(way) > max_basis){
+    #screen_each_level=T
+    x_bas = make_design_matrix(X, way)
+    cor_vals = apply(x_bas, 2, cor, y)
+    way = way[which(rank(-abs(cor_vals))<= max_basis)]
   }
   if (screen_each_level) {
-    print(length(way))
+
 
     keep = screen_basis(basis_list=c(reduced_basis_list, way),
                         X=X,
@@ -289,7 +305,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
 
     two_way_combos = two_way_combos[, keep, drop = F]
     way = way[keep]
-    print(length(way))
+
   }
 
   if (max_dim == 2 | ncol(X) == 2) {
@@ -326,9 +342,10 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
   })
 
   res = res[!sapply(res, is.null)]
-  print(paste0("three: ", length(res)))
+
 
   if (length(res) == 0) {
+    print(paste0("three: ",0))
     return(list(way, list()))
   }
   keeper = unlist(sapply(res, function(v) {
@@ -336,6 +353,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
   }))
   res = res[keeper]
   res = as.matrix(do.call(cbind, res))
+  print(paste0("three: ", ncol(res)))
   new_basis = apply(res, 2, getBasis)
 
 

@@ -151,13 +151,12 @@ fit_halfast <- function(X = NULL,
                     upper.limits = ifelse(!is.null(Y), max(Y)-min(Y), Inf),
                     lower.limits = ifelse(!is.null(Y), min(Y)-max(Y), -Inf),
                     screen_cor_pval = NULL,
-                    max_num_basis = 25000,
+                    max_num_two_way = 50000,
+                    max_total_basis = 250000,
                     verbose = T,
-
-
-
                     ...,
                     yolo = F) {
+
   # check arguments and catch function call
   call <- match.call(expand.dots = TRUE)
   fit_type <- match.arg(fit_type)
@@ -255,7 +254,7 @@ fit_halfast <- function(X = NULL,
         basis_list_one_way <- enumerate_basis(X_quant, 1, smoothness_orders, include_order_zero)
 
       }
-      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X=X_quant, y=Y,screen_each_level = screen_basis_interactions, max_num_basis = max_num_basis)
+      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X=X_quant, y=Y,screen_each_level = screen_basis_interactions, max_num_two_way = max_num_two_way)
     }
     else{
       basis_list <- enumerate_basis(X_quant, max_degree, smoothness_orders, include_order_zero)
@@ -265,7 +264,7 @@ fit_halfast <- function(X = NULL,
   }
 
   if(verbose){
-    print(paste0("Current basis function amount: ", length(basis_list)))
+    print(paste0("Current basis size: ", length(basis_list)))
   }
 
 
@@ -296,12 +295,21 @@ fit_halfast <- function(X = NULL,
   if (!is.null(reduce_basis) && is.numeric(reduce_basis)) {
     reduced_basis_map <- make_reduced_basis_map(x_basis, reduce_basis)
     if(verbose){
-      print(paste0("Reduce basis reduced by: ", length(basis_list) - length(reduced_basis_map), " basis functions."))
+      print(paste0("Reduce basis removed: ", length(basis_list) - length(reduced_basis_map), " basis functions."))
     }
     x_basis <- x_basis[, reduced_basis_map]
 
     basis_list <- basis_list[reduced_basis_map]
   }
+
+  if(length(basis_list) > max_total_basis){
+    print(paste0("Number of basis functions exceeded ",max_total_basis, ". Performing correlation based filtering." ))
+    cor_vals <- qlcMatrix::corSparse(x_basis,Matrix(Y,ncol=1,sparse=T))
+    keep = which(rank(-abs(cor_vals)) <= max_total_basis)
+    basis_list <- basis_list[keep]
+    x_basis <- x_basis[keep]
+  }
+
 
 
 
@@ -466,7 +474,7 @@ fit_halfast <- function(X = NULL,
         NULL
       },
     unpenalized_covariates = unpenalized_covariates,
-    old_basis_list=old_basis_list,
+
     formula = formula
 
   )

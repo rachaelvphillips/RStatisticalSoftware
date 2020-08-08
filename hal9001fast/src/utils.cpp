@@ -59,6 +59,8 @@ NumericVector calc_pnz(const MSpMat& X) {
   return(pnz);
 }
 
+
+
 // [[Rcpp::export]]
 NumericVector get_pnz(const MSpMat& X) {
   IntegerVector nz = non_zeros(X);

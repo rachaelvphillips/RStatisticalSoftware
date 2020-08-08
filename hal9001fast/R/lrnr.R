@@ -5,7 +5,7 @@ Lrnr_hal9001fast <- R6::R6Class(
   public = list(
     initialize = function(max_degree = 3,
                           formula = NULL,
-                          reduce_basis = function(n){min(1/sqrt(n)/2,50/n)},
+                          reduce_basis = function(n){1/sqrt(n)/2},
                           keep_min = 3,
                           dcor_pval = 0.25,
                           cor_pval = 0.15,
@@ -16,6 +16,8 @@ Lrnr_hal9001fast <- R6::R6Class(
                           lambda = NULL,
                           cv_select=F,
                           keep_cov = NULL,
+                          max_num_two_way = 75000,
+                          max_total_basis = 250000,
 
 
                           ...) {
@@ -67,16 +69,19 @@ Lrnr_hal9001fast <- R6::R6Class(
         print(remove)
         print(paste0("Number of covariates removed: ", length(remove)))
         #Effectively remove columns
-        if(is.vector(smoothness_orders)){
+        if(length(smoothness_orders)>1){
           smoothness_orders = smoothness_orders[-remove]
 
         }
-         X = X[,-remove,drop=F]
+        if(length(remove)>0){
+          X = X[,-remove,drop=F]
+
+        }
       }
       else{
         remove = NULL
       }
-
+      print(dim(X))
       # perform hal fit
       if(!is.null(formula)){
         #Use formula spec if available
@@ -84,13 +89,19 @@ Lrnr_hal9001fast <- R6::R6Class(
         colnames(data) = c(colnames(X), task$nodes$outcome)
         formula <- formula_hal(formula$formula, data, smoothness_orders, bins, custom_group = formula$custom_group)
 
-        fit <- fit_halfast(formula = formula, screen_cor_pval = params$cor_pval, family = task$outcome_type$glm_family(),  lambda = params$lambda, cv_select = cv_select,reduce_basis = reduce_basis)
+        fit <- fit_halfast(formula = formula, screen_cor_pval = params$cor_pval, family = task$outcome_type$glm_family(),  lambda = params$lambda,
+                           cv_select = cv_select,reduce_basis = reduce_basis,
+                           max_num_two_way = params$max_num_two_way,
+                           max_total_basis = params$max_total_basis,)
       }
       else{
 
         fit <- fit_halfast(X = X, Y=Y, max_degree = params$max_degree, smoothness_orders=smoothness_orders, screen_cor_pval = params$cor_pval, family = task$outcome_type$glm_family(),
                            screen_basis_main_terms = params$screen_basis_main_terms,
-                           screen_basis_interactions = params$screen_basis_interactions,  lambda = params$lambda, reduce_basis = reduce_basis, cv_select = cv_select, num_bins = bins)
+                           screen_basis_interactions = params$screen_basis_interactions,
+                           lambda = params$lambda, reduce_basis = reduce_basis, cv_select = cv_select, num_bins = bins,
+                           max_num_two_way = params$max_num_two_way,
+                           max_total_basis = params$max_total_basis,)
 
       }
 
@@ -104,14 +115,17 @@ Lrnr_hal9001fast <- R6::R6Class(
       return(fit_object)
     },
     .predict = function(task = NULL) {
+      X = task$X
       fit <- self$fit_object$fit
       remove <- self$fit_object$remove
-      if(!is.null(remove)){
+
+      if(!is.null(remove) & length(remove)>0){
         X = as.matrix(X)
-        X[,remove] =0
+        X = X[,-remove]
       }
 
-      predictions = predict(fit, new_data = X)
+      predictions = predict(fit, new_data = as.matrix(X))
+
       return(predictions)
     },
     .required_packages = c("hal9001fast")

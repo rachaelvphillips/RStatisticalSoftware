@@ -31,7 +31,8 @@ fit_halfast(
   upper.limits = ifelse(!is.null(Y), max(Y) - min(Y), Inf),
   lower.limits = ifelse(!is.null(Y), min(Y) - max(Y), -Inf),
   screen_cor_pval = NULL,
-  max_num_basis = 25000,
+  max_num_two_way = 50000,
+  max_total_basis = 2e+05,
   verbose = T,
   ...,
   yolo = F
