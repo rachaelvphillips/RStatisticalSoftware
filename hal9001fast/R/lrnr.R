@@ -1,17 +1,23 @@
 
-Lrnr_hal9001 <- R6::R6Class(
-  classname = "Lrnr_hal9001", inherit = Lrnr_base,
+Lrnr_hal9001fast <- R6::R6Class(
+  classname = "Lrnr_hal9001fast", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
     initialize = function(max_degree = 3,
-                          fit_type = "glmnet",
-                          n_folds = 10,
-                          use_min = TRUE,
-                          reduce_basis = NULL,
-                          return_lasso = TRUE,
-                          return_x_basis = FALSE,
-                          basis_list = NULL,
-                          cv_select = TRUE,
+                          formula = NULL,
+                          reduce_basis = function(n){min(1/sqrt(n)/2,50/n)},
+                          keep_min = 3,
+                          dcor_pval = 0.25,
+                          cor_pval = 0.15,
+                          smoothness_orders = 0,
+                          bins = function(n){max(50,min(n/10,500))},
+                          screen_basis_main_terms = F,
+                          screen_basis_interactions = F,
+                          lambda = NULL,
+                          cv_select=F,
+                          keep_cov = NULL,
+
+
                           ...) {
       params <- args_to_list()
       super$initialize(params = params, ...)
@@ -21,33 +27,93 @@ Lrnr_hal9001 <- R6::R6Class(
     .properties = c("continuous", "binomial"),
 
     .train = function(task) {
-      args <- self$params
+      params <- self$params
+      X <- as.matrix(task$X)
+      Y <- as.vector(task$Y)
+      formula <- params$formula
+      smoothness_orders <- params$smoothness_orders
+      if(length(smoothness_orders)>1){
+        smoothness_orders <- smoothness_orders[match(colnames(X), names(smoothness_orders))]
 
-      outcome_type <- self$get_outcome_type(task)
-
-      if (is.null(args$family)) {
-        args$family <- args$family <- outcome_type$glm_family()
+      }
+      bins <- params$bins
+      if(is.function(bins)){
+        bins <- round(bins(nrow(X)))
       }
 
-      args$X <- as.matrix(task$X)
-      args$Y <- outcome_type$format(task$Y)
-      args$yolo <- FALSE
-
-      if (task$has_node("weights")) {
-        args$weights <- task$weights
+      reduce_basis <- params$reduce_basis
+      cv_select<- self$params$cv_select
+      if(is.function(reduce_basis)){
+        reduce_basis <- reduce_basis(nrow(task$X))
       }
 
-      if (task$has_node("offset")) {
-        args$offset <- task$offset
+      # Perform nonparametric variable screening by independence
+      if(!is.null(params$dcor_pval)){
+        if(nrow(task$X)<=200){
+          params$dcor_pval = 0.5
+        }
+        else if(nrow(task$X)<=400){
+            params$dcor_pval = 0.2
+          }
+        pvals <- apply(X,2, function(x,y){energy::dcorT.test(x,y)$p.value}, y = Y)
+        print(pvals)
+        remove <- which(pvals > params$dcor_pval)
+        if(ncol(X)-length(remove)<params$keep_min){
+          remove = which(rank(-pvals) <= (ncol(X) - params$keep_min))
+        }
+        if(!is.null(params$keep_cov)){
+          remove = setdiff(remove, match(params$keep_cov,colnames(X)))
+        }
+        print(remove)
+        print(paste0("Number of covariates removed: ", length(remove)))
+        #Effectively remove columns
+        if(is.vector(smoothness_orders)){
+          smoothness_orders = smoothness_orders[-remove]
+
+        }
+         X = X[,-remove,drop=F]
+      }
+      else{
+        remove = NULL
       }
 
-      fit_object <- call_with_args(hal9001::fit_hal, args)
+      # perform hal fit
+      if(!is.null(formula)){
+        #Use formula spec if available
+        data <- cbind(X,Y)
+        colnames(data) = c(colnames(X), task$nodes$outcome)
+        formula <- formula_hal(formula$formula, data, smoothness_orders, bins, custom_group = formula$custom_group)
+
+        fit <- fit_halfast(formula = formula, screen_cor_pval = params$cor_pval, family = task$outcome_type$glm_family(),  lambda = params$lambda, cv_select = cv_select,reduce_basis = reduce_basis)
+      }
+      else{
+
+        fit <- fit_halfast(X = X, Y=Y, max_degree = params$max_degree, smoothness_orders=smoothness_orders, screen_cor_pval = params$cor_pval, family = task$outcome_type$glm_family(),
+                           screen_basis_main_terms = params$screen_basis_main_terms,
+                           screen_basis_interactions = params$screen_basis_interactions,  lambda = params$lambda, reduce_basis = reduce_basis, cv_select = cv_select, num_bins = bins)
+
+      }
+
+
+
+
+
+      fit_object <- list()
+      fit_object$remove = remove
+      fit_object$fit = fit
       return(fit_object)
     },
     .predict = function(task = NULL) {
-      predictions <- predict(self$fit_object, new_data = as.matrix(task$X))
+      fit <- self$fit_object$fit
+      remove <- self$fit_object$remove
+      if(!is.null(remove)){
+        X = as.matrix(X)
+        X[,remove] =0
+      }
+
+      predictions = predict(fit, new_data = X)
       return(predictions)
     },
-    .required_packages = c("hal9001")
+    .required_packages = c("hal9001fast")
   )
 )

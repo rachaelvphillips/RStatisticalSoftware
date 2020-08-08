@@ -14,7 +14,7 @@ knitr::opts_chunk$set(
 )
 ```
 
-# R/`hal9001`
+# R/`hal9001fast`
 
 [![Travis-CI Build Status](https://travis-ci.org/tlverse/hal9001.svg?branch=master)](https://travis-ci.org/tlverse/hal9001)
 [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/tlverse/hal9001?branch=master&svg=true)](https://ci.appveyor.com/project/tlverse/hal9001)

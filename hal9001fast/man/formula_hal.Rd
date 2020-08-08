@@ -12,7 +12,9 @@ formula_hal(
   bins = NULL,
   generate_lower_degrees = F,
   exclusive_dot = F,
-  custom_group = NULL
+  custom_group = NULL,
+  remove = NULL,
+  ...
 )
 }
 \arguments{

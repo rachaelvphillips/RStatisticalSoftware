@@ -84,7 +84,7 @@ formula_hal <-
            bins = NULL,
            generate_lower_degrees = F,
            exclusive_dot = F,
-           custom_group = NULL) {
+           custom_group = NULL, remove = NULL,...) {
     if(any(sapply(names(custom_group), function(name){nchar(name)!=1}))){
       stop("Custom group names must be single characters of length one.")
     }
@@ -180,7 +180,7 @@ formula_hal <-
     X = quantizer(X, bins)
    Y= data[, outcome]
     names = colnames(X)
-
+    remove = match(remove, colnames(X))
     # Process the variables specified in each term and the monotonicity constraints for each term
     interactions = stringr::str_match_all(form, "[^-][ihd]\\(([^\\s()]+)\\)")[[1]]
     interactions = interactions[, 2]
@@ -457,8 +457,13 @@ formula_hal <-
     # Generate basis functions
 print(interactions_index)
     add_basis = function(i){
-      if (length(interactions_index) == 0)
+
+      if (length(interactions_index) == 0){
         return()
+      }
+      if(any(remove %in% interactions_index[[i]])){
+        return()
+      }
       new_basis = basis_list_cols_order(interactions_index[[i]], X, order_map, include_zero_order, F)
       if (monotone_type[i] == "i") {
         lower.limits <<- c(lower.limits, rep(0, length(new_basis)))
@@ -475,7 +480,13 @@ print(interactions_index)
       basis_list<<-c(basis_list, new_basis)
     }
     lapply(1:length(interactions_index), add_basis)
-
+    keep_dot_arg = function(combo){
+      if(any(remove %in% combo)){
+        return(F)
+      }
+      return(T)
+    }
+    dot_argument_combos = dot_argument_combos[sapply(dot_argument_combos, keep_dot_arg )]
     # add the . and .^max_degree basis functions
     basis_listrest = unlist(
       lapply(
@@ -548,7 +559,7 @@ fit <- function(x){
   UseMethod("fit",x)
 
 }
-fit.formula_hal9001 = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
+fit.formula_hal9001fast = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
   fit_hal(formula = formula, family = family, yolo=F, ...)
 }
 
@@ -592,7 +603,7 @@ importance <- function(fit, covariate, X = NULL, intervene_on = NULL){
 
 
 
-summary.hal9001 <- function(fit, lambda_index = NULL, vim = F, plot_vim = F){
+summary.hal9001fast <- function(fit, lambda_index = NULL, vim = F, plot_vim = F){
   formula =  fit$formula
   preds = predict(fit, new_data = formula$X)
   coefs = fit$coefs

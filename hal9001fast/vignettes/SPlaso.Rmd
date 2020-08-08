@@ -9,25 +9,70 @@ knitr::opts_chunk$set(echo = TRUE)
 
 
 ```{r}
+devtools::document()
 
-n=300
+```
+
+
+```{r}
+is.vector(3)
+
+```
+
+
+
+```{r}
+library(sl3)
+n=1000
+X = as.matrix(cbind(replicate(30, runif(n,1,2))))
+X = data.frame(X)
+Y = 2*rowSums((X[,1:20,drop=F]))^3 + rnorm(n,0,2)
+
+data = data.frame(cbind(X,Y))
+colnames(data) = c(colnames(X), "y")
+task = make_sl3_Task(data, covariates = colnames(X), outcome = "y")
+
+lrnr <- make_learner(Lrnr_hal9001fast, max_degree =3, cv_select = T,bins=100,  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F)
+lrnr <- lrnr$train(task)
+
+```
+
+
+
+
+
+```{r}
+
 X = as.matrix(cbind(replicate(10, runif(n))))
-X = X
-Y = rowSums(X[,1:3])^3 + rnorm(n,0,1)
+X = data.frame(X)
+trueY =  2*rowSums((X[,1:3,drop=F]))^2
+Y = trueY + rnorm(n,0,1)
 
-testX =  as.matrix(cbind(replicate(100, runif(n))))
-testY =  5*rowMeans(testX[,1:25])^3 + rnorm(n,0,1)
+data = data.frame(cbind(X,Y))
+colnames(data) = c(colnames(X), "y")
+task = make_sl3_Task(data, covariates = colnames(X), outcome = "y")
+plot(2*rowSums(sin(10*X[,1:3,drop=F]))^2,lrnr$predict(task))
+plot(2*rowSums(sin(10*X[,1:3,drop=F]))^2,Y)
+plot(trueY,lrnr$predict(task))
+
+mean(( 2*rowSums(sin(10*X[,1:3,drop=F]))^2 - Y)^2)
+mean(( lrnr$predict(task) - Y)^2)
+mean(( lrnr$predict(task) - trueY)^2)
 ```
 
 
+
+
+
+
+
 ```{r}
-basis = enumerate_basis(X,1)
-f=screen_basis_by_cor(basis,X,y)
+lrnr$fit_object$fit$basis_list
 ```
 
 ```{r}
-length(f[[1]])
-
+s=energy::dcorT.test(Y,Y)
+s$p.value
 ```
 
 ```{r}

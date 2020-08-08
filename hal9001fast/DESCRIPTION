@@ -33,8 +33,6 @@ Depends:
   R (>= 3.1.0),
   Rcpp
 License: GPL-3
-URL: https://github.com/tlverse/hal9001
-BugReports: https://github.com/tlverse/hal9001/issues
 Encoding: UTF-8
 LazyData: true
 Imports:

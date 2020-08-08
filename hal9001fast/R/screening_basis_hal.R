@@ -1,12 +1,14 @@
 
 
 #' @export
-screen_basis_by_cor = function(basis_list, X, y, cutoff = 0.05, keep = c()){
+screen_basis_by_cor = function(basis_list, X, y, cutoff = 0.2, keep = c()){
   x_basis = make_design_matrix(X, basis_list)
   pvals = (apply(x_basis,2,function(x,y){
+
     if(sd(x)==0){return(1)}
     return(cor.test(x,y)$p.value)
   },y=Y))
+  print(quantile(pvals))
   keep = union(which(pvals <=cutoff), keep)
   return(list(basis_list[keep],x_basis[,keep] ))
 }
@@ -186,7 +188,7 @@ get_higher_basis = function(reduced_basis_list,
     return(reduced_basis_list)
   }
 
-  basis_lists = get_higher_basis_up_to_three(reduced_basis_list, max_dim, X, y, screen_each_level)
+  basis_lists = get_higher_basis_up_to_three(reduced_basis_list, max_dim, X, y, screen_each_level, max_num_basis)
 
 
 
@@ -226,7 +228,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
                                         max_dim,
                                         X,
                                         y,
-                                        screen_each_level) {
+                                        screen_each_level, max_basis = 20000) {
   if (max_dim == 1 | ncol(X) == 1) {
     return(list(list(), list()))
   }
@@ -273,7 +275,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
   two_way_combos = two_way_combos[, throw, drop = F]
   t = proc.time()
   print(paste0("twoways: ", length(way)))
-  if(length(way) >5000){
+  if(length(way) >max_basis){
     screen_each_level=T
   }
   if (screen_each_level) {

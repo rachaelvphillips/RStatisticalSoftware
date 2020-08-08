@@ -125,7 +125,7 @@
 #' }
 #'
 #' @export
-fit_hal <- function(X = NULL,
+fit_halfast <- function(X = NULL,
                     Y = NULL,
                     X_unpenalized = NULL,
                     formula = NULL,
@@ -137,7 +137,7 @@ fit_hal <- function(X = NULL,
                     n_folds = 10,
                     foldid = NULL,
                     use_min = TRUE,
-                    reduce_basis = NULL,
+                    reduce_basis = ifelse(!is.null(X), 1/sqrt(ncol(X))/log(ncol(X)), NULL),
                     screen_basis_main_terms = F,
                     screen_basis_interactions = F,
                     family = c("gaussian", "binomial", "cox"),
@@ -151,11 +151,13 @@ fit_hal <- function(X = NULL,
                     upper.limits = Inf,
                     lower.limits = -Inf,
                     screen_cor_pval = NULL,
+                    max_num_basis = 25000,
+                    verbose = T,
 
 
 
                     ...,
-                    yolo = TRUE) {
+                    yolo = F) {
   # check arguments and catch function call
   call <- match.call(expand.dots = TRUE)
   fit_type <- match.arg(fit_type)
@@ -253,7 +255,7 @@ fit_hal <- function(X = NULL,
         basis_list_one_way <- enumerate_basis(X_quant, 1, smoothness_orders, include_order_zero)
 
       }
-      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X=X_quant, y=Y,screen_each_level = screen_basis_interactions)
+      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X=X_quant, y=Y,screen_each_level = screen_basis_interactions, max_num_basis = max_num_basis)
     }
     else{
       basis_list <- enumerate_basis(X_quant, max_degree, smoothness_orders, include_order_zero)
@@ -262,7 +264,9 @@ fit_hal <- function(X = NULL,
 
   }
 
-
+  if(verbose){
+    print(paste0("Current basis function amount: ", length(basis_list)))
+  }
 
 
 
@@ -274,8 +278,12 @@ fit_hal <- function(X = NULL,
   #Do correlation based basis screening
   if(!is.null(screen_cor_pval) & is.numeric(screen_cor_pval)){
     out_lst = screen_basis_by_cor(basis_list, X,Y,screen_cor_pval)
+    if(verbose){
+      print(paste0("Correlation screening removed: ", length(basis_list) - length(out_lst[[1]]), " basis functions."))
+    }
     basis_list = out_lst[[1]]
     x_basis = out_lst[[2]]
+
   }
   else{
     time_enumerate_basis <- proc.time()
@@ -283,16 +291,16 @@ fit_hal <- function(X = NULL,
     x_basis <- make_design_matrix(X, basis_list)
   }
   time_design_matrix <- proc.time()
-  # catalog and eliminate duplicates
-  # Weird behavior for non binary
-  if(is.null(smoothness_orders) | all(smoothness_orders==0)){
-    print(" nooo")
-    copy_map <- make_copy_map(x_basis)
-    unique_columns <- as.numeric(names(copy_map))
-    x_basis <- x_basis[, unique_columns]
-  }
-  else{
-    copy_map = NULL
+
+  # Filter basis functions based on proportion
+  if (!is.null(reduce_basis) && is.numeric(reduce_basis)) {
+    reduced_basis_map <- make_reduced_basis_map(x_basis, reduce_basis)
+    if(verbose){
+      print(paste0("Reduce basis reduced by: ", length(basis_list) - length(reduced_basis_map), " basis functions."))
+    }
+    x_basis <- x_basis[, reduced_basis_map]
+
+    basis_list <- basis_list[reduced_basis_map]
   }
 
 
@@ -325,19 +333,31 @@ fit_hal <- function(X = NULL,
   time_rm_duplicates <- proc.time()
 
   # NOTE: keep only basis functions with some (or higher) proportion of 1's
-  if (!is.null(reduce_basis) && is.numeric(reduce_basis)) {
-    reduced_basis_map <- make_reduced_basis_map(x_basis, reduce_basis)
-    x_basis <- x_basis[, reduced_basis_map]
-  }
 
   # bookkeeping: get end time of basis reduction procedure
   time_reduce_basis <- proc.time()
+
+
+  # catalog and eliminate duplicates
+  # Weird behavior for non binary
+  if(is.null(smoothness_orders) | all(smoothness_orders==0)){
+
+    copy_map <- make_copy_map(x_basis)
+    unique_columns <- as.numeric(names(copy_map))
+    x_basis <- x_basis[, unique_columns]
+  }
+  else{
+    copy_map = NULL
+  }
 
   # NOTE: workaround for "Cox model not implemented for sparse x in glmnet"
   if (family == "cox") {
     x_basis <- as.matrix(x_basis)
   }
 
+  if(verbose){
+    print(paste0("Final size of basis is: ", length(basis_list)))
+  }
   # fit Lasso regression
   if (fit_type == "lassi") {
     message(paste(
@@ -450,6 +470,6 @@ fit_hal <- function(X = NULL,
     formula = formula
 
   )
-  class(fit) <- "hal9001"
+  class(fit) <- "hal9001fast"
   return(fit)
 }
