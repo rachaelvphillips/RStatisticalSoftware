@@ -94,6 +94,7 @@ formula_hal <-
     if(any(sapply(names(custom_group), function(name){name == "."}))){
       stop("Group name '.' is not allowed.")
     }
+    data = as.matrix(data)
     form = formula
     if (is.null(smoothness_orders) | !is.numeric(smoothness_orders)) {
       smoothness_orders = round(rep(0, ncol(data) -1))
@@ -532,19 +533,37 @@ print(interactions_index)
     return(form_obj)
   }
 #' @export
-print.formula_hal9001 <- function(formula){
-  cat(paste0("Functional specification for hal9001 fit:",
-             "\n Call: ", formula$call,
-             "\n Formula: ", formula$formula,
-             "\n Expanded Formula: ", formula$formula_expanded,
-             "\n Number of smooth variables: ",  sum(formula$smoothness_orders>0),
-             "\n Smoothness range: ", ifelse(formula$include_zero_order | any(formula$smoothness_orders==0), 0, 1), " -> ", max(formula$smoothness_orders),
-             " \n Number of basis functions: ", length(formula$basis_list),
-             "\n Number of monotone-increasing basis functions: ", sum(formula$lower.limits ==0),
-             "\n Number of monotone-decreasing basis functions: ", sum(formula$upper.limits ==0),
+print.formula_hal9001 <- function(formula, expand = F){
+
+  if(expand){
+    cat(paste0("Functional specification for hal9001 fit:",
+               "\n Call: ", formula$call,
+               "\n Formula: ", formula$formula,
+               "\n Expanded Formula: ", formula$formula_expanded,
+               "\n Number of smooth variables: ",  sum(formula$smoothness_orders>0),
+               "\n Smoothness range: ", ifelse(formula$include_zero_order | any(formula$smoothness_orders==0), 0, 1), " -> ", max(formula$smoothness_orders),
+               " \n Number of basis functions: ", length(formula$basis_list),
+               "\n Number of monotone-increasing basis functions: ", sum(formula$lower.limits ==0),
+               "\n Number of monotone-decreasing basis functions: ", sum(formula$upper.limits ==0),
 
 
-              "\n"))
+               "\n"))
+  }
+  else{
+    cat(paste0("Functional specification for hal9001 fit:",
+               "\n Call: ", formula$call,
+               "\n Formula: ", formula$formula,
+
+               "\n Number of smooth variables: ",  sum(formula$smoothness_orders>0),
+               "\n Smoothness range: ", ifelse(formula$include_zero_order | any(formula$smoothness_orders==0), 0, 1), " -> ", max(formula$smoothness_orders),
+               " \n Number of basis functions: ", length(formula$basis_list),
+               "\n Number of monotone-increasing basis functions: ", sum(formula$lower.limits ==0),
+               "\n Number of monotone-decreasing basis functions: ", sum(formula$upper.limits ==0),
+
+
+               "\n"))
+  }
+
   return(invisible(NULL))
 }
 
