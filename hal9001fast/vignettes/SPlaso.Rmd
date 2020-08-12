@@ -13,56 +13,142 @@ devtools::document()
 ```
 
 
-```{r}
-library(qlcMatrix)
-n=1000
-X = as.matrix(cbind(replicate(10, runif(n,1,2))))
-X = data.frame(X)
-trueY = 2*(rowMeans(X[,1:10,drop=F]))^2
-Y = trueY  + rnorm(n,0,1.2)
-X=as.matrix(X)
-blst = enumerate_basis(X,2)
-x_bas = make_design_matrix(X,blst)
-```
-
-
-```{r}
-t=proc.time()
-#f=corSparse(x_bas,Matrix(Y,ncol=1,sparse=T))
-t-proc.time()
-
-t=proc.time()
-#g=apply(x_bas,2,function(x,y){if(sd(x)==0){return(0)}; cor(x,y)},Y)
-t-proc.time()
-
-
-cor.test(x_bas[,1],Y)
-y=Y
-t_stat = sapply(cor(x_bas[,1],Y), function(c){c/sqrt((1-c^2)/(length(y)-2))})
-  pvals = sapply(t_stat, function(t){2*pt(t, length(y)-2, lower=T)})
-  
-  t_stat
-  pvals
-```
 
 
 
 ```{r}
 library(sl3)
-n=5000
-X = as.matrix(cbind(replicate(10, runif(n,1,2))))
+n=100
+k=5
+
+folds = compute_subsemble_fold(n,k)
+strata_ids = attr(folds, "strata_ids")
+strata_ids
+lrnr = make_learner(Lrnr_subsemble, lrnr = make_learner(Lrnr_glm), strata_ids = strata_ids)
+
+```
+
+
+```{r}
+library(sl3)
+library(delayed)
+library(data.table)
+ stk = make_learner(sl3::Stack, make_learner(Lrnr_glm), make_learner(Lrnr_glmnet))
+lrnr = make_learner(Lrnr_subsemble, lrnr =stk, strata_ids = strata_ids)
+#lrnr = lrnr$train(task)
+#tsk = lrnr$chain(task)
+#tsk$X
+# lrnr = lrnr$train(task)
+# lrnr$learner_fits$Lrnr_glm_TRUE_strata_1$base_predict()
+# lrnr$predict(task)
+lrnr_subsemble <- make_learner(Pipeline, lrnr, Lrnr_subsemble_metalearner$new(strata_ids = strata_ids))
+lrn = lrnr_subsemble$train(task)
+
+```
+
+
+```{r, include = F}
+library(R6)
+devtools::document()
+```
+
+
+
+```{r}
+
+t=proc.time()
+
+f=run_descent_gaussian(rbind(x),c(y),as.vector(beta-.01), max_iter = 1000, verbose=T)
+proc.time()-t
+```
+
+
+```{r}
+plot(y,x%*%(beta+.01))
+plot(y,x%*%f)
+```
+
+
+```{r}
+t = proc.time()
+mat =  replicate(10,calc_canon_grad(x,Y,beta))
+t1 = proc.time()
+t1 - t
+for(i in 1:10){
+link = y - x %*% beta
+}
+t2 = proc.time()
+t2 - t1
+```
+
+
+```{r}
+
+link = y - x %*% beta
+x_summed =  Matrix::crossprod(x, link)
+grad = x_summed * beta
+t1 = proc.time()
+betas = as.vector(beta+1)
+for(i in 1:100){
+link = y - x %*% beta
+ 
+}
+ proc.time() - t1
+```
+
+```{r}
+beta + 1
+
+```
+```{r}
+library(R6)
+devtools::document()
+
+```
+
+
+
+
+```{r}
+
+lambda = c(1,0.5)
+f=make_learner_subsemble_hal(make_learner(Lrnr_hal9001, max_degree=1,cv_select=F, lambda = lambda, verbose=F), task,k=4, num_preds = length(lambda))
+f = delayed_learner_train(f[[1]], f[[2]])
+
+sched <- Scheduler$new(f, FutureJob, nworkers = 1, verbose = F)
+f <- sched$compute()
+f$predict()
+```
+
+
+```{r}
+a =f$fit_object$learner_fits[[2]]$fit_object$learner_fits[[1]]$fit_object$beta
+c = f$fit_object$learner_fits[[2]]$fit_object$learner_fits[[1]]$fit_object$hal_fits[[2]]$coefs[-1]
+sum(abs(a))
+sum(abs(c))
+```
+
+```{r}
+library(R6)
+
+devtools::document()
+library(R6)
+n=1000
+X = as.matrix(cbind(replicate(20, runif(n,1,2))))
 X = data.frame(X)
-trueY = 2*(rowMeans(X[,1:10,drop=F]))^2
+trueY = 2*(rowSums(X[,1:10,drop=F]))^2 + 2*(rowSums(X[,11:20,drop=F]^2))
 Y = trueY  + rnorm(n,0,1.2)
 
 data = data.frame(cbind(X,Y))
 colnames(data) = c(colnames(X), "y")
-task = make_sl3_Task(data, covariates = colnames(X), outcome = "y")
+task = sl3_hal_Task$new(data, covariates = colnames(X), outcome = "y")
+```
 
-lrnr <- make_learner(Lrnr_hal9001fast, max_degree = 3, cv_select = F,bins=500,  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F, smoothness_orders=1, max_total_basis = 200000)
+```{r}
+lrnr <- make_learner(Lrnr_hal9001fast, max_degree = 3, cv_select = F,bins=c(100,50,10),  cor_pval=0.05, dcor_pval = NULL, screen_basis_main_terms=F, screen_basis_interactions=F, smoothness_orders=1, max_total_basis = 50000)
 tmp = lrnr$train(task)
 lambda = tmp$fit_object$fit$lambda_star
-lrnr <- make_learner(Lrnr_hal9001fast, max_degree = 3, cv_select = F,bins=500,  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F, lambda = lambda, smoothness_orders = 1)
+lrnr <- make_learner(Lrnr_hal9001fast, max_degree = 2, cv_select = F,bins= c(500,50,5),  cor_pval=0.15,screen_basis_main_terms=T, screen_basis_interactions=F, lambda = lambda, smoothness_orders = 1)
 #lrnr <- lrnr$train(task)
 cv_hal = make_learner(Pipeline, Lrnr_cv$new(lrnr), Lrnr_cv_selector$new())
 ```

@@ -1,10 +1,12 @@
 
 #' @importFrom qlcMatrix corSparse
 #' @export
-screen_basis_by_cor = function(basis_list, X, y, cutoff = 0.2, keep = c()){
-
+# Screens a basis list by the pearson correlation value for each basis
+# This is an unaggressive screening method designed to simply remove useless basis functions
+screen_basis_by_cor = function(basis_list, X, y, pval_cutoff = 0.1, keep = c()){
+  cutoff = pval_cutoff
   x_basis = make_design_matrix(X, basis_list)
-  cors = qlcMatrix::corSparse(x_basis,Matrix(y,ncol=1,sparse=T))
+  cors = qlcMatrix::corSparse(x_basis, Matrix::Matrix(y,ncol=1,sparse=T))
   cors[is.na(cors)] = 0
 
   t_stat = sapply(cors, function(c){c/sqrt((1-c^2)/(length(y)-2))})
@@ -14,12 +16,12 @@ screen_basis_by_cor = function(basis_list, X, y, cutoff = 0.2, keep = c()){
   #   if(sd(x)==0){return(1)}
   #   return(cor.test(x,y)$p.value)
   # },y=y))
-  print(quantile(pvals))
+
   keep = union(which(pvals <=cutoff), keep)
   return(list(basis_list[keep],x_basis[,keep] ))
 }
 
-
+# Discretizes/bins the covariates of a matrix by rounding each value to the nearest 1/bins quantile.
 #' @export
 quantizer = function(X, bins) {
   if (is.null(bins)) {
@@ -41,7 +43,8 @@ quantizer = function(X, bins) {
   return(quantizer(X))
 }
 
-
+# Aggressively screens a basis. First performs correlation screening and then uses hal to screen.
+# Designed to be used for iteratively screening the basis when the basis list is constructed in a sequential way.
 screen_basis = function(basis_list,
                         X,
                         y,
@@ -50,12 +53,12 @@ screen_basis = function(basis_list,
                         lower.limits = -Inf,
                         upper.limits = Inf,
                         screen_at_which_lambda = NULL,
-                        family = "gaussian") {
+                        family = "gaussian", pval_cutoff = 0.05) {
   print(paste0("Current basis size is ", length(basis_list)))
 
   X = as.matrix(X)
 
-  screen_by_cor_out = screen_basis_by_cor(basis_list,X,y, keep = index_to_keep)
+  screen_by_cor_out = screen_basis_by_cor(basis_list,X,y, keep = index_to_keep, pval_cutoff = pval_cutoff)
   x_basis = screen_by_cor_out[[2]]
   basis_list = screen_by_cor_out[[1]]
 
@@ -131,6 +134,8 @@ screen_basis = function(basis_list,
   return(basis_list)
 }
 
+# Takes two basis lists and generates the interactions obtained by multiplyng basis functios
+# whose knot points/cutoffs correspond to the same individual.
 merge_basis = function(reduced_basis_list1,
                        reduced_basis_list2,
                        X) {
@@ -182,13 +187,13 @@ merge_basis = function(reduced_basis_list1,
 
 }
 
-
+# From a basis list (containing main-term one way basis functions), generate higher order interactions corresponding with observed cutoffs/knot points.
 get_higher_basis = function(reduced_basis_list,
                             max_dim,
                             X,
                             y,
                             screen_each_level = F,
-                            max_num_two_way = Inf) {
+                            max_num_two_way = Inf, pval_cutoff = 0.05) {
   if (length(reduced_basis_list) == 0) {
     return(NULL)
   }
@@ -196,7 +201,7 @@ get_higher_basis = function(reduced_basis_list,
     return(reduced_basis_list)
   }
 
-  basis_lists = get_higher_basis_up_to_three(reduced_basis_list, max_dim, X, y, screen_each_level, max_num_two_way)
+  basis_lists = get_higher_basis_up_to_three(reduced_basis_list, max_dim, X, y, screen_each_level, max_num_two_way, pval_cutoff = pval_cutoff)
 
 
 
@@ -233,11 +238,12 @@ get_higher_basis = function(reduced_basis_list,
 }
 
 
+# Hard-coded but fast way to generate the second and third degree interactions from a main term basis list
 get_higher_basis_up_to_three = function(reduced_basis_list,
                                         max_dim,
                                         X,
                                         y,
-                                        screen_each_level, max_basis = 20000) {
+                                        screen_each_level, max_basis = 20000, pval_cutoff=0.05) {
   if (max_dim == 1 | ncol(X) == 1) {
     return(list(list(), list()))
   }
@@ -285,7 +291,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
   t = proc.time()
   print(paste0("twoways (pre cor screening): ", length(way)))
 
-  way = screen_basis_by_cor(way,X,y,0.2)[[1]]
+  way = screen_basis_by_cor(way,X,y, pval_cutoff =pval_cutoff )[[1]]
   print(paste0("twoways (after cor screening): ", length(way)))
 
   if(length(way) > max_basis){
@@ -301,7 +307,7 @@ get_higher_basis_up_to_three = function(reduced_basis_list,
                         X=X,
                         y=y,
                         index_to_keep=1:length(reduced_basis_list),
-                        return_index=T)
+                        return_index=T, pval_cutoff = pval_cutoff)
 
     two_way_combos = two_way_combos[, keep, drop = F]
     way = way[keep]

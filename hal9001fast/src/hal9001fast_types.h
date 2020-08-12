@@ -3,6 +3,8 @@
 #define HAL9001FAST_TYPES_H
 #include <RcppEigen.h>
 using namespace Rcpp;
+typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> Mat;
+typedef Eigen::Matrix<double, Eigen::Dynamic, 1> Vec;
 typedef Eigen::SparseMatrix<double> SpMat;
 typedef Eigen::SparseMatrix<int> IntSpMat;
 typedef Eigen::Map<SpMat> MSpMat;

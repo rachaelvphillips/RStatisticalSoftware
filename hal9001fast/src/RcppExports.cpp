@@ -7,6 +7,19 @@
 
 using namespace Rcpp;
 
+// calc_canon_grad
+SpMat calc_canon_grad(SpMat& X, const SpMat& Y, const SpMat& beta);
+RcppExport SEXP _hal9001fast_calc_canon_grad(SEXP XSEXP, SEXP YSEXP, SEXP betaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SpMat& >::type X(XSEXP);
+    Rcpp::traits::input_parameter< const SpMat& >::type Y(YSEXP);
+    Rcpp::traits::input_parameter< const SpMat& >::type beta(betaSEXP);
+    rcpp_result_gen = Rcpp::wrap(calc_canon_grad(X, Y, beta));
+    return rcpp_result_gen;
+END_RCPP
+}
 // index_first_copy
 IntegerVector index_first_copy(const MSpMat& X);
 RcppExport SEXP _hal9001fast_index_first_copy(SEXP XSEXP) {
@@ -180,6 +193,7 @@ END_RCPP
 RcppExport SEXP _rcpp_module_boot_lassi_module();
 
 static const R_CallMethodDef CallEntries[] = {
+    {"_hal9001fast_calc_canon_grad", (DL_FUNC) &_hal9001fast_calc_canon_grad, 3},
     {"_hal9001fast_index_first_copy", (DL_FUNC) &_hal9001fast_index_first_copy, 1},
     {"_hal9001fast_apply_copy_map", (DL_FUNC) &_hal9001fast_apply_copy_map, 2},
     {"_hal9001fast_lassi_predict", (DL_FUNC) &_hal9001fast_lassi_predict, 3},

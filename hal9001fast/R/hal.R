@@ -108,7 +108,7 @@
 #' @importFrom glmnet cv.glmnet glmnet
 #' @importFrom stats coef
 #' @importFrom assertthat assert_that
-#'
+#' @importFrom Matrix Matrix
 #' @return Object of class \code{hal9001}, containing a list of basis
 #'  functions, a copy map, coefficients estimated for basis functions, and
 #'  timing results (for assessing computational efficiency).
@@ -130,14 +130,15 @@ fit_halfast <- function(X = NULL,
                     X_unpenalized = NULL,
                     formula = NULL,
                     max_degree = 3,
+                    max_edge_degree = 3,
                     smoothness_orders = NULL,
                     include_order_zero = F,
-                    num_bins = 500,
+                    num_bins = sapply(1:max_degree, function(degree) 500/degree),
                     fit_type = c("glmnet", "lassi"),
                     n_folds = 10,
                     foldid = NULL,
                     use_min = TRUE,
-                    reduce_basis = ifelse(!is.null(X), 1/sqrt(ncol(X))/log(ncol(X)), NULL),
+                    reduce_basis = ifelse(!is.null(X), 1/sqrt(ncol(X))/2, NULL),
                     screen_basis_main_terms = F,
                     screen_basis_interactions = F,
                     family = c("gaussian", "binomial", "cox"),
@@ -151,9 +152,10 @@ fit_halfast <- function(X = NULL,
                     upper.limits = ifelse(!is.null(Y), max(Y)-min(Y), Inf),
                     lower.limits = ifelse(!is.null(Y), min(Y)-max(Y), -Inf),
                     screen_cor_pval = NULL,
-                    max_num_two_way = 50000,
-                    max_total_basis = 250000,
+                    max_num_two_way = ifelse(!is.null(X) & nrow(X) <=1000, 100000, 50000),
+                    max_total_basis =  ifelse(!is.null(X) & nrow(X) <=1000, 500000, 350000),
                     verbose = T,
+                    standardize = F,
                     ...,
                     yolo = F) {
 
@@ -242,7 +244,13 @@ fit_halfast <- function(X = NULL,
   # make design matrix for HAL
   old_basis_list = NULL
   if (is.null(basis_list)) {
-    X_quant = quantizer(X, num_bins)
+    if(!is.null(num_bins)){
+      num_bins = suppressWarnings(round(num_bins) + rep(0,max_degree))
+      X_quant = quantizer(X, num_bins[1])
+    } else{
+      X_quant = X
+    }
+
     if(screen_basis_main_terms | screen_basis_interactions){
       if(screen_basis_main_terms){
         basis_list <- enumerate_basis(X_quant, 1, smoothness_orders, include_order_zero)
@@ -252,13 +260,15 @@ fit_halfast <- function(X = NULL,
       }
       else{
         basis_list_one_way <- enumerate_basis(X_quant, 1, smoothness_orders, include_order_zero)
-
       }
-      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X=X_quant, y=Y,screen_each_level = screen_basis_interactions, max_num_two_way = max_num_two_way)
+      basis_list <- get_higher_basis(basis_list_one_way, max_degree, X=X_quant, y=Y, screen_each_level = screen_basis_interactions, max_num_two_way = max_num_two_way, pval_cutoff = screen_cor_pval)
     }
     else{
-      basis_list <- enumerate_basis(X_quant, max_degree, smoothness_orders, include_order_zero)
-
+      basis_list <- enumerate_basis(X_quant, max_degree, smoothness_orders, include_order_zero, bins = num_bins)
+    }
+    # Generate interactions only using zero-edge basis functions (e.g. minimum of each covariate)
+    if(!is.null(max_edge_degree) & max_edge_degree > max_degree){
+      basis_list <- union(basis_list, enumerate_edge_basis(X_quant, max_edge_degree, smoothness_orders, include_order_zero))
     }
 
   }
@@ -286,7 +296,6 @@ fit_halfast <- function(X = NULL,
   }
   else{
     time_enumerate_basis <- proc.time()
-
     x_basis <- make_design_matrix(X, basis_list)
   }
   time_design_matrix <- proc.time()
@@ -303,11 +312,15 @@ fit_halfast <- function(X = NULL,
   }
 
   if(length(basis_list) > max_total_basis){
-    print(paste0("Number of basis functions exceeded ",max_total_basis, ". Performing correlation based filtering." ))
-    cor_vals <- qlcMatrix::corSparse(x_basis,Matrix(Y,ncol=1,sparse=T))
+    print(paste0("Number of basis functions (", length(basis_list), ") exceeded ",max_total_basis, ". Performing correlation based filtering." ))
+    cor_vals <- qlcMatrix::corSparse(x_basis, Matrix::Matrix(Y,ncol=1,sparse=T))
+    cor_vals[sapply(cor_vals, is.na)] <- 0
+
     keep = which(rank(-abs(cor_vals)) <= max_total_basis)
+
     basis_list <- basis_list[keep]
-    x_basis <- x_basis[keep]
+    x_basis <- x_basis[,keep]
+
   }
 
 
@@ -353,6 +366,7 @@ fit_halfast <- function(X = NULL,
     copy_map <- make_copy_map(x_basis)
     unique_columns <- as.numeric(names(copy_map))
     x_basis <- x_basis[, unique_columns]
+    basis_list <- basis_list[unique_columns]
   }
   else{
     copy_map = NULL
@@ -386,6 +400,7 @@ fit_halfast <- function(X = NULL,
   } else if (fit_type == "glmnet") {
     # just use the standard implementation available in glmnet
     if (!cv_select) {
+
       hal_lasso <- glmnet::glmnet(
         x = x_basis,
         y = Y,
@@ -394,6 +409,7 @@ fit_halfast <- function(X = NULL,
         penalty.factor = penalty_factor,
         upper.limits = upper.limits,
         lower.limits = lower.limits,
+        standardize=standardize,
         ...
       )
       lambda_star <- hal_lasso$lambda
@@ -409,6 +425,7 @@ fit_halfast <- function(X = NULL,
         penalty.factor = penalty_factor,
         upper.limits = upper.limits,
         lower.limits = lower.limits,
+        standardize=standardize,
         ...
       )
       if (use_min) {

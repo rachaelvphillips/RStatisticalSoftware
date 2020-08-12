@@ -5,10 +5,10 @@ Lrnr_hal9001fast <- R6::R6Class(
   public = list(
     initialize = function(max_degree = 3,
                           formula = NULL,
-                          reduce_basis = function(n){1/sqrt(n)/2},
+                          reduce_basis = function(n){1/sqrt(n)},
                           keep_min = 3,
                           dcor_pval = 0.25,
-                          cor_pval = 0.15,
+                          cor_pval = 0.1,
                           smoothness_orders = 0,
                           bins = function(n){max(50,min(n/10,500))},
                           screen_basis_main_terms = F,
@@ -18,6 +18,8 @@ Lrnr_hal9001fast <- R6::R6Class(
                           keep_cov = NULL,
                           max_num_two_way = 75000,
                           max_total_basis = 250000,
+                          link_as_pred = F,
+                          verbose = F,
 
 
                           ...) {
@@ -58,7 +60,7 @@ Lrnr_hal9001fast <- R6::R6Class(
             params$dcor_pval = 0.2
           }
         pvals <- apply(X,2, function(x,y){energy::dcorT.test(x,y)$p.value}, y = Y)
-        print(pvals)
+
         remove <- which(pvals > params$dcor_pval)
         if(ncol(X)-length(remove)<params$keep_min){
           remove = which(rank(-pvals) <= (ncol(X) - params$keep_min))
@@ -66,7 +68,7 @@ Lrnr_hal9001fast <- R6::R6Class(
         if(!is.null(params$keep_cov)){
           remove = setdiff(remove, match(params$keep_cov,colnames(X)))
         }
-        print(remove)
+
         print(paste0("Number of covariates removed: ", length(remove)))
         #Effectively remove columns
         if(length(smoothness_orders)>1){
@@ -92,7 +94,7 @@ Lrnr_hal9001fast <- R6::R6Class(
         fit <- fit_halfast(formula = formula, screen_cor_pval = params$cor_pval, family = task$outcome_type$glm_family(),  lambda = params$lambda,
                            cv_select = cv_select,reduce_basis = reduce_basis,
                            max_num_two_way = params$max_num_two_way,
-                           max_total_basis = params$max_total_basis,)
+                           max_total_basis = params$max_total_basis, verbose = self$params$verbose)
       }
       else{
 
@@ -101,7 +103,7 @@ Lrnr_hal9001fast <- R6::R6Class(
                            screen_basis_interactions = params$screen_basis_interactions,
                            lambda = params$lambda, reduce_basis = reduce_basis, cv_select = cv_select, num_bins = bins,
                            max_num_two_way = params$max_num_two_way,
-                           max_total_basis = params$max_total_basis,)
+                           max_total_basis = params$max_total_basis,verbose = self$params$verbose)
 
       }
 
@@ -115,7 +117,7 @@ Lrnr_hal9001fast <- R6::R6Class(
       return(fit_object)
     },
     .predict = function(task = NULL) {
-      X = task$X
+      X = as.matrix(task$X)
       fit <- self$fit_object$fit
       remove <- self$fit_object$remove
 
@@ -123,8 +125,11 @@ Lrnr_hal9001fast <- R6::R6Class(
         X = as.matrix(X)
         X = X[,-remove]
       }
-
-      predictions = predict(fit, new_data = as.matrix(X))
+      if(self$params$link_as_pred){
+        predictions = predict(fit$glmnet_lasso, newx = make_design_matrix(as.matrix(X), fit$basis_list), type = "link")
+      } else {
+        predictions = predict(fit, new_data = as.matrix(X))
+      }
 
       return(predictions)
     },

@@ -9,7 +9,8 @@ enumerate_basis(
   max_degree = NULL,
   order_map = rep(0, ncol(x)),
   include_zero_order = F,
-  include_lower_order = F
+  include_lower_order = F,
+  bins = NULL
 )
 }
 \arguments{
