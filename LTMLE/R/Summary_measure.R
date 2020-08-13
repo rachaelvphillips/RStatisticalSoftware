@@ -20,9 +20,10 @@ Summary_measure <- R6Class(
         params$summary_function = summary_function_wrap
         private$.params <- params
     },
-    summarize = function(data){
+    summarize = function(data, add_id = T){
       data <- private$.process_data(data, NULL)
       func <- private$.params$summary_function
+      # Needed since  pass by promise would break next line
       data <- data[,]
 
 
@@ -36,6 +37,9 @@ Summary_measure <- R6Class(
        assertthat::assert_that(ncol(reduced_data)-1 == length(self$params$name),
                               msg = "The summary measure names does not match length of summary measure function output.")
       colnames(reduced_data) <- c("id", self$params$name)
+      if(!add_id){
+        reduced_data$id = F
+      }
       return(reduced_data)
     }
   ),
@@ -58,7 +62,6 @@ Summary_measure <- R6Class(
         data = as.data.table(data)
       }
 
-
       if(is.null(row_index)){
         return(data)
       }
@@ -69,7 +72,6 @@ Summary_measure <- R6Class(
 
 make_summary_measure_NULL <- function(column_names = ""){
   name =  NULL
-
   summary_function <- function(data){
     return(data.table(NULL))
 

@@ -76,15 +76,15 @@ ltmle3_Task <- R6Class(
       time <- target_node_object$time
       past_data <- self$get_data()
       IsTreatmentNode <- stringr::str_detect(target_node, "[AY]")
-      skip = F
+      skip <- F
       if(IsTreatmentNode){
         past_data <- past_data[past_data$t <= time,]
 
       }
       else {
         if(time ==1){
-          past_data = data.table(NULL)
-          covariates = c()
+          past_data <- data.table(NULL)
+          covariates <- c()
           skip = T
         }
         else{
@@ -159,7 +159,28 @@ ltmle3_Task <- R6Class(
           self$npsem[[node_name]]$variables
         }
       )
-      setnames(new_data, node_names, node_variables)
+      node_times <- sapply(
+        node_names,
+        function(node_name) {
+          self$npsem[[node_name]]$time
+        }
+      )
+      node_index <- lapply(
+        node_times,
+        function(time) {
+          which(self$data$t==time)
+        }
+      )
+
+      old_data <- data.table::copy(self$data[, node_variables, with = F])
+
+      lapply(seq_along(node_index), function(i){
+        index <- node_index[[i]]
+        var <- node_variables[[i]]
+        set(old_data, index, var) <- new_data[,node_names[[i]],with=F]
+      })
+      new_data <- old_data
+      #setnames(new_data, node_names, node_variables)
 
       new_task <- self$clone()
       new_column_names <- new_task$add_columns(new_data, uuid)
