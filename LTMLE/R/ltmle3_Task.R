@@ -10,11 +10,31 @@ ltmle3_Task <- R6Class(
     data = function() {
       all_variables <- unlist(lapply(self$npsem, `[[`, "variables"))
       self$get_data(columns = unique(c("id" , "t", all_variables)))
+    },
+    weights = function() {
+      # Assumes weights are constant in time
+      super$weights[!duplicated(self$data$id)]
+    },
+    offset = function() {
+      # Assumes offset are constant in time
+      super$offset[!duplicated(self$data$id)]
     }
   ),
   public = list(
-    initialize = function(data, npsem, id = "id", ...) {
-      super$initialize(data, npsem, id = "id", ...)
+    initialize = function(data, npsem, id = "id", time = "t",  ...) {
+
+      #If time and id are not named as "t" and "id" then
+      #add columns
+      if(id!="id"){
+        data[,"id", with = F] <- data[,id, with = F]
+        id = "id"
+      }
+      if(time!="t"){
+        data[, "t", with = F] <- data[,time, with = F]
+        time = "t"
+      }
+
+      super$initialize(data, npsem, id = "id", time = "t", add_censoring_indicators = F,  ...)
     },
     get_tmle_node = function(node_name, format = FALSE, include_time = F) {
       # node as dt vs node as column
@@ -33,6 +53,7 @@ ltmle3_Task <- R6Class(
       }
       tmle_node <- self$npsem[[node_name]]
       node_var <- tmle_node$variables
+
       if (is.null(node_var)) {
         return(data.table(NULL))
       }
@@ -72,35 +93,87 @@ ltmle3_Task <- R6Class(
 
       return(data)
     },
-    get_regression_task = function(target_node, scale = FALSE, drop_censored = FALSE, is_time_variant = FALSE) {
+    get_regression_task = function(target_node, scale = FALSE, drop_censored = FALSE, is_time_variant = F) {
+
+      # If target_node specifies multiple nodes
+      # then return the pooled regression task obtained from each node-specific regression task, if possible.
+      if(length(target_node)>1){
+        all_tasks <- lapply(target_node, self$get_regression_task, scale, drop_censored , is_time_variant)
+        all_nodes <- lapply(all_tasks, function(task) task$nodes)
+        time_is_node <- sapply(all_nodes, function(node) !is.null(node$time))
+        assertthat::assert_that(all(time_is_node))
+        assertthat::assert_that(all.equal(unique(unlist(all_nodes, use.names = F)), unlist(all_nodes[[1]], use.names = F)))
+        #If they contain the same nodes we can merge
+        pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$data))
+        nodes <- all_nodes[1]
+        # Make sure time is included as covariate
+        nodes$covariates <- union("t", nodes$covariates)
+
+
+        pooled_regression_task <- sl3_Task$new(
+          pooled_data,
+          nodes = nodes,
+          outcome_type = self$npsem[[target_node[1]]]$variable_type,
+          folds = self$folds
+        )
+        return(pooled_regression_task)
+      }
+
+
       npsem <- self$npsem
       target_node_object <- npsem[[target_node]]
       outcome <- target_node_object$variables
+      #get t-1 data and then get all t varialbes of past
+      time <- target_node_object$time
+      past_data <- self$get_data()
+      past_data <- past_data[,]
+
+      if(drop_censored & !is.null(target_node_object$censoring_node)){
+        # Censoring node should represent a n*t binary vector which is 1 for individual n
+        # at time t if the individual is censored/dies at that time.
+        # The time of failure/censoring is extracted from this vector.
+        censoring_node_var <- target_node_object$censoring_node$variables
+        assertthat::assert_that(all(past_data[, censoring_node_var, with = F][[1]] %in% c(0,1)), msg = "Error: drop_censored is T for non-binary censoring variable ")
+        getT <- function(X){
+          event_index <- which(X[,censoring_node_var,with=F]==1)
+          event_index <- min(event_index)
+          if(length(event_index)==0){
+            return(Inf)
+          }
+          event_t <- X[event_index, "t", with = F][[1]]
+
+          return(event_t)
+        }
+        failure_times <- past_data[, getT(.SD), by = id, .SDcols = c("t", censoring_node_var)][[2]]
+
+        dont_keep <- which(failure_times < time)
+      }
 
       parent_names <- target_node_object$parents
       parent_nodes <- npsem[parent_names]
-      #times <- as.vector(sapply(parent_nodes, function(node) node$time))
+
+
+      times <- as.vector(sapply(parent_nodes, function(node) node$time))
+      parent_covariates <- as.vector(sapply(parent_nodes, function(node) node$variables))
+      add_to_past <- unique(parent_covariates[times == time])
+
       outcome_data <- self$get_tmle_node(target_node, format = TRUE)
+      past_data <- past_data[past_data$t <= time,]
+      ignore_cols <- setdiff(colnames(past_data), c("t", "id", add_to_past))
+      # Safeguard to ensure no future data leakage
+      # Handling down the line should ensure that this step isn't ever needed
+      # But better safe than sorry
+      set(past_data,  which(past_data$t == time), ignore_cols, NA)
+      set(past_data, , setdiff(colnames(past_data), c("t", "id", unique(parent_covariates))) , NA)
 
-      time <- target_node_object$time
-      past_data <- self$get_data()
-      IsTreatmentNode <- stringr::str_detect(target_node, "[AY]")
       skip <- F
-      if(IsTreatmentNode){
-        past_data <- past_data[past_data$t <= time,]
-
+      if(length(parent_covariates) == 0){
+        past_data <- data.table(NULL)
+        covariates <- c()
+        skip <- T
       }
-      else {
-        if(time ==1){
-          past_data <- data.table(NULL)
-          covariates <- c()
-          skip = T
-        }
-        else{
-          past_data <- past_data[past_data$t <= time - 1,]
 
-        }
-      }
+
 
 
       all_covariate_data <- past_data
@@ -108,35 +181,46 @@ ltmle3_Task <- R6Class(
         summary_measures <- target_node_object$summary_functions
 
         all_covariate_data <- lapply(summary_measures, function(fun){
-          if(IsTreatmentNode){
-            #If this summary measure depends on treatment then set past to t-1
-            #This ensures that no summary measures use the outcome
-            #And allows summary measures to depend on the most recent L
-            #Which happens at the same time as A.
-            if(length(intersect(fun$column_names, outcome))>0){
-              all_covariate_data <- all_covariate_data[all_covariate_data$t <= time - 1,]
-            }
+
+          #If this summary measure depends on treatment then set past to t-1
+          #This ensures that no summary measures use the outcome
+          #And allows summary measures to depend on the most recent L
+          #Which happens at the same time as A.
+
+          assertthat::assert_that(all(fun$column_names %in% c("id" , "t", parent_covariates)), msg = sprintf("Error: Summary_meaure depends on covariates not found in parent nodes. Summary measure: %s & Parent covariates: %s", fun$column_names, parent_covariates))
+          if(length(intersect(fun$column_names, ignore_cols)) ==  length((fun$column_names))){
+            all_covariate_data <- all_covariate_data[all_covariate_data$t <= time - 1,]
           }
+
           return(fun$summarize(all_covariate_data))}
         )
         all_covariate_data <- all_covariate_data %>% purrr::reduce(dplyr::full_join, by = "id")
-        print(all_covariate_data)
+
 
         covariates <- setdiff(colnames(all_covariate_data), "id")
-        t_col <- data.table("t" = rep(time, nrow(all_covariate_data)))
+        t_col <- data.table(rep(time, nrow(all_covariate_data)))
+        colnames(t_col) <- "t"
+        if("t" %in% colnames(all_covariate_data))  all_covariate_data$t <- NULL
+
         all_covariate_data <- cbind(t_col, all_covariate_data)
+      }
+      if(is_time_variant){
+        # TODO Not sure if this is the correct use of is_time_variant
+        covariates <- union("t", covariates)
       }
 
       nodes <- self$nodes
 
       node_data <- self$get_data(, unlist(nodes))
-      # Keep only node_data for each individual once
-      # Assumes that these nodes are constant in time
-      node_data <- node_data[!duplicated(node_data$id),]
+      # Keep only node_data for each individual at the time of this tmle node
+      node_data <- node_data[self$data$t == time,]
       nodes$outcome <- outcome
       nodes$covariates <- covariates
+      nodes$time <- "t"
       regression_data <- do.call(cbind, list(all_covariate_data, outcome_data, node_data))
-      print(regression_data)
+      if(drop_censored){
+        regression_data <- regression_data[-dont_keep,]
+      }
       regression_task <- sl3_Task$new(
         regression_data,
         nodes = nodes,

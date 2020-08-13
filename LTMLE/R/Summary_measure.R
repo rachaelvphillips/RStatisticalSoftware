@@ -1,6 +1,16 @@
 #' @importFrom R6 R6Class
 #' @import data.table
 
+# Summary measure object that collapses the past history into a finite dimensional vector for each person
+# Argument summary_function should be a function that takes a data.table representing the history of a single person,
+# where each row corresponds to a time point of the past, and the columns are covariates.
+# The returned result should be a vector.
+# Note that some elements of the final row may be NA if some covariates are measured at the same present time but are still
+# ... part of the past due to time ordering. This should be handled as needed.
+# Note this is avoided if the covariates specified by "column_names" all occur at the same time (e.g. are all from the L2 node)
+#
+
+
 #' @export
 Summary_measure <- R6Class(
   classname = "Summary_measure",
@@ -96,6 +106,7 @@ make_summary_measure_FULL <- function(column_names){
       colnames(dat) <- paste(colnames(data)[i], t, sep = "_")
 
       return(dat)}))
+
     return(data)
 
   }
@@ -124,15 +135,32 @@ make_summary_measure_last_value <- function(column_names){
       }
       data <- data[, column_names, with = F]
     }
-    return(data[nrow(data),])
+
+    last_vals <- data[nrow(data),]
+
+    if(length(which(is.na(last_vals)))>0){
+    last_vals[,which(is.na(last_vals)),with=F]  <- data[nrow(data)-1, which(is.na(last_vals)), with = F]
+    }
+
+    return(last_vals)
 
   }
-
+  most_recent <-  function(v){v[length(v)]}
+  return(make_summary_measure_apply(column_names,  most_recent))
   return(Summary_measure$new(column_names, summary_function, name))
 }
 
 
 make_summary_measure_apply <- function(column_names, FUN){
+  name = as.character(substitute(FUN))
+  if(name[1] == "function")
+  {
+    name = "FUN"
+  }
+
+  wrap_FUN <- function(v){
+    FUN(as.vector(na.omit(v)))
+  }
   summary_function <- function(data){
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
@@ -140,13 +168,13 @@ make_summary_measure_apply <- function(column_names, FUN){
       }
       data <- data[, column_names, with = F]
     }
-    data <- as.data.table(t(apply(data, 2, FUN)))
+    data <- as.data.table(t(apply(data, 2, wrap_FUN)))
     colnames(data) <- as.character(1:ncol(data))
 
     return(data)
 
   }
-  return(Summary_measure$new(column_names, summary_function, paste(column_names, as.character(substitute(FUN)), sep = "_")))
+  return(Summary_measure$new(column_names, summary_function, paste(column_names, name, sep = "_")))
 
 }
 
@@ -168,9 +196,14 @@ make_summary_measure_relative_difference_from_t0 <- function(column_names){
       }
       data <- data[, column_names, with = F]
     }
-    return(data[nrow(data),] - data[1,])
+    diff <- data[nrow(data),] - data[1,]
+    change <- which(is.na(diff))
+    diff <- data[nrow(data)-1,change, with = F] - data[1,change, with = F]
+    return(diff)
 
   }
+  rel_diff_t0 <-  function(v){v[length(v)] - v[1]}
+  return(make_summary_measure_apply(column_names,  rel_diff_t0))
   return(Summary_measure$new(column_names, summary_function, paste(column_names, "rel_diff_t0")))
 
 }
@@ -186,8 +219,11 @@ make_summary_measure_relative_difference_from_last_t <- function(column_names){
       data <- data[, column_names, with = F]
     }
     data <- data[nrow(data) - data[nrow(data)-1,],]
-    data <- data.table(matrix(data,nrow=1))
+    change <- which(is.na(diff))
+    data[,change,with=F] <- data[nrow(data)-1,change, with = F] - data[nrow(data)-2,change, with = F]
   }
+  rel_diff_last_t <-  function(v){v[length(v)] - v[length(v)-1]}
+  return(make_summary_measure_apply(column_names,  rel_diff_last_t))
   return(Summary_measure$new(column_names, summary_function, name))
 
 }
@@ -213,7 +249,7 @@ make_summary_measure_slope <- function(column_names){
 
 
     slopes = sapply(colnames(data)[-1], function(name){
-      return(as.vector(coef(lm(as.formula(paste(name, "~ t")), data.frame(data)))[2]))
+      return(as.vector(coef(lm(as.formula(paste(name, "~ t")), data.frame(data)[, c("t", "name")]))[2]))
     })
 
 

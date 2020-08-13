@@ -5,13 +5,13 @@ ltmle3_Node <- R6Class(
   inherit = tmle3_Node,
   public = list(
     initialize = function(name, variables, parents = c(), time = NULL, summary_functions = NULL,
-                          variable_type = NULL, scale = FALSE) {
+                          variable_type = NULL, censoring_node = NULL, scale = FALSE) {
       if(!is.list(summary_functions)){
         summary_functions <- list(summary_functions)
       }
       private$.ltmle_params = list(time = time, summary_functions = summary_functions)
       super$initialize(name, variables, parents,
-                       variable_type, scale)
+                       variable_type, censoring_node = censoring_node, scale)
     },
     print = function() {
       node_class <- class(self)[1]
