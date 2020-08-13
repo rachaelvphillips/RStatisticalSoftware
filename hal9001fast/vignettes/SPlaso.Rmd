@@ -112,7 +112,7 @@ devtools::document()
 ```{r}
 
 lambda = c(1,0.5)
-f=make_learner_subsemble_hal(make_learner(Lrnr_hal9001, max_degree=1,cv_select=F, lambda = lambda, verbose=F), task,k=4, num_preds = length(lambda))
+f=make_learner_subsemble_hal(make_learner(Lrnr_hal9001fast, max_degree=1,cv_select=F, lambda = lambda, verbose=F), task,k=4, num_preds = length(lambda))
 f = delayed_learner_train(f[[1]], f[[2]])
 
 sched <- Scheduler$new(f, FutureJob, nworkers = 1, verbose = F)
@@ -123,7 +123,7 @@ f$predict()
 
 ```{r}
 a =f$fit_object$learner_fits[[2]]$fit_object$learner_fits[[1]]$fit_object$beta
-c = f$fit_object$learner_fits[[2]]$fit_object$learner_fits[[1]]$fit_object$hal_fits[[2]]$coefs[-1]
+c = f$fit_object$learner_fits[[2]]$fit_object$learner_fits[[1]]$fit_object$hal_fits[[2]]$coefs
 sum(abs(a))
 sum(abs(c))
 ```
