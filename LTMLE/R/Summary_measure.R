@@ -17,7 +17,7 @@ Summary_measure <- R6Class(
           return(result)
         }
         params <- sl3::args_to_list()
-        params$summary_function = summary_function_wrap
+        params$summary_function <- summary_function_wrap
         private$.params <- params
     },
     summarize = function(data, add_id = T){
@@ -29,16 +29,19 @@ Summary_measure <- R6Class(
 
       reduced_data <- data[,func(.SD), by = id,
                            .SDcols = self$params$column_names]
+
      #  num_sample <- length(unique(reduced_data$id))
      #  num_summary_vars <- nrow(reduced_data) / num_sample
      #  reduced_data$summary_id <- c(1:num_summary_vars, num_sample)
      #  reduced_data <- reshape(reduced_data, idvar = "id", timevar = "summary_id", direction = "wide")
 
-       assertthat::assert_that(ncol(reduced_data)-1 == length(self$params$name),
+       assertthat::assert_that(is.null(self$params$name) | ncol(reduced_data)-1 == length(self$params$name),
                               msg = "The summary measure names does not match length of summary measure function output.")
-      colnames(reduced_data) <- c("id", self$params$name)
+      if(!is.null(self$params$name)){
+        colnames(reduced_data) <- c("id", self$params$name)
+      }
       if(!add_id){
-        reduced_data$id = F
+        reduced_data$id = NULL
       }
       return(reduced_data)
     }
@@ -74,6 +77,26 @@ make_summary_measure_NULL <- function(column_names = ""){
   name =  NULL
   summary_function <- function(data){
     return(data.table(NULL))
+
+  }
+
+  return(Summary_measure$new(column_names, summary_function, name))
+}
+
+
+make_summary_measure_FULL <- function(column_names){
+  column_names <- union("t", column_names)
+  name =  NULL
+
+  summary_function <- function(data){
+    t <- data$t
+    data$t <- NULL
+    data <- do.call(cbind, lapply(1:ncol(data), function(i){
+      dat <- data.table::transpose(data[,i, with =F])
+      colnames(dat) <- paste(colnames(data)[i], t, sep = "_")
+
+      return(dat)}))
+    return(data)
 
   }
 

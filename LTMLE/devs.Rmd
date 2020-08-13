@@ -4,15 +4,18 @@ output: html_document
 ---
 
 ```{r}
+remotes::install_github("Larsvanderlaan/tmle3")
 devtools::document()
-
 ```
+
+
+
 
 ```{r}
 library(tmle3)
 library(data.table)
 
-dt = data.table(cbind(c(1,2,1,2), c(1,1,3,3), c(1,2,3,4),c(2,4,6,9), c(4,4,2,2), c(1,1,2,2)))
+dt = data.table(cbind(c(1,2,1,2), c(1,1,3,3), c(1,0,0,1),c(1,0,1,0), c(1,1,1,0), c(1,1,2,2)))
 colnames(dt) = c("t" ,"W", "L", "A", "Y", "id")
 dt
 
@@ -69,16 +72,67 @@ full_npsem = lapply(seq_along(time_ordered_nodes), get_graph, time_ordered_nodes
 
 ```
 
+```{r}
+devtools::document()
 
+```
+
+```{r}
+devtools::document()
+```
 
 ```{r}
 dt
 
 task = ltmle3_Task$new(dt, full_npsem)
 
+tsk = task$get_regression_task("A1")
+tsk$data
+```
 
-tmp = task$get_regression_task("Y")
+
+```{r}
+task$folds
+dt
+tmp = task$get_regression_task("Y", is_time_variant=T)
 tmp$data
+
+```
+
+
+```{r}
+d = data.table( c(1,1), c(1,1))
+colnames(d) <- c("A1", "A0")
+
+cf_task = task$generate_counterfactual_task("1234", d)
+cf_task$data
+```
+
+
+```{r}
+
+lik = generate_likelihood(task)
+lik$validate_task(task)
+
+lik$train(task)
+```
+
+```{r}
+task$weights
+
+```
+
+
+```{r}
+lik1 = lik$train(task)
+task$get_regression_task("A1")$weights
+lik1$get_likelihood(task, "A1")
+lik1$get_likelihood(task, "")
+```
+
+```{r}
+
+devtools::document()
 ```
 
 
