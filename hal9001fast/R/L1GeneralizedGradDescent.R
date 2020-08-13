@@ -8,8 +8,8 @@ get_next_beta <- function(x,y, beta, last_risk, eps_max_scale = 1, last_eps = NU
   #x_summed = Matrix::colSums(x * link)
   if(iter==1){
     weights = 1
-
   }
+
   x_summed= Matrix::crossprod(x, link)
   grad = x_summed * beta
   can_grad = grad - (sum(grad * abs(beta))/ sum(beta^2))*abs(beta)
