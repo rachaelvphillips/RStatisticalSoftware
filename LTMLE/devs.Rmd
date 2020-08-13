@@ -6,6 +6,7 @@ output: html_document
 ```{r}
 remotes::install_github("Larsvanderlaan/tmle3")
 devtools::document()
+library(tmle3)
 ```
 
 
@@ -125,9 +126,9 @@ task$weights
 
 ```{r}
 lik1 = lik$train(task)
-task$get_regression_task("A1")$weights
-lik1$get_likelihood(task, "A1")
-lik1$get_likelihood(task, "")
+
+lik1$get_likelihoods(task)
+lik1$get_likelihoods(task, "L0")
 ```
 
 ```{r}
