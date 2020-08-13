@@ -18,7 +18,7 @@ ltmle3_Node <- R6Class(
       cat(sprintf("%s: %s\n", node_class, self$name))
       cat(sprintf("\tVariables: %s\n", paste(self$variables, collapse = ", ")))
       cat(sprintf("\tParents: %s\n", paste(self$parents, collapse = ", ")))
-      cat(sprintf("\tSummary Measures: %s\n", paste(sapply(self$summary_functions, function(f){f$name}), collapse = ", ")))
+      cat(sprintf("\tSummary Measures: %s\n", paste(unlist(sapply(self$summary_functions, function(f){f$name})), collapse = ", ")))
 
     }
   ),

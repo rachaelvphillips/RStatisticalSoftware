@@ -8,8 +8,11 @@
 # Note that some elements of the final row may be NA if some covariates are measured at the same present time but are still
 # ... part of the past due to time ordering. This should be handled as needed.
 # Note this is avoided if the covariates specified by "column_names" all occur at the same time (e.g. are all from the L2 node)
-#
-
+# Data to be summarized must have a column name "id" representing the id for each individual.
+# A number of possible summary measure objects are available in constructors below.
+# Note that the constructor "make_summary_measure_apply" can be used to safely make
+# a summary_measure object. The input function should take a vector of observations of a single covariate over time
+# for a single person and spit out a single value.
 
 #' @export
 Summary_measure <- R6Class(
