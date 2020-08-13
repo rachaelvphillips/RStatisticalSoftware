@@ -1,4 +1,4 @@
-generate_likelihood <- function(task, lrnr_binomial = Lrnr_glm$new(family = "binomial"), lrnr_continuous = Lrnr_condensier$new() ){
+generate_likelihood <- function(task, lrnr_binomial = Lrnr_glm$new(), lrnr_continuous = Lrnr_condensier$new() ){
   factor_list = c()
   for(name in names(task$npsem)){
     node <- task$npsem[[name]]

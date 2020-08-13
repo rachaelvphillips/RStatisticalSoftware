@@ -21,11 +21,12 @@ Summary_measure <- R6Class(
   class = TRUE,
   public = list(
     initialize = function(column_names, summary_function, name = "Summary"){
+        # Summary function must return data.table with nrow = 1 ...
+       # for self$summarize to work correctly.
         summary_function_wrap <- function(data){
           result <- summary_function(data)
           if(!is.data.table(result)){
             result <- data.table(matrix(result, nrow =1))
-
           }
           return(result)
         }
@@ -36,13 +37,14 @@ Summary_measure <- R6Class(
     summarize = function(data, add_id = T){
       data <- private$.process_data(data, NULL)
       func <- private$.params$summary_function
-      # Needed since  pass by promise would break next line
+      # Needed since pass by promise would break next line apparently
       data <- data[,]
 
 
       reduced_data <- data[,func(.SD), by = id,
                            .SDcols = self$params$column_names]
 
+    # This code isn't needed unless func does not return a data.table, which can't happen.
      #  num_sample <- length(unique(reduced_data$id))
      #  num_summary_vars <- nrow(reduced_data) / num_sample
      #  reduced_data$summary_id <- c(1:num_summary_vars, num_sample)

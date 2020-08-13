@@ -9,8 +9,8 @@ Likelihood_pooled <- R6Class(
   class = TRUE,
   inherit = Likelihood,
   active = list(
-    factor_list_unpooled = function(){
-      self$params$factor_list_unpooled
+    factor_list_pooled = function(){
+      self$params$factor_list_pooled
     }
   ),
   public = list(
@@ -33,8 +33,12 @@ Likelihood_pooled <- R6Class(
       #factor_list is used for training
       #factor_list_unpooled is used for prediction
       #Assumes that training is done via mutation
-      params$factor_list <- factor_list
-      params$factor_list_unpooled <- factor_list_unpooled
+
+      #factor_list appears just like a standard factor_list except it contains duplicate LF_factors
+      #corresponding to the pooled nodes.
+      params$factor_list <- factor_list_unpooled
+      #factor_list_pooled only contains the unique factors
+      params$factor_list_pooled <- factor_list
       if (is.null(cache)) {
         cache <- Likelihood_cache$new()
       }
@@ -46,14 +50,14 @@ Likelihood_pooled <- R6Class(
       assert_that(is(tmle_task, "tmle3_Task"))
 
       factor_list <- self$factor_list
-      factor_names <- unlist(lapply(factor_list, `[[`, "name"))
+      factor_names <- names(factor_list)
       task_nodes <- names(tmle_task$npsem)
       if (!all(factor_names %in% task_nodes)) {
         stop("factor_list and task$npsem must have matching names")
       }
     },
     get_likelihood = function(tmle_task, node, fold_number = "full") {
-      likelihood_factor <- self$factor_list_unpooled[[node]]
+      likelihood_factor <- self$factor_list[[node]]
       # first check for cached values for this task
 
       likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number)
@@ -65,7 +69,7 @@ Likelihood_pooled <- R6Class(
         self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values)
       }
       #Subset to only likelihood values of this node
-      likelihood_values <- likelihood_values[,node, with = F]
+      likelihood_values <- likelihood_values[, node, with = F]
 
       return(likelihood_values)
     },

@@ -147,6 +147,8 @@ ltmle3_Task <- R6Class(
         failure_times <- past_data[, getT(.SD), by = id, .SDcols = c("t", censoring_node_var)][[2]]
 
         dont_keep <- which(failure_times < time)
+      } else {
+        dont_keep <- c()
       }
 
       parent_names <- target_node_object$parents
@@ -218,8 +220,8 @@ ltmle3_Task <- R6Class(
       nodes$covariates <- covariates
       nodes$time <- "t"
       regression_data <- do.call(cbind, list(all_covariate_data, outcome_data, node_data))
-      if(drop_censored){
-        regression_data <- regression_data[-dont_keep,]
+      if(drop_censored & !is.null(target_node_object$censoring_node) & length(dont_keep)>0){
+        regression_data <- regression_data[-dont_keep,, with = F]
       }
       regression_task <- sl3_Task$new(
         regression_data,

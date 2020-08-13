@@ -1,11 +1,27 @@
 
 ```{r, include=F}
-#remotes::install_github("Larsvanderlaan/tmle3", ref = "devel")
+remotes::install_github("Larsvanderlaan/tmle3", ref = "devel")
 
 library(tmle3)
 devtools::document()
 ```
 
+
+```{r}
+
+observed <- c(1,1,2,2,2,3)
+uniq_obs <- unique(observed)
+counts <- as.list(rep(0, length(uniq_obs)))
+names(counts) <- uniq_obs
+for(obs in uniq_obs){
+  counts[[obs]] <- sum(observed == obs)
+  
+}
+
+matched_obs <- match(observed, uniq_obs)
+weights <- as.vector(sapply(matched_obs, function(i) counts[[i]]))
+weights / sum(weights)
+```
 
 ```{r}
 
@@ -51,7 +67,7 @@ task = ltmle3_Task$new(final, npsem)
 task$get_data()
 tsk = task$get_regression_task("Y")
 tsk$data
-
+likelihood <- generate_likelihood(task)
 ```
 
 
@@ -59,22 +75,19 @@ tsk$data
 
 
 ```{r}
-
-#all.equal(unlist(task$nodes), unlist(task$nodes))
-task$get_regression_task("Y")$data
-
-#task$get_regression_task("A1")$data
-#copy_task = task$get_regression_task(c("A0", "A1"))
-#copy_task$data
+likelihood <- likelihood$train(task)
 ```
 
 
 
 
+```{r}
 
+match(c("a", "b"), c("a", "a", "b"))
+```
 
 ```{r}
-tmle3_Task$init
+likelihood$get_likelihoods(task)
 
 ```
 
