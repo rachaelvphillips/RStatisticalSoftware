@@ -60,15 +60,26 @@ final
 ```
 
 
-
-
 ```{r}
-npsem <- generate_npsem(final, "L", "L", "A", "Y")
 task = ltmle3_Task$new(final, npsem)
-task$get_data()
-tsk = task$get_regression_task("Y")
-tsk$data
+task$get_tmle_node("L0", include_id = T, format = T)
+task$get_regression_task("L0")
+
+```
+
+
+```{r}
+final$A_at_risk = c(rep(1,200), rep(1,200))
+
+npsem <- generate_npsem(final, "L", "L", "A", "Y")
+
+task = ltmle3_Task$new(final, npsem)
+
+tsk = task$get_regression_task("A1", drop_censored = F)
+tsk$get_data()
+tsk$X
 likelihood <- generate_likelihood(task)
+
 ```
 
 
@@ -76,12 +87,8 @@ likelihood <- generate_likelihood(task)
 
 
 ```{r}
-likelihood <- likelihood$train(task)
-```
-
-
-```{r}
-likelihood$get_likelihoods(task)
+k=likelihood$train(task)
+(likelihood$get_likelihood(task, "L0"))
 
 ```
 

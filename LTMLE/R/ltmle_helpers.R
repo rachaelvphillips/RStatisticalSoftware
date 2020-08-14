@@ -7,15 +7,15 @@ generate_likelihood <- function(task, lrnr_binomial = Lrnr_glm$new(), lrnr_conti
       factor_list <- c(factor_list, name = LF_emp$new(name ))
     }
     else if(node$variable_type$type == "binomial"){
-      factor_list <- c(factor_list, name = LF_fit$new(name,  lrnr_binomial))
+      factor_list <- c(factor_list, name = LF_fit_pooled$new(name,  lrnr_binomial))
     }
     else{
-      factor_list <- c(factor_list, name = LF_fit$new(name, lrnr_continuous ))
+      factor_list <- c(factor_list, name = LF_fit_pooled$new(name, lrnr_continuous ))
     }
 
 
   }
-  return(Likelihood$new(factor_list))
+  return(Likelihood_pooled$new(factor_list))
 }
 
 
@@ -29,6 +29,7 @@ generate_npsem <- function(data, baseline, time_dep_cov, trtment, outcome){
 
 
 get_node = function(i, node_names, baseline, trtment, time_dep_cov, outcome){
+  at_risk = NULL
   if(i==1 | i==2 |i == 3){
     #baseline = c(baseline, time_dep_cov)
   }
@@ -40,6 +41,7 @@ get_node = function(i, node_names, baseline, trtment, time_dep_cov, outcome){
     parents = node_names[1:(i-1)]
     if(i%%2==0){
       cov = trtment
+      at_risk = make_summary_measure_last_value("A_at_risk")
     } else {
       cov = time_dep_cov
     }
@@ -64,13 +66,13 @@ get_node = function(i, node_names, baseline, trtment, time_dep_cov, outcome){
     summaries = base_line_summary
   }
   else if(i==3){
-    summaries =  c( base_line_summary, make_summary_measure_last_value(trtment))
+    summaries =  c( base_line_summary, make_summary_measure_last_value(trtment, strict_past = F))
   }
   else{
     summaries = c(base_line_summary, time_dep_summary)
   }
 
-  return(define_lnode(node_names[i], cov, parents,time,summaries))
+  return(define_lnode(node_names[i], cov, parents,time,summaries, at_risk_summary_function = at_risk))
 
 }
 

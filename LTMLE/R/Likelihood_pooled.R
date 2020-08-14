@@ -7,11 +7,55 @@ Likelihood_pooled <- R6Class(
   classname = "Likelihood_pooled",
   portable = TRUE,
   class = TRUE,
-  inherit = Likelihood,
+  inherit = Lrnr_base,
   active = list(
     factor_list_pooled = function(){
       self$params$factor_list_pooled
+    },
+    factor_list = function() {
+      return(self$params$factor_list)
+    },
+    nodes = function() {
+      return(names(self$factor_list))
+    },
+    cache = function() {
+      return(private$.cache)
+    },
+    censoring_nodes = function() {
+      return(private$.censoring_nodes)
     }
+  ),
+  private = list(
+    .train_sublearners = function(tmle_task) {
+      factor_fits <- lapply(self$factor_list, function(factor) {
+        factor$delayed_train(tmle_task) })
+      result <- bundle_delayed(factor_fits)
+      return(result)
+    },
+    .train = function(tmle_task, factor_fits) {
+      factor_list <- self$factor_list
+      for (i in seq_along(factor_list)) {
+        factor_list[[i]]$train(tmle_task, factor_fits[[i]])
+      }
+      # TODO: mutating factor list of Lrnr_object instead of returning a fit
+      #       which is not what sl3 Lrnrs usually do
+
+      censoring_nodes <- lapply(tmle_task$npsem, function(node) {
+        node$censoring_node$name
+      })
+
+      names(censoring_nodes) <- names(tmle_task$npsem)
+      private$.censoring_nodes <- censoring_nodes
+      return("trained")
+    },
+    .predict = function(tmle_task) {
+      stop("predict method doesn't work for Likelihood. See Likelihood$get_likelihoods for analogous method")
+    },
+    .chain = function(tmle_task) {
+      stop("chain method doesn't work for Likelihood. Currently, no analogous functionality")
+    },
+    .cache = NULL,
+    .censoring_nodes = NULL
   ),
   public = list(
     initialize = function(factor_list, cache = NULL, ...) {
@@ -26,7 +70,7 @@ Likelihood_pooled <- R6Class(
         names <- c(factor_names[[i]])
         factor <- factor_list[[i]]
         for(name in names){
-          factor_list_unpooled$name <- factor
+          factor_list_unpooled[[name]] <- factor
         }
       }
       names(factor_list) <-  sapply(factor_names, function(name) paste(name, collapse = "%"))
@@ -46,6 +90,13 @@ Likelihood_pooled <- R6Class(
 
       super$initialize(params)
     },
+
+    print = function() {
+      lapply(self$factor_list, print)
+      invisible(NULL)
+    },
+
+
     validate_task = function(tmle_task) {
       assert_that(is(tmle_task, "tmle3_Task"))
 
@@ -67,7 +118,7 @@ Likelihood_pooled <- R6Class(
         # if not, generate new ones
         likelihood_values <- likelihood_factor$get_likelihood(tmle_task, fold_number)
         nodes <- names(likelihood_values)
-        # Cache all likelihood values for all nodes in likelihood_values
+        # Cache all likelihood values for all nodes in likelihood_values.
         for(node in nodes) {
           self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values[, node, with = F], node)
         }
@@ -92,6 +143,56 @@ Likelihood_pooled <- R6Class(
       } else {
         return(self$get_likelihood(tmle_task, nodes[[1]], fold_number))
       }
+    },
+    get_possible_counterfactuals = function(nodes = NULL) {
+
+      # get factors for nodes
+      factor_list <- self$factor_list
+      if (!is.null(nodes)) {
+        factor_list <- factor_list[nodes]
+      }
+
+      all_levels <- lapply(factor_list, function(likelihood_factor) {
+        likelihood_factor$variable_type$levels
+      })
+      all_levels <- all_levels[!(sapply(all_levels, is.null))]
+      level_grid <- expand.grid(all_levels)
+      return(level_grid)
+    },
+    base_train = function(task, pretrain) {
+      self$validate_task(task)
+      fit_object <- private$.train(task, pretrain)
+      new_object <- self$clone() # copy parameters, and whatever else
+      new_object$set_train(fit_object, task)
+      return(new_object)
+    },
+    add_factors = function(factor_list) {
+      if (inherits(factor_list, "LF_base")) {
+        factor_list <- list(factor_list)
+      }
+
+      factor_names <- sapply(factor_list, `[[`, "name")
+
+      # train factors if necessary
+      factor_list <- lapply(factor_list, train_lf, self$training_task)
+
+      # add factors to list of factors
+      private$.params$factor_list[factor_names] <- factor_list
+    },
+    sample = function(tmle_task = NULL, sample_lib = NULL) {
+      # for now assume nodes are in order
+      # TODO: order nodes based on dependencies
+      if (is.NULL(sample_lib = NULL)) {
+        nodes <- names(self$factor_list)
+        sample_lib <- rep(list(NULL), length(nodes))
+        names(sample_lib) <- nodes
+      }
+
+      for (node in names(self$factor_list)) {
+        tmle_task <- factor_list$node$sample(tmle_task, sample_lib$node)
+      }
+
+      return(tmle_task)
     }
   )
 )

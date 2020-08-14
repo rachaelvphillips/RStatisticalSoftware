@@ -49,6 +49,8 @@ LF_fit_pooled <- R6Class(
     delayed_train = function(tmle_task) {
       # just return prefit learner if that's what we have
       # otherwise, make a delayed fit and return that
+
+
       if (self$learner$is_trained) {
         return(self$learner)
       }
@@ -62,13 +64,20 @@ LF_fit_pooled <- R6Class(
       return(learner_fit)
     },
     train = function(tmle_task, learner_fit) {
-      super$train(tmle_task)
+      #super$train(tmle_task)
+      #get first node for outcome type
+
+      tmle_nodes <- lapply(self$names, function(node) tmle_task$npsem[[node]])
+      private$.variable_type <- lapply(tmle_nodes, function(node) node$variable_type)
+      private$.training_task <- tmle_task
       private$.learner <- learner_fit
     },
     shape_predictions = function(tmle_task, preds){
       # Reshapes predictions if this is a pooled_task
       # returns the predictions as n x len(self$names) data.table.
-      if(length(self$names)==1){
+      if(length(self$name)==1){
+        preds <- data.table(preds)
+        setnames(preds, self$name)
         return(preds)
       }
       ids <- tmle_task$get_node("id")
@@ -77,8 +86,13 @@ LF_fit_pooled <- R6Class(
         preds[which(ids == id)]
       })
       # Stack preds so each row corresponds to the prediction for a single person
-      preds_stacked <- data.table(do.call(rbind, preds_list))
-      setnames(preds_stacked, self$names)
+      if(length(preds_list) == 1){
+        preds_stacked <- data.table(preds_list[[1]])
+      } else {
+        preds_stacked <- data.table(do.call(rbind, preds_list))
+      }
+
+      setnames(preds_stacked, self$name)
       return(preds_stacked)
     },
     get_mean = function(tmle_task, fold_number) {
@@ -92,14 +106,19 @@ LF_fit_pooled <- R6Class(
       preds <- shape_predictions(tmle_task, preds)
       return(preds)
     },
-    get_density = function(tmle_task, fold_number) {
+    get_density = function(tmle_task, fold_number, check_at_risk = T) {
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
       learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
       learner <- self$learner
       preds <- learner$predict_fold(learner_task, fold_number)
-
       outcome_type <- self$learner$training_task$outcome_type
+      Y <- learner_task$Y
+      if(any(is.na(Y))){
+
+      }
       observed <- outcome_type$format(learner_task$Y)
+      data <-  learner_task$get_data()
+
       if (outcome_type$type == "binomial") {
         likelihood <- ifelse(observed == 1, preds, 1 - preds)
       } else if (outcome_type$type == "categorical") {
@@ -111,9 +130,33 @@ LF_fit_pooled <- R6Class(
       } else {
         stop(sprintf("unsupported outcome_type: %s", outcome_type$type))
       }
-      likelihood <- shape_predictions(tmle_task, likelihood)
+      if(check_at_risk & "at_risk" %in% colnames(data)) {
+        assertthat::assert_that("last_val" %in% colnames(data), msg = "If at_risk is a column then last_val must be as well.")
+        not_at_risk <- which(data$at_risk == 0)
+        if(length(not_at_risk)>0){
+          lst_val <- unlist(data[not_at_risk,"last_val", with = F])
+          #If not at risk then equal to last value with prob 1
+          likelihood[not_at_risk] <- as.numeric(observed[not_at_risk] == lst_val)
+        }
+
+      }
+
+      likelihood <- self$shape_predictions(tmle_task, likelihood)
       return(likelihood)
     },
+    get_likelihood = function(tmle_task, fold_number = "full") {
+      if (self$type == "mean") {
+        values <- self$get_mean(tmle_task, fold_number)
+      } else {
+        values <- self$get_density(tmle_task, fold_number)
+      }
+      if (!is.null(self$bound)) {
+        values <- bound(values, self$bound)
+      }
+
+      return(values)
+    },
+
     sample = function(tmle_task, n_samples = NULL, fold_number = "full") {
       warning("This function has not been implemented for pooled tasks.")
       # TODO: fold

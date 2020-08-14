@@ -20,10 +20,13 @@ Summary_measure <- R6Class(
   portable = TRUE,
   class = TRUE,
   public = list(
-    initialize = function(column_names, summary_function, name = "Summary"){
+    initialize = function(column_names, summary_function, name = "Summary", strict_past = F){
         # Summary function must return data.table with nrow = 1 ...
        # for self$summarize to work correctly.
         summary_function_wrap <- function(data){
+          if(all(is.na(data))) {
+            return(data)
+          }
           result <- summary_function(data)
           if(!is.data.table(result)){
             result <- data.table(matrix(result, nrow =1))
@@ -34,8 +37,16 @@ Summary_measure <- R6Class(
         params$summary_function <- summary_function_wrap
         private$.params <- params
     },
-    summarize = function(data, add_id = T){
-      data <- private$.process_data(data, NULL)
+    set_name = function(name){
+      private$.params$name <- name
+    },
+    set_strict_past = function(strict_past){
+      private$.params$strict_past <- strict_past
+    },
+    summarize = function(data, time, add_id = T){
+
+      data <- private$.process_data(data, time, NULL)
+
       func <- private$.params$summary_function
       # Needed since pass by promise would break next line apparently
       data <- data[,]
@@ -68,16 +79,25 @@ Summary_measure <- R6Class(
     name = function(){
       self$params$name
     },
+    strict_past = function(){
+      self$params$strict_past
+    },
     params = function(){
       private$.params
     }
   ),
   private = list(
     .params = NULL,
-    .process_data = function(data, row_index){
-      assertthat::assert_that("id" %in% colnames(data), msg = "Error: Column 'id' not found in data.")
+    .process_data = function(data, time, row_index){
+      assertthat::assert_that(all(c("id", "t") %in% colnames(data)), msg = "Error: Column 'id' or 't' not found in data.")
       if(!is.data.table(data)){
         data = as.data.table(data)
+      }
+
+      if(self$params$strict_past) {
+        data <- data[which(data$t < time), ]
+      } else {
+        data <- data[which(data$t <= time), ]
       }
 
       if(is.null(row_index)){
@@ -130,10 +150,11 @@ make_summary_measure_baseline <- function(column_names){
 }
 
 
-make_summary_measure_last_value <- function(column_names){
+make_summary_measure_last_value <- function(column_names, strict_past = F){
   name = paste(column_names, "most_recent", sep = "_")
 
   summary_function <- function(data){
+
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
         stop("Summary function error: Not all column names found in data object.")
@@ -151,12 +172,12 @@ make_summary_measure_last_value <- function(column_names){
 
   }
   most_recent <-  function(v){v[length(v)]}
-  return(make_summary_measure_apply(column_names,  most_recent))
+  return(make_summary_measure_apply(column_names,  most_recent, strict_past))
   return(Summary_measure$new(column_names, summary_function, name))
 }
 
 
-make_summary_measure_apply <- function(column_names, FUN){
+make_summary_measure_apply <- function(column_names, FUN, strict_past = T){
   name = as.character(substitute(FUN))
   if(name[1] == "function")
   {
@@ -179,7 +200,7 @@ make_summary_measure_apply <- function(column_names, FUN){
     return(data)
 
   }
-  return(Summary_measure$new(column_names, summary_function, paste(column_names, name, sep = "_")))
+  return(Summary_measure$new(column_names, summary_function, paste(column_names, name, sep = "_"),strict_past))
 
 }
 
@@ -230,6 +251,25 @@ make_summary_measure_relative_difference_from_last_t <- function(column_names){
   rel_diff_last_t <-  function(v){v[length(v)] - v[length(v)-1]}
   return(make_summary_measure_apply(column_names,  rel_diff_last_t))
   return(Summary_measure$new(column_names, summary_function, name))
+
+}
+
+# takes competing risk columns and returns indicator variable if at risk
+make_summary_measure_competing_indicator <- function(competing, strict_past = T){
+  column_names <- c(competing)
+  name <- paste(paste(competing, collapse = "_"), "at_risk", sep = "_")
+  summary_function <- function(data){
+    if(!all.equal(colnames(data), column_names)){
+      if(!(all(column_names %in% colnames(data)))){
+        stop("Summary function error: Not all column names found in data object.")
+      }
+      data <- data[, column_names, with = F]
+    }
+    # If any of competing risks jumped then at_risk is 0
+    at_risk <- as.numeric(all(rowSums(data[,competing, with = F])==0))
+    return(at_risk)
+  }
+  return(Summary_measure$new(column_names, summary_function, name, strict_past))
 
 }
 

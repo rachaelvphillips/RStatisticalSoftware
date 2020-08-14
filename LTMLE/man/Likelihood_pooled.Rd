@@ -11,16 +11,21 @@ All output behavior is identical to the standard Likelihood object.
 Likelihood object that supports a list of pooled LF objects (e.g. LF_fit_pooled)
 All output behavior is identical to the standard Likelihood object.
 }
-\section{Super classes}{
-\code{\link[sl3:Lrnr_base]{sl3::Lrnr_base}} -> \code{\link[tmle3:Likelihood]{tmle3::Likelihood}} -> \code{Likelihood_pooled}
+\section{Super class}{
+\code{\link[sl3:Lrnr_base]{sl3::Lrnr_base}} -> \code{Likelihood_pooled}
 }
 \section{Methods}{
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-new}{\code{Likelihood_pooled$new()}}
+\item \href{#method-print}{\code{Likelihood_pooled$print()}}
 \item \href{#method-validate_task}{\code{Likelihood_pooled$validate_task()}}
 \item \href{#method-get_likelihood}{\code{Likelihood_pooled$get_likelihood()}}
 \item \href{#method-get_likelihoods}{\code{Likelihood_pooled$get_likelihoods()}}
+\item \href{#method-get_possible_counterfactuals}{\code{Likelihood_pooled$get_possible_counterfactuals()}}
+\item \href{#method-base_train}{\code{Likelihood_pooled$base_train()}}
+\item \href{#method-add_factors}{\code{Likelihood_pooled$add_factors()}}
+\item \href{#method-sample}{\code{Likelihood_pooled$sample()}}
 \item \href{#method-clone}{\code{Likelihood_pooled$clone()}}
 }
 }
@@ -40,11 +45,6 @@ All output behavior is identical to the standard Likelihood object.
 \item \out{<span class="pkg-link" data-pkg="sl3" data-topic="Lrnr_base" data-id="subset_covariates">}\href{../../sl3/html/Lrnr_base.html#method-subset_covariates}{\code{sl3::Lrnr_base$subset_covariates()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="sl3" data-topic="Lrnr_base" data-id="train">}\href{../../sl3/html/Lrnr_base.html#method-train}{\code{sl3::Lrnr_base$train()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="sl3" data-topic="Lrnr_base" data-id="train_sublearners">}\href{../../sl3/html/Lrnr_base.html#method-train_sublearners}{\code{sl3::Lrnr_base$train_sublearners()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="add_factors">}\href{../../tmle3/html/Likelihood.html#method-add_factors}{\code{tmle3::Likelihood$add_factors()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="base_train">}\href{../../tmle3/html/Likelihood.html#method-base_train}{\code{tmle3::Likelihood$base_train()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="get_possible_counterfactuals">}\href{../../tmle3/html/Likelihood.html#method-get_possible_counterfactuals}{\code{tmle3::Likelihood$get_possible_counterfactuals()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="print">}\href{../../tmle3/html/Likelihood.html#method-print}{\code{tmle3::Likelihood$print()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="sample">}\href{../../tmle3/html/Likelihood.html#method-sample}{\code{tmle3::Likelihood$sample()}}\out{</span>}
 }
 \out{</details>}
 }
@@ -54,6 +54,15 @@ All output behavior is identical to the standard Likelihood object.
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$new(factor_list, cache = NULL, ...)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-print"></a>}}
+\if{latex}{\out{\hypertarget{method-print}{}}}
+\subsection{Method \code{print()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$print()}\if{html}{\out{</div>}}
 }
 
 }
@@ -85,6 +94,42 @@ All output behavior is identical to the standard Likelihood object.
   nodes = NULL,
   fold_number = "full"
 )}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-get_possible_counterfactuals"></a>}}
+\if{latex}{\out{\hypertarget{method-get_possible_counterfactuals}{}}}
+\subsection{Method \code{get_possible_counterfactuals()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$get_possible_counterfactuals(nodes = NULL)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-base_train"></a>}}
+\if{latex}{\out{\hypertarget{method-base_train}{}}}
+\subsection{Method \code{base_train()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$base_train(task, pretrain)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-add_factors"></a>}}
+\if{latex}{\out{\hypertarget{method-add_factors}{}}}
+\subsection{Method \code{add_factors()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$add_factors(factor_list)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-sample"></a>}}
+\if{latex}{\out{\hypertarget{method-sample}{}}}
+\subsection{Method \code{sample()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$sample(tmle_task = NULL, sample_lib = NULL)}\if{html}{\out{</div>}}
 }
 
 }

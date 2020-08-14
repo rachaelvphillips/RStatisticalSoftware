@@ -38,6 +38,10 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
     }
 }
 
+\seealso{
+Other Likelihood objects: 
+\code{\link{Targeted_Likelihood_pooled}}
+}
 \concept{Likelihood objects}
 \keyword{data}
 \section{Super class}{
@@ -52,6 +56,7 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
 \item \href{#method-shape_predictions}{\code{LF_fit_pooled$shape_predictions()}}
 \item \href{#method-get_mean}{\code{LF_fit_pooled$get_mean()}}
 \item \href{#method-get_density}{\code{LF_fit_pooled$get_density()}}
+\item \href{#method-get_likelihood}{\code{LF_fit_pooled$get_likelihood()}}
 \item \href{#method-sample}{\code{LF_fit_pooled$sample()}}
 \item \href{#method-clone}{\code{LF_fit_pooled$clone()}}
 }
@@ -60,7 +65,6 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
 \out{<details open ><summary>Inherited methods</summary>}
 \itemize{
 \item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="LF_base" data-id="cf_values">}\href{../../tmle3/html/LF_base.html#method-cf_values}{\code{tmle3::LF_base$cf_values()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="LF_base" data-id="get_likelihood">}\href{../../tmle3/html/LF_base.html#method-get_likelihood}{\code{tmle3::LF_base$get_likelihood()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="LF_base" data-id="print">}\href{../../tmle3/html/LF_base.html#method-print}{\code{tmle3::LF_base$print()}}\out{</span>}
 }
 \out{</details>}
@@ -121,7 +125,16 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
 \if{latex}{\out{\hypertarget{method-get_density}{}}}
 \subsection{Method \code{get_density()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_density(tmle_task, fold_number)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_density(tmle_task, fold_number, check_at_risk = T)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-get_likelihood"></a>}}
+\if{latex}{\out{\hypertarget{method-get_likelihood}{}}}
+\subsection{Method \code{get_likelihood()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_likelihood(tmle_task, fold_number = "full")}\if{html}{\out{</div>}}
 }
 
 }

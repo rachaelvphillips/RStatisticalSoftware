@@ -36,8 +36,13 @@ ltmle3_Task <- R6Class(
 
       super$initialize(data, npsem, id = "id", time = "t", add_censoring_indicators = F,  ...)
     },
-    get_tmle_node = function(node_name, format = FALSE, include_time = F) {
-      # node as dt vs node as column
+    get_tmle_node = function(node_name, format = FALSE, include_time = F, include_id = T) {
+     # returns node value
+     # note if row is missing for person at time specified by node
+      # then it is assumed the individual was not monitored and was not subject to change
+      # the last known value of the node (at previous time) will be used instead
+
+       # node as dt vs node as column
       # scaling
       # caching that accounts for these
       # keep defaults the same
@@ -45,7 +50,7 @@ ltmle3_Task <- R6Class(
       # format variables (using format Y ) when
       # categorical should be formatted as factors
       # what does the ate and tsm spec do here
-      cache_key <- sprintf("%s_%s_%s", node_name, format, include_time)
+      cache_key <- sprintf("%s_%s_%s_%s", node_name, format, include_time, include_id)
 
       cached_data <- get0(cache_key, private$.node_cache, inherits = FALSE)
       if (!is.null(cached_data)) {
@@ -57,10 +62,86 @@ ltmle3_Task <- R6Class(
       if (is.null(node_var)) {
         return(data.table(NULL))
       }
-      data <- self$get_data(self$row_index, c("t", node_var))
 
-      time <- private$.npsem[[node_name]]$time
-      data <- data[data$t == time,]
+      data <- self$get_data(self$row_index, c("t", "id", node_var))
+      if(format == TRUE & !is.null(tmle_node$node_type) ){
+        print("noooo")
+        if(tmle_node$node_type == "counting_process") {
+          # Convert counting process format to hazard outcome format
+
+          to_hazard <- function(v) {
+            first_jump <- min(which(v==1))
+            v[] = 0
+            v[first_jump] =1
+            return(v)
+          }
+          data_as_haz <- data[, lapply(.SD, to_hazard), by = id, .SDcols = node_var]
+          data_as_haz$t <- data$t
+          data <- data_as_haz
+
+          time <- private$.npsem[[node_name]]$time
+          all_ids <- unique(data$id)
+          orig_data <- data
+
+          last_obs_value <- function(X){
+            max_time_index <- which.max(X$t)
+            return(X[max_time_index,])
+          }
+          # Handle that those whose outcome was not subject to change do not have a row in dataset
+          # Therefore, extract last observed value of node_var up until this time.
+          data <- data[data$t <= time, ]
+          # get last observed value for each person (either at this time if there is a row or not)
+          data <- data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
+          # If person was not monitored at this time then there hazard is 0.
+          data[which(data$t!= time), node_var] <- 0
+          # set time to current time
+          data$t = time
+
+        }
+      } else {
+        time <- private$.npsem[[node_name]]$time
+        all_ids <- unique(data$id)
+        orig_data <- data
+
+        last_obs_value <- function(X){
+          max_time_index <- which.max(X$t)
+          return(X[max_time_index,])
+        }
+        # Handle that those whose outcome was not subject to change do not have a row in dataset
+        # Therefore, extract last observed value of node_var up until this time.
+        data <- data[data$t <= time, ]
+        # get last observed value for each person (either at this time if there is a row or not)
+        data <- data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
+        # set time to current time
+        data$t = time
+      }
+
+
+
+
+
+      # # Check those who were not subject to change/monitoring (e.g. missing row at this time)
+      # not_monitored <- setdiff(all_ids, id)
+      # if(length(not_monitored)>0){
+      #   # Get last observed value of outcome, could happen at different times for each person
+      #   data_not_monitored <- orig_data[which(orig_data$id %in% not_monitored), ]
+      #   last_obs_value <- function(X){
+      #     max_time_index <- which.max(X$t)
+      #     return(X[max_time_index, ,])
+      #   }
+      #   data_not_monitored <- orig_data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
+      #   # Match up column order
+      #   data_not_monitored <- data_not_monitored[, colnames(data),with = F]
+      #   #merge data by rows
+      #   data <- rbind(data, data_not_monitored)
+      #
+      # }
+      #Order by id
+      data <- data[order(data$id),]
+
+      id <- data$id
+      data$id <- NULL
+
       t <- data$t
       data$t <- NULL
 
@@ -76,6 +157,7 @@ ltmle3_Task <- R6Class(
 
         data <- var_type$format(data)
         data <- self$scale(data, node_name)
+
         data <- data.table(data)
         setnames(data, node_var)
 
@@ -83,9 +165,13 @@ ltmle3_Task <- R6Class(
       }
 
       if(include_time){
-        data <- data.table(cbind(t ,data))
-        setnames(data, c("t", node_var))
+        data$t <- t
+
       }
+      if(include_id){
+        data$id <- id
+      }
+
 
 
 
@@ -125,59 +211,51 @@ ltmle3_Task <- R6Class(
       outcome <- target_node_object$variables
       #get t-1 data and then get all t varialbes of past
       time <- target_node_object$time
+      at_risk_vars <- target_node_object$at_risk_vars
       past_data <- self$get_data()
       past_data <- past_data[,]
 
-      if(drop_censored & !is.null(target_node_object$censoring_node)){
-        # Censoring node should represent a n*t binary vector which is 1 for individual n
-        # at time t if the individual is censored/dies at that time.
-        # The time of failure/censoring is extracted from this vector.
-        censoring_node_var <- target_node_object$censoring_node$variables
-        assertthat::assert_that(all(past_data[, censoring_node_var, with = F][[1]] %in% c(0,1)), msg = "Error: drop_censored is T for non-binary censoring variable ")
-        getT <- function(X){
-          event_index <- which(X[,censoring_node_var,with=F]==1)
-          event_index <- min(event_index)
-          if(length(event_index)==0){
-            return(Inf)
-          }
-          event_t <- X[event_index, "t", with = F][[1]]
-
-          return(event_t)
-        }
-        failure_times <- past_data[, getT(.SD), by = id, .SDcols = c("t", censoring_node_var)][[2]]
-
-        dont_keep <- which(failure_times < time)
-      } else {
-        dont_keep <- c()
-      }
 
       parent_names <- target_node_object$parents
       parent_nodes <- npsem[parent_names]
-
+      all_vars <- unique(unlist(lapply(npsem, `[[`, "variables")))
 
       times <- as.vector(sapply(parent_nodes, function(node) node$time))
       parent_covariates <- as.vector(sapply(parent_nodes, function(node) node$variables))
-      add_to_past <- unique(parent_covariates[times == time])
+      past_same_time_vars <- unique(parent_covariates[times == time])
 
-      outcome_data <- self$get_tmle_node(target_node, format = TRUE)
+      # Note that those with missing rows will be included in outcome_data.
+      # There value will be set to last measured value.
+      outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T)
+      #Subset to data up until current time
       past_data <- past_data[past_data$t <= time,]
-      ignore_cols <- setdiff(colnames(past_data), c("t", "id", add_to_past))
+      # Find ids with observation row at this time. E.g. those who were monitored at this time
+      # These people are implicitely in the at-risk set.
+      risk_set <- c()
+      monitored_ids <- past_data[, any(.SD==time), by = id, .SDcols = c("t")]
+      monitored_ids <- monitored_ids[which(monitored_ids[[2]]), id]
+
+      risk_set <- unlist(c(risk_set, monitored_ids))
+      # Extract those who were not monitored at this time to be dropped.
+      #not_monitored_ids <- monitored_ids[-which(monitored_ids[[2]]), id][[1]]
+
+      strict_past_vars <- setdiff(all_vars, c("t", "id", past_same_time_vars))
       # Safeguard to ensure no future data leakage
-      # Handling down the line should ensure that this step isn't ever needed
-      # But better safe than sorry
-      set(past_data,  which(past_data$t == time), ignore_cols, NA)
-      set(past_data, , setdiff(colnames(past_data), c("t", "id", unique(parent_covariates))) , NA)
+      # Needed for summary functions that depend on both current time values and past time values
+      set(past_data,  which(past_data$t == time), strict_past_vars, NA)
+      #set(past_data, , setdiff(colnames(past_data), c("t", "id", unique(parent_covariates))) , NA)
 
       skip <- F
       if(length(parent_covariates) == 0){
-        past_data <- data.table(NULL)
+        past_data <- (NULL)
         covariates <- c()
         skip <- T
+
       }
 
 
 
-
+      #This contains all people who have had some observation in the past  up until now
       all_covariate_data <- past_data
       if(!skip){
         summary_measures <- target_node_object$summary_functions
@@ -188,41 +266,104 @@ ltmle3_Task <- R6Class(
           #This ensures that no summary measures use the outcome
           #And allows summary measures to depend on the most recent L
           #Which happens at the same time as A.
+          subset_time <- time
 
-          assertthat::assert_that(all(fun$column_names %in% c("id" , "t", parent_covariates)), msg = sprintf("Error: Summary_meaure depends on covariates not found in parent nodes. Summary measure: %s & Parent covariates: %s", fun$column_names, parent_covariates))
-          if(length(intersect(fun$column_names, ignore_cols)) ==  length((fun$column_names))){
-            all_covariate_data <- all_covariate_data[all_covariate_data$t <= time - 1,]
+          if(!is.null(strict_past_vars) & any(fun$column_names %in% strict_past_vars)){
+            if(!fun$strict_past){
+              #warning("Summary measure is not based on strict past and does not respect the time ordering of npsem. Manually handling this.")
+              #subset_time <- subset_time - 1
+            }
           }
 
-          return(fun$summarize(all_covariate_data))}
+          return(fun$summarize(all_covariate_data, subset_time))}
         )
+
         all_covariate_data <- all_covariate_data %>% purrr::reduce(dplyr::full_join, by = "id")
-
-
+        #all_covariate_data$id <- NULL
         covariates <- setdiff(colnames(all_covariate_data), "id")
-        t_col <- data.table(rep(time, nrow(all_covariate_data)))
-        colnames(t_col) <- "t"
+        covariates <- setdiff(covariates, at_risk_vars)
+
+        if(!is.null(at_risk_vars)){
+          risk_indicator_cols <-  c(at_risk_vars$at_risk_competing, at_risk_vars$at_risk)
+          keep <- which(rowSums(all_covariate_data[, risk_indicator_cols, with = F])!=0)
+          still_at_risk_ids <- all_covariate_data[keep, id]
+
+          risk_set <- intersect(risk_set, still_at_risk_ids)
+
+          # Indicator whether person is still at risk
+          all_covariate_data$at_risk <- as.numeric(all_covariate_data$id %in% still_at_risk_ids)
+          # last measured value of outcome for each person
+          # Set outcome of those who are not at risk to last observed value
+          last_val <- all_covariate_data[,at_risk_vars$last_val, with = F]
+          if(!is.null(target_node_object$node_type)){
+            if(target_node_object$node_type == "counting_process") {
+              # If counting process then last value  should be set to zero (for hazard)
+              # technically only true for those not in risk set (but only needed for those people so its fine)
+              last_val[] <- 0
+            }
+          }
+          # remove all at_risk based covariates which aren't part of the machine learning
+          setDT(all_covariate_data)
+          set(all_covariate_data, ,"last_val", last_val)
+          set(all_covariate_data, , at_risk_vars$last_val,  NULL)
+          set(all_covariate_data, , at_risk_vars$at_risk_competing,  NULL)
+          set(all_covariate_data, , at_risk_vars$at_risk,  NULL)
+
+
+
+        } else {
+          setDT(all_covariate_data)
+
+          all_covariate_data[, last_val := NA]
+        }
+        # Add column specifying those at risk
+        #all_covariate_data$at_risk <- as.numeric(all_covariate_data$id %in% risk_set)
+
+
+
+        #t_col <- data.table(rep(time, nrow(all_covariate_data)))
+        #colnames(t_col) <- "t"
         if("t" %in% colnames(all_covariate_data))  all_covariate_data$t <- NULL
 
-        all_covariate_data <- cbind(t_col, all_covariate_data)
+        #all_covariate_data <- cbind(t_col, all_covariate_data)
       }
       if(is_time_variant){
         # TODO Not sure if this is the correct use of is_time_variant
-        covariates <- union("t", covariates)
+        #covariates <- union("t", covariates)
       }
 
       nodes <- self$nodes
 
       node_data <- self$get_data(, unlist(nodes))
       # Keep only node_data for each individual at the time of this tmle node
-      node_data <- node_data[self$data$t == time,]
+      node_data <- node_data[self$get_data()$t == time,]
       nodes$outcome <- outcome
       nodes$covariates <- covariates
       nodes$time <- "t"
-      regression_data <- do.call(cbind, list(all_covariate_data, outcome_data, node_data))
-      if(drop_censored & !is.null(target_node_object$censoring_node) & length(dont_keep)>0){
-        regression_data <- regression_data[-dont_keep,, with = F]
+      # Merge all data by id. Full join so all rows are kept and NA's added.
+      # NA rows will necessarily be dropped if drop_censored = T.
+      # Otherwise only the outcome variables should be NA for unobserved/unmonitored outcomes.
+      # If one is interested in getting predictions for people not observed at this time
+      # then one must add a row with the desired outcome.
+      if(skip) {
+        regression_data <-  list(outcome_data, node_data) %>% reduce(full_join, "id")
+
+      } else {
+        regression_data <-  list(all_covariate_data, outcome_data, node_data) %>% reduce(full_join, "id")
+
       }
+      regression_data$at_risk <- as.numeric(regression_data$id %in% risk_set)
+      # For those who had missing rows, set their last_val to the current value of node_var.
+      set_last_val_to_current<- intersect(which(is.na(regression_data$last_val)), which(!(regression_data$id %in% risk_set)))
+      if(length(set_last_val_to_current) > 0 ){
+        set(regression_data,set_last_val_to_current, "last_val", regression_data[set_last_val_to_current, outcome, with = F] )
+
+      }
+      # Only keep rows of those in risk set
+      if(drop_censored){
+        regression_data <- regression_data[which(regression_data$id %in% risk_set),]
+      }
+
       regression_task <- sl3_Task$new(
         regression_data,
         nodes = nodes,
