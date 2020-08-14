@@ -60,13 +60,17 @@ Likelihood_pooled <- R6Class(
       likelihood_factor <- self$factor_list[[node]]
       # first check for cached values for this task
 
-      likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number)
+      likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number, node)
       # note the above contains all values from the pooled task, not just this node.
 
       if (is.null(likelihood_values)) {
         # if not, generate new ones
         likelihood_values <- likelihood_factor$get_likelihood(tmle_task, fold_number)
-        self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values)
+        nodes <- names(likelihood_values)
+        # Cache all likelihood values for all nodes in likelihood_values
+        for(node in nodes) {
+          self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values[, node, with = F], node)
+        }
       }
       #Subset to only likelihood values of this node
       likelihood_values <- likelihood_values[, node, with = F]

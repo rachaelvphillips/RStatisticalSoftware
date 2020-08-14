@@ -63,6 +63,7 @@ final
 
 
 ```{r}
+npsem <- generate_npsem(final, "L", "L", "A", "Y")
 task = ltmle3_Task$new(final, npsem)
 task$get_data()
 tsk = task$get_regression_task("Y")
@@ -79,18 +80,12 @@ likelihood <- likelihood$train(task)
 ```
 
 
-
-
-```{r}
-
-match(c("a", "b"), c("a", "a", "b"))
-```
-
 ```{r}
 likelihood$get_likelihoods(task)
 
 ```
 
+`
 
 ```{r}
 d = data.table( c(1,1), c(1,1))
