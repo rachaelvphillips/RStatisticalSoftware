@@ -57,6 +57,25 @@ Param_base <- R6Class(
       # For each bundle specify the loss and submodel that needs to be used
       return(list("A%B%C" = list(loss, submodel), "D" = list(loss, submodel)))
     },
+    loss_function = function(estimate_list, observed_list){
+      # Example of loss function which takes list
+      loss <- lapply(seq_along(estimate_list), function(i){
+        get_loss(estimate_list[[i]], observed_list[[i]])
+      })
+      return(rowSums(do.call(cbind, loss)))
+    },
+    submodel = function(epsilon, initial_list, H_list){
+      # TODO Also handle when only one element is passed, and not list
+      #  Example of submodel that updates multiple nodes with single epsilon
+      submodel_helper = function(epsilon, initial, H) {
+        plogis(qlogis(initial) + H %*% epsilon)
+      }
+      new_likelihoods <- lapply(seq_along(initial_list), function(i){
+        submodel_helper(epsilon, initial_list[[i]], H_list[[i]] )
+      })
+      # returns list
+      return(new_likelihoods)
+    },
     estimates = function(tmle_task = NULL, fold_number = "full") {
       # Compute full estimate and EIC
       result <- c(Estimates, EIC)
@@ -65,6 +84,7 @@ Param_base <- R6Class(
     print = function() {
       cat(sprintf("%s: %s\n", class(self)[1], self$name))
     }
+
   ),
   active = list(
     name = function() {

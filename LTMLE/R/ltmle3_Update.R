@@ -145,6 +145,7 @@ tmle3_Update <- R6Class(
                                       update_node_key = "Y",
                                       drop_censored = FALSE) {
 
+      # Generates a sub_model data in list form if needed
       update_node <- self$key_to_node_bundle(update_node_key)
       # if(length(update_node)>1){
       #   #If multiple update nodes then pass list
@@ -179,11 +180,11 @@ tmle3_Update <- R6Class(
       # Merge clever covariates for each node across parameters
       covariates_dt_list <- clever_covariates %>% reduce(reduce_f)
       #covariates_dt <- do.call(cbind, node_covariates)
+      # Stack EIC node-specific components for each target parameter
       EIC_comps_stacked <- unlist(EIC_comps)
 
       node_submodel_info <- lapply(submodel_info, `[[`, update_node_key)
       # TODO check that parameters share the same loss functions and submodels
-      # They must be compatible for this to make sense
       node_submodel_info <- node_submodel_info[[1]]
       loss <- node_submodel_info$loss
       submodel <- node_submodel_info$submodel
@@ -271,6 +272,7 @@ tmle3_Update <- R6Class(
       H <- do.call(rbind, covariates_dt_list)
       loss_function <- submodel_data$loss
       submodel <- submodel_data$submodel
+      submodel_data_pooled = list(H = H, observed = observed,  initial = initial)
       # If list of submodel data
       # if(all(names(submodel_data) %in% self$update_nodes)){
       #   submodel_data_list <- submodel_data
@@ -285,7 +287,7 @@ tmle3_Update <- R6Class(
       # }
 
       if (self$constrain_step) {
-        ncol_H <- ncol(submodel_data$H)
+        ncol_H <- ncol(H)
         if (!(is.null(ncol_H) || (ncol_H == 1))) {
           stop(
             "Updater detected `constrain_step=TRUE` but multi-epsilon submodel.\n",
@@ -295,8 +297,10 @@ tmle3_Update <- R6Class(
 
 
         risk <- function(epsilon) {
-          # TODO change
-          submodel_estimate <- self$apply_submodel(submodel_data, epsilon)
+          # TODO change?
+          submodel_estimate <- self$apply_submodel(submodel_data, epsilon, submodel)
+          # When submodel_data is pooled list, should submodel_estimate return named list of estimates?
+
           loss <- loss_function(submodel_estimate, submodel_data$observed)
           mean(loss)
         }
@@ -327,20 +331,20 @@ tmle3_Update <- R6Class(
       } else {
         if (self$fluctuation_type == "standard") {
           suppressWarnings({
-            submodel_fit <- glm(observed ~ H - 1, submodel_data,
-                                offset = qlogis(submodel_data$initial),
+            submodel_fit <- glm(observed ~ H - 1, submodel_data_pooled,
+                                offset = qlogis(initial),
                                 family = binomial(),
-                                start = rep(0, ncol(submodel_data$H))
+                                start = rep(0, ncol(H))
             )
           })
         } else if (self$fluctuation_type == "weighted") {
           if (self$one_dimensional) {
             suppressWarnings({
-              submodel_fit <- glm(observed ~ -1, submodel_data,
-                                  offset = qlogis(submodel_data$initial),
+              submodel_fit <- glm(observed ~ -1, submodel_data_pooled,
+                                  offset = qlogis(initial),
                                   family = binomial(),
                                   weights = as.numeric(H),
-                                  start = rep(0, ncol(submodel_data$H))
+                                  start = rep(0, ncol(H))
               )
             })
           } else {
@@ -349,10 +353,10 @@ tmle3_Update <- R6Class(
               "This is incompatible. Proceeding with `fluctuation_type='standard'`."
             )
             suppressWarnings({
-              submodel_fit <- glm(observed ~ H - 1, submodel_data,
-                                  offset = qlogis(submodel_data$initial),
+              submodel_fit <- glm(observed ~ H - 1, submodel_data_pooled,
+                                  offset = qlogis(initial),
                                   family = binomial(),
-                                  start = rep(0, ncol(submodel_data$H))
+                                  start = rep(0, ncol(H))
               )
             })
           }
@@ -378,6 +382,7 @@ tmle3_Update <- R6Class(
       -1 * ifelse(observed == 1, log(estimate), log(1 - estimate))
     },
     apply_submodel = function(submodel_data, epsilon, submodel) {
+      # TODO
       submodel(epsilon, submodel_data$initial, submodel_data$H)
     },
     debundle_submodel = function(bundle, node){
@@ -488,6 +493,7 @@ tmle3_Update <- R6Class(
         self$update_step(likelihood, tmle_task, update_fold, subset_nodes)
 
         # update estimates based on updated likelihood
+        # TODO current estimates not needed. we only need EIC comp from clever cov
         private$.current_estimates <- lapply(self$tmle_params, function(tmle_param) {
           tmle_param$estimates(tmle_task, update_fold)
         })
