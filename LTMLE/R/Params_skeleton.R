@@ -23,6 +23,8 @@ Param_base <- R6Class(
     initialize = function(observed_likelihood, ..., nodes_to_target = "Y") {
       # What is nodes to target for?
       nodes_to_target = c("A%B%C", "D")
+      expanded_nodes_map <- c("A" = "A%B%C", "D" = D)
+      private$.expanded_nodes_map <- expanded_nodes_map
       private$.observed_likelihood <- observed_likelihood
       private$.nodes_to_target <- nodes_to_target
 
@@ -71,6 +73,9 @@ Param_base <- R6Class(
     type = function() {
       return(private$.type)
     },
+    expanded_nodes_map = function(){
+      private$.expanded_nodes_map
+    },
 
     observed_likelihood = function() {
       return(private$.observed_likelihood)
@@ -89,7 +94,8 @@ Param_base <- R6Class(
   private = list(
     .type = "undefined",
     .observed_likelihood = NULL,
-    .outcome_node = NULL,
+    .nodes_to_target = NULL,
+    .expanded_nodes_map = NULL,
     .targeted = TRUE,
     .supports_outcome_censoring = FALSE
   )
