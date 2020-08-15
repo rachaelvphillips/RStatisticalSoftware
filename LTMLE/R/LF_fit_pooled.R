@@ -34,6 +34,8 @@
 #'     \item{\code{learner}}{The learner or learner fit object}
 #'     }
 #' @export
+#'
+#' TODO If outcome is multivariate then this assumes learner will handle the multi outcome and return predictions as a matrix
 LF_fit_pooled <- R6Class(
   classname = "LF_fit_pooled",
   portable = TRUE,
@@ -60,6 +62,7 @@ LF_fit_pooled <- R6Class(
       # fit scaled task for bounded continuous
       learner_task <- tmle_task$get_regression_task(outcome_node, scale = TRUE, drop_censored=TRUE,
                                                     is_time_variant = self$is_time_variant)
+
       learner_fit <- delayed_learner_train(self$learner, learner_task)
       return(learner_fit)
     },
@@ -99,6 +102,7 @@ LF_fit_pooled <- R6Class(
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
       learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
       learner <- self$learner
+
       preds <- learner$predict_fold(learner_task, fold_number)
 
       # unscale preds (to handle bounded continuous)
@@ -130,18 +134,22 @@ LF_fit_pooled <- R6Class(
       } else {
         stop(sprintf("unsupported outcome_type: %s", outcome_type$type))
       }
+
       if(check_at_risk & "at_risk" %in% colnames(data)) {
-        assertthat::assert_that("last_val" %in% colnames(data), msg = "If at_risk is a column then last_val must be as well.")
+        names_last_val <- paste("last_val", learner_task$nodes$outcome, sep = "_")
+        # TODO Support multivariate outcome
+        assertthat::assert_that(all(names_last_val %in% colnames(data)), msg = "If at_risk is a column then last_val must be as well.")
         not_at_risk <- which(data$at_risk == 0)
         if(length(not_at_risk)>0){
-          lst_val <- unlist(data[not_at_risk,"last_val", with = F])
+          lst_val <- data[not_at_risk, names_last_val, with = F]
           #If not at risk then equal to last value with prob 1
           likelihood[not_at_risk] <- as.numeric(observed[not_at_risk] == lst_val)
         }
 
       }
-
       likelihood <- self$shape_predictions(tmle_task, likelihood)
+
+
       return(likelihood)
     },
     get_likelihood = function(tmle_task, fold_number = "full") {

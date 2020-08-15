@@ -7,7 +7,13 @@ devtools::document()
 ```
 
 
+```{r}
 
+final
+task = sl3_Task$new(final, c("L", "A"), c("Y", "t"))
+task$Y
+task$outcome_type$
+```
 
 ```{r}
 
@@ -69,18 +75,41 @@ likelihood <- generate_likelihood(task)
 
 ```{r}
 k=likelihood$train(task)
-(likelihood$get_likelihood(task, "L0"))
+(likelihood$get_likelihood(task, "Y"))
 
 ```
 
-`
 
 ```{r}
-d = data.table( c(1,1), c(1,1))
-colnames(d) <- c("A1", "A0")
-task$X
-cf_task = task$generate_counterfactual_task("1234", d)
-cf_task$data
+reduce_f <- function(x,y){
+ 
+  out = list()
+  names_out <- names(x)
+  for(i in seq_along(x)){
+   
+    out[[names_out[i]]] <- cbind(x[[i]], y[[i]])
+  }
+  return(out)
+}
+list(list(a=1,b=2,c=3), list(a=1,b=2,c=3)) %>% reduce(reduce_f)
+```
+
+
+```{r}
+probs
+collapse_nodes <- list("P" = c("L0", "L1", "A0", "A1", "Y"))
+factors = c(k$factor_list$A0, k$factor_list$A1)
+
+collapsed_k = Collapsed_Likelihood$new(k,collapse_nodes )
+collapsed_k$factor_list
+
+collapsed_k$get_likelihoods(task)
+collapsed_k$get_hidden_nodes("P")
+```
+
+```{r}
+collapsed_k$factor_list
+
 ```
 
 ```{r}

@@ -199,7 +199,9 @@ ltmle3_Task <- R6Class(
 
       # If target_node specifies multiple nodes
       # then return the pooled regression task obtained from each node-specific regression task, if possible.
+      # E.g. pool over time.
       if(length(target_node)>1){
+
         all_tasks <- lapply(target_node, self$get_regression_task, scale, drop_censored , is_time_variant)
         all_nodes <- lapply(all_tasks, function(task) task$nodes)
         time_is_node <- sapply(all_nodes, function(node) !is.null(node$time))
@@ -327,17 +329,18 @@ ltmle3_Task <- R6Class(
           }
           # remove all at_risk based covariates which aren't part of the machine learning
           setDT(all_covariate_data)
-          set(all_covariate_data, ,"last_val", last_val)
-          set(all_covariate_data, , at_risk_vars$last_val,  NULL)
-          set(all_covariate_data, , at_risk_vars$at_risk_competing,  NULL)
-          set(all_covariate_data, , at_risk_vars$at_risk,  NULL)
 
+          names_last_val <- paste("last_val", outcome, sep  = "_")
+          set(all_covariate_data, , names_last_val, last_val)
+          set(all_covariate_data, , at_risk_vars$last_val,  NULL)
+          if(!is.null( at_risk_vars$at_risk_competing)) set(all_covariate_data, , at_risk_vars$at_risk_competing,  NULL)
+          set(all_covariate_data, , at_risk_vars$at_risk,  NULL)
 
 
         } else {
           setDT(all_covariate_data)
-
-          all_covariate_data[, last_val := NA]
+          names_last_val <- paste("last_val", outcome, sep  = "_")
+          all_covariate_data[, (names_last_val) := NA]
         }
         # Add column specifying those at risk
         #all_covariate_data$at_risk <- as.numeric(all_covariate_data$id %in% risk_set)
