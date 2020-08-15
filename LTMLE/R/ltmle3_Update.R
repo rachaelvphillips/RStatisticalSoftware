@@ -183,8 +183,8 @@ tmle3_Update <- R6Class(
       # TODO check that parameters share the same loss functions and submodels
       # They must be compatible for this to make sense
       node_submodel_info <- node_submodel_info[[1]]
-      node_loss <- node_submodel_info$loss
-      node_submodel <- node_submodel_info$submodel
+      loss <- node_submodel_info$loss
+      submodel <- node_submodel_info$submodel
 
 
       if (self$one_dimensional) {
@@ -217,14 +217,23 @@ tmle3_Update <- R6Class(
 
       # TODO make sure that if there is only one node specified by update_node_key
       # that nothing breaks and each element of submodel_data is still a list
+      # submodel data now specifies the entire updating procedure including loss and submodel
+      names(observed_list) <- update_node
+      names(H) <- update_node
+      names(initial) <- update_node
+
       submodel_data <- list(
         observed = observed_list,
         H = covariates_dt_list,
         initial = initial_list,
+        loss = loss,
+        submodel = submodel
 
       )
 
       # TODO handle this
+      # Censoring/risk set could be a summary measure of past and may not be in dataset
+      # Will need to extract the at_risk indicator from the regression task of each node
       if(drop_censored){
         censoring_node<-tmle_task$npsem[[update_node]]$censoring_node$name
         if(!is.null(censoring_node)){
