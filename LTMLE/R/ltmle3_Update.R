@@ -400,7 +400,7 @@ tmle3_Update <- R6Class(
       # TODO make sure that submodel data/clever covariates are cached.
       # Currently the above is computing the submodel data for all nodes in bundle...
       # Alternatively we could do apply_update in bundles, but then changed to Targeted_lik
-      # would need to be made. It would break the abstration.
+      # would need to be made.
 
       submodel_data <- debundle_submodel(submodel_data, update_node)
 

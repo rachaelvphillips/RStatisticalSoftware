@@ -113,10 +113,12 @@ ltmle3_Task <- R6Class(
           max_time_index <- which.max(X$t)
           return(X[max_time_index,])
         }
-        # Handle that those whose outcome was not subject to change do not have a row in dataset
+        # Handle that those whose outcome was not subject to change and do not have a row in dataset
         # Therefore, extract last observed value of node_var up until this time.
         data <- data[data$t <= time, ]
         # get last observed value for each person (either at this time if there is a row or not)
+        # TODO If people are censored then they will end up having data drawn here (last observed value)
+        # TODO Should we treat censoring and at_risk sets differently?
         data <- data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
         # set time to current time
         data$t = time
