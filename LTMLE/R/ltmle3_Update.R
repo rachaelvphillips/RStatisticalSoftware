@@ -263,10 +263,11 @@ tmle3_Update <- R6Class(
 
       )
       # pool submodel data
+      # TODO make sure the fits below use this data and not submodel_data
       observed <- unlist(submodel_data$observed)
       initial <- unlist(submodel_data$initial)
       H <- do.call(rbind, covariates_dt_list)
-      loss <- submodel_data$loss
+      loss_function <- submodel_data$loss
       submodel <- submodel_data$submodel
       # If list of submodel data
       # if(all(names(submodel_data) %in% self$update_nodes)){
@@ -292,8 +293,9 @@ tmle3_Update <- R6Class(
 
 
         risk <- function(epsilon) {
+          # TODO change
           submodel_estimate <- self$apply_submodel(submodel_data, epsilon)
-          loss <- self$loss_function(submodel_estimate, submodel_data$observed)
+          loss <- loss_function(submodel_estimate, submodel_data$observed)
           mean(loss)
         }
 
@@ -417,8 +419,9 @@ tmle3_Update <- R6Class(
       return(updated_likelihood)
     },
     check_convergence = function(tmle_task, fold_number = "full") {
-      # For each update_node, get the eic components (from clever cov result)
-      # check each comp sep
+      # TODO For each update_node, get the eic components (from clever cov result)
+      # check each component separately
+      # TODO change everything
 
       estimates <- self$current_estimates
 
