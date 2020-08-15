@@ -88,8 +88,9 @@ tmle3_Update <- R6Class(
       private$.epsilons[[current_step]] <- na_epsilons
 
       for (update_node in update_nodes) {
-        # update_node can be a list of nodes if update must be pooled
+        # update_node could be keyed multinode
         # get new submodel fit
+        expanded_node <- self$key_to_node_bundle(update_nodes)
         submodel_data <- self$generate_submodel_data(
           likelihood, tmle_task,
           fold_number, update_node,
@@ -99,31 +100,32 @@ tmle3_Update <- R6Class(
         new_epsilon <- self$fit_submodel(submodel_data)
 
         # update likelihoods
-        if(length(update_node)==1){
+        if(length(expanded_node)==1){
           likelihood$update(new_epsilon, current_step, fold_number, update_node)
         } else {
           # If factors have shared epsilon
-          for(node in update_node ){
+          for(node in expanded_node ){
+            # TODO apply_update will fail
             likelihood$update(new_epsilon, current_step, fold_number, node)
           }
         }
 
         if (fold_number != "full") {
           # update full fit likelihoods if we haven't already
-          if(length(update_node)==1){
+          if(length(expanded_node)==1){
             likelihood$update(new_epsilon, self$step_number, "full", update_node)
           } else {
             # If factors have shared epsilon
-            for(node in update_node ){
+            for(node in expanded_node ){
               likelihood$update(new_epsilon,self$step_number, "full", node)
             }
           }
         }
         # Update shared epsilons
-        if(length(update_node)==1){
+        if(length(expanded_node)==1){
           private$.epsilons[[current_step]][[update_node]] <- new_epsilon
         } else {
-          for(node in update_node ){
+          for(node in expanded_node ){
             private$.epsilons[[current_step]][[node]] <- new_epsilon
           }
         }
@@ -374,13 +376,31 @@ tmle3_Update <- R6Class(
     apply_submodel = function(submodel_data, epsilon, submodel) {
       submodel(epsilon, submodel_data$initial, submodel_data$H)
     },
+    debundle_submodel = function(bundle, node){
+      submodel_data <- list(
+      observed = bundle$observed$node,
+      H = bundle$H$node,
+      initial = bundle$initial$node,
+      loss = bundle$loss,
+      submodel = bundle$submodel
+      )
+      return(submodel_data)
+    },
     apply_update = function(tmle_task, likelihood, fold_number, new_epsilon, update_node) {
-
-      # TODO This function only assumes update_node is length 1. Which should be fine.
+      # Update_node will always be a single node (never a bundled nodes key)
+      # TODO However, submodel_data won't work for nodes contained in bundled nodes
       submodel_data <- self$generate_submodel_data(
         likelihood, tmle_task,
         fold_number, update_node, drop_censored = FALSE
       )
+      # TODO make sure that submodel data/clever covariates are cached.
+      # Currently the above is computing the submodel data for all nodes in bundle...
+      # Alternatively we could do apply_update in bundles, but then changed to Targeted_lik
+      # would need to be made. It would break the abstration.
+
+      submodel_data <- debundle_submodel(submodel_data, update_node)
+
+
 
       updated_likelihood <- self$apply_submodel(submodel_data, new_epsilon)
 
@@ -397,6 +417,9 @@ tmle3_Update <- R6Class(
       return(updated_likelihood)
     },
     check_convergence = function(tmle_task, fold_number = "full") {
+      # For each update_node, get the eic components (from clever cov result)
+      # check each comp sep
+
       estimates <- self$current_estimates
 
       n <- length(unique(tmle_task$id))
