@@ -23,7 +23,7 @@ Param_base <- R6Class(
     initialize = function(observed_likelihood, ..., nodes_to_target = "Y") {
       # What is nodes to target for?
       nodes_to_target = c("A%B%C", "D")
-      expanded_nodes_map <- c("A" = "A%B%C", "D" = D)
+      expanded_nodes_map <- c("A" = c("A%B%C",1), "B" = c("A%B%C",2), "C" = c("A%B%C",3), "D" = c("D",1))
       private$.expanded_nodes_map <- expanded_nodes_map
       private$.observed_likelihood <- observed_likelihood
       private$.nodes_to_target <- nodes_to_target

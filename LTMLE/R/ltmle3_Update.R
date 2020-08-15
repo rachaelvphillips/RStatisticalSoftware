@@ -254,14 +254,16 @@ tmle3_Update <- R6Class(
     fit_submodel = function(submodel_data) {
 
 
-      submodel_data <- list(
-        observed = observed_list,
-        H = covariates_dt_list,
-        initial = initial_list,
-        loss = loss,
-        submodel = submodel
+      #expected format: submodel_data <- list(
+      #   observed = observed_list,
+      #   H = covariates_dt_list,
+      #   initial = initial_list,
+      #   loss = loss,
+      #   submodel = submodel
+      #
+      # )
 
-      )
+
       # pool submodel data
       # TODO make sure the fits below use this data and not submodel_data
       observed <- unlist(submodel_data$observed)
