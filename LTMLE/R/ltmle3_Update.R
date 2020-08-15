@@ -251,18 +251,33 @@ tmle3_Update <- R6Class(
     },
     fit_submodel = function(submodel_data) {
 
-      # If list of submodel data
-      if(all(names(submodel_data) %in% self$update_nodes)){
-        submodel_data_list <- submodel_data
-        observed_list <- lapply(submodel_data, `[[`, "observed")
-        H_list <- lapply(submodel_data, `[[`, "H")
-        initial_list <- lapply(submodel_data, `[[`, "initial")
-        # get pooled submodel data from which epsilon should be fit
-        submodel_data <- list(observed = unlist(observed_list),
-                              H = do.call(rbind(H_list)),
-                              initial = unlist(initial_list))
 
-      }
+      submodel_data <- list(
+        observed = observed_list,
+        H = covariates_dt_list,
+        initial = initial_list,
+        loss = loss,
+        submodel = submodel
+
+      )
+      # pool submodel data
+      observed <- unlist(submodel_data$observed)
+      initial <- unlist(submodel_data$initial)
+      H <- do.call(rbind, covariates_dt_list)
+      loss <- submodel_data$loss
+      submodel <- submodel_data$submodel
+      # If list of submodel data
+      # if(all(names(submodel_data) %in% self$update_nodes)){
+      #   submodel_data_list <- submodel_data
+      #   observed_list <- lapply(submodel_data, `[[`, "observed")
+      #   H_list <- lapply(submodel_data, `[[`, "H")
+      #   initial_list <- lapply(submodel_data, `[[`, "initial")
+      #   # get pooled submodel data from which epsilon should be fit
+      #   submodel_data <- list(observed = unlist(observed_list),
+      #                         H = do.call(rbind(H_list)),
+      #                         initial = unlist(initial_list))
+      #
+      # }
 
       if (self$constrain_step) {
         ncol_H <- ncol(submodel_data$H)
