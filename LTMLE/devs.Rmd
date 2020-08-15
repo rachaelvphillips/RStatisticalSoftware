@@ -7,21 +7,7 @@ devtools::document()
 ```
 
 
-```{r}
 
-observed <- c(1,1,2,2,2,3)
-uniq_obs <- unique(observed)
-counts <- as.list(rep(0, length(uniq_obs)))
-names(counts) <- uniq_obs
-for(obs in uniq_obs){
-  counts[[obs]] <- sum(observed == obs)
-  
-}
-
-matched_obs <- match(observed, uniq_obs)
-weights <- as.vector(sapply(matched_obs, function(i) counts[[i]]))
-weights / sum(weights)
-```
 
 ```{r}
 
@@ -60,12 +46,7 @@ final
 ```
 
 
-```{r}
-task = ltmle3_Task$new(final, npsem)
-task$get_tmle_node("L0", include_id = T, format = T)
-task$get_regression_task("L0")
 
-```
 
 
 ```{r}

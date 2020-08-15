@@ -13,18 +13,24 @@ ltmle3_Task <- R6Class(
     },
     weights = function() {
       # Assumes weights are constant in time
-      super$weights[!duplicated(self$data$id)]
+      keep <- !duplicated(self$data$id)
+      id <- self$data$id[keep]
+      #Return weights in order of id
+      super$weights[keep][order(id)]
     },
     offset = function() {
+      keep <- !duplicated(self$data$id)
+      id <- self$data$id[keep]
       # Assumes offset are constant in time
-      super$offset[!duplicated(self$data$id)]
+      # return offset
+      super$offset[keep][order(id)]
     }
   ),
   public = list(
     initialize = function(data, npsem, id = "id", time = "t",  ...) {
 
       #If time and id are not named as "t" and "id" then
-      #add columns
+      # add columns
       if(id!="id"){
         data[,"id", with = F] <- data[,id, with = F]
         id = "id"
@@ -33,7 +39,8 @@ ltmle3_Task <- R6Class(
         data[, "t", with = F] <- data[,time, with = F]
         time = "t"
       }
-
+      # Missing values may not be censoring, just information that the value hasn't changed since last time point
+      # Censoring should not be handled automatically.
       super$initialize(data, npsem, id = "id", time = "t", add_censoring_indicators = F,  ...)
     },
     get_tmle_node = function(node_name, format = FALSE, include_time = F, include_id = T) {
@@ -65,7 +72,6 @@ ltmle3_Task <- R6Class(
 
       data <- self$get_data(self$row_index, c("t", "id", node_var))
       if(format == TRUE & !is.null(tmle_node$node_type) ){
-        print("noooo")
         if(tmle_node$node_type == "counting_process") {
           # Convert counting process format to hazard outcome format
 
@@ -165,10 +171,19 @@ ltmle3_Task <- R6Class(
       }
 
       if(include_time){
+        if(!is.data.table(data)){
+          data <- data.table(data)
+          setnames(data, node_var)
+        }
         data$t <- t
+
 
       }
       if(include_id){
+        if(!is.data.table(data)){
+          data <- data.table(data)
+          setnames(data, node_var)
+        }
         data$id <- id
       }
 
@@ -180,6 +195,7 @@ ltmle3_Task <- R6Class(
       return(data)
     },
     get_regression_task = function(target_node, scale = FALSE, drop_censored = FALSE, is_time_variant = F) {
+      # TODO Not sure what is_time_variant is for.
 
       # If target_node specifies multiple nodes
       # then return the pooled regression task obtained from each node-specific regression task, if possible.
@@ -209,7 +225,6 @@ ltmle3_Task <- R6Class(
       npsem <- self$npsem
       target_node_object <- npsem[[target_node]]
       outcome <- target_node_object$variables
-      #get t-1 data and then get all t varialbes of past
       time <- target_node_object$time
       at_risk_vars <- target_node_object$at_risk_vars
       past_data <- self$get_data()
@@ -239,11 +254,13 @@ ltmle3_Task <- R6Class(
       # Extract those who were not monitored at this time to be dropped.
       #not_monitored_ids <- monitored_ids[-which(monitored_ids[[2]]), id][[1]]
 
+      # Ensure that variables explicitely mentioned as nodes in npsem are not included in data
+      # For example W -> A where W and A both happen at time t. Then the node W should not observe
+      # ... the value of A at time t. Setting to NA ensures not future data leakage for summary measures.
       strict_past_vars <- setdiff(all_vars, c("t", "id", past_same_time_vars))
       # Safeguard to ensure no future data leakage
       # Needed for summary functions that depend on both current time values and past time values
       set(past_data,  which(past_data$t == time), strict_past_vars, NA)
-      #set(past_data, , setdiff(colnames(past_data), c("t", "id", unique(parent_covariates))) , NA)
 
       skip <- F
       if(length(parent_covariates) == 0){
@@ -270,6 +287,7 @@ ltmle3_Task <- R6Class(
 
           if(!is.null(strict_past_vars) & any(fun$column_names %in% strict_past_vars)){
             if(!fun$strict_past){
+              #
               #warning("Summary measure is not based on strict past and does not respect the time ordering of npsem. Manually handling this.")
               #subset_time <- subset_time - 1
             }
@@ -281,17 +299,22 @@ ltmle3_Task <- R6Class(
         all_covariate_data <- all_covariate_data %>% purrr::reduce(dplyr::full_join, by = "id")
         #all_covariate_data$id <- NULL
         covariates <- setdiff(colnames(all_covariate_data), "id")
+        # TODO generate names of at_risk_vars with uuid so that no colissions happen with real data
         covariates <- setdiff(covariates, at_risk_vars)
 
+        # If risk set is specified for node then handle this.
         if(!is.null(at_risk_vars)){
+          # if any of risk_indicator_cols is 0 then person is no longer at risk
           risk_indicator_cols <-  c(at_risk_vars$at_risk_competing, at_risk_vars$at_risk)
-          keep <- which(rowSums(all_covariate_data[, risk_indicator_cols, with = F])!=0)
+          # Those at risk should have a row of only 1's.
+          keep <- which(rowSums(all_covariate_data[, risk_indicator_cols, with = F])==length(risk_indicator_cols))
           still_at_risk_ids <- all_covariate_data[keep, id]
 
+          # The risk_set shrinks
           risk_set <- intersect(risk_set, still_at_risk_ids)
 
           # Indicator whether person is still at risk
-          all_covariate_data$at_risk <- as.numeric(all_covariate_data$id %in% still_at_risk_ids)
+          #all_covariate_data$at_risk <- as.numeric(all_covariate_data$id %in% still_at_risk_ids)
           # last measured value of outcome for each person
           # Set outcome of those who are not at risk to last observed value
           last_val <- all_covariate_data[,at_risk_vars$last_val, with = F]
