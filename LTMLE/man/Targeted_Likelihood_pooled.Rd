@@ -16,6 +16,7 @@ Requires that Likelihood cache can handle pooled predictions.
 }
 \seealso{
 Other Likelihood objects: 
+\code{\link{LF_collapsed}},
 \code{\link{LF_fit_pooled}}
 }
 \concept{Likelihood objects}

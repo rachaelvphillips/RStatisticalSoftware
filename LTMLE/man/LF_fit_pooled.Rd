@@ -40,6 +40,7 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
 
 \seealso{
 Other Likelihood objects: 
+\code{\link{LF_collapsed}},
 \code{\link{Targeted_Likelihood_pooled}}
 }
 \concept{Likelihood objects}

@@ -6,10 +6,11 @@ ltmle3_Node <- R6Class(
   inherit = tmle3_Node,
   public = list(
     initialize = function(name, variables, parents = c(), time = NULL, summary_functions = NULL,
-                          node_type = NULL,  at_risk_summary_function = NULL, include_competing_risks = T,  variable_type = NULL, scale = FALSE) {
+                          node_type = NULL,  at_risk_summary_function = NULL, include_competing_risks = F,  variable_type = NULL, scale = FALSE) {
       if(!is.list(summary_functions)){
         summary_functions <- list(summary_functions)
       }
+      print("hi")
       # Handle counting process at risk summary functions
       if(!(is.null(node_type)) ) {
         if(node_type == "counting_process"){
@@ -21,18 +22,24 @@ ltmle3_Node <- R6Class(
           last_val_summary <- make_summary_measure_last_value(variables, strict_past = T)
           last_val_summary$set_name(paste(paste(variables, collapse = "_"), "at_risk_last_val", sep = "_") )
           at_risk_competing_summary <- NULL
-          if(include_competing_risks){
-            at_risk_competing_summary <- make_summary_measure_competing_indicator(competing = competing_set, strict_past = T)
-          }
+
+
           # Store variables to be omitted from training set
           if(!is.null(at_risk_summary_function)) {
             at_risk_name <- at_risk_summary_function$name
           } else {
             at_risk_name <- NULL
           }
+          if(include_competing_risks){
+            at_risk_competing_summary <- make_summary_measure_competing_indicator(competing = competing_set, strict_past = T)
+            at_risk_vars <- list(last_val = last_val_summary$name, at_risk_competing = at_risk_competing_summary$name, at_risk = at_risk_name)
+            summary_functions <- c(summary_functions, last_val_summary, at_risk_competing_summary, at_risk_summary_function)
+          } else {
 
-          at_risk_vars <- list(last_val = last_val_summary$name, at_risk_competing = at_risk_competing_summary$name, at_risk = at_risk_name)
-          summary_functions <- c(summary_functions, last_val_summary, at_risk_competing_summary, at_risk_summary_function)
+          at_risk_vars <- list(last_val = last_val_summary$name, at_risk_competing = NULL, at_risk = at_risk_name)
+          summary_functions <- c(summary_functions, last_val_summary, at_risk_summary_function)
+        }
+
         }
       } else if (!is.null(at_risk_summary_function)){
         at_risk_summary_function$set_name(paste(paste(variables, collapse = "_"), "at_risk", sep = "_") )

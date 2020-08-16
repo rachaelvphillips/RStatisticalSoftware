@@ -85,3 +85,12 @@ get_node_names <- function(num_time_points){
   ltmle_nodes = c(unlist(lapply(seq_len(num_time_points)-1, get_time_point)), "Y")
   return(ltmle_nodes)
 }
+
+
+
+
+
+
+
+
+
