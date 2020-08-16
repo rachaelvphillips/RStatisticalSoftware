@@ -6,10 +6,14 @@ ltmle3_Task <- R6Class(
   portable = TRUE,
   class = TRUE,
   inherit = tmle3_Task,
+  private = list(
+    .force_at_risk = F,
+    .non_data_columns = NULL
+  ),
   active = list(
     data = function() {
       all_variables <- unlist(lapply(self$npsem, `[[`, "variables"))
-      self$get_data(columns = unique(c("id" , "t", all_variables)))
+      self$get_data(columns = unique(c(private$.non_data_columns, "id" , "t", all_variables)))
     },
     weights = function() {
       # Assumes weights are constant in time
@@ -27,10 +31,12 @@ ltmle3_Task <- R6Class(
     }
   ),
   public = list(
-    initialize = function(data, npsem, id = "id", time = "t",  ...) {
+    initialize = function(data, npsem, id = "id", time = "t", extra_summary_measure_columns = "at_risk", force_at_risk = F,  ...) {
 
       #If time and id are not named as "t" and "id" then
       # add columns
+      private$.force_at_risk = force_at_risk
+      private$.non_data_columns = extra_summary_measure_columns
       if(id!="id"){
         data[,"id", with = F] <- data[,id, with = F]
         id = "id"
@@ -81,13 +87,15 @@ ltmle3_Task <- R6Class(
       }
       if(time == "pooled"){
         #If pooled then get value of variable at all times. Use the force_time argument.
-        all_times <- sort(unique(data$t))
+        all_times <- unique(data$t)
+        times <- seq(min(all_times), max(all_times), 1)
+
         nodes_vals_for_all_times <- lapply(all_times, self$get_tmle_node, node_name = node_name, format=format,  include_time = T, include_id = T )
         return(do.call(rbind, nodes_vals_for_all_times))
       }
 
 
-      if(format == TRUE & !is.null(tmle_node$node_type) ){
+      if(FALSE & format == TRUE & !is.null(tmle_node$node_type) ){
         if(tmle_node$node_type == "counting_process") {
           # Convert counting process format to hazard outcome format
 
@@ -232,7 +240,8 @@ ltmle3_Task <- R6Class(
         assertthat::assert_that(all(time_is_node))
         assertthat::assert_that(all.equal(unique(unlist(all_nodes, use.names = F)), unlist(all_nodes[[1]], use.names = F)))
         #If they contain the same nodes we can merge
-        pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$data))
+        pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$get_data()))
+
         nodes <- all_nodes[1]
         # Make sure time is included as covariate
         nodes$covariates <- union("t", nodes$covariates)
@@ -241,6 +250,7 @@ ltmle3_Task <- R6Class(
         pooled_regression_task <- sl3_Task$new(
           pooled_data,
           nodes = nodes,
+
           outcome_type = self$npsem[[target_node[1]]]$variable_type,
           folds = self$folds
         )
@@ -259,11 +269,12 @@ ltmle3_Task <- R6Class(
       }
 
       at_risk_vars <- target_node_object$at_risk_vars
-      past_data <- self$get_data()
+      past_data <- self$data
       past_data <- past_data[,]
       if(time == "pooled"){
         # If node is pooled across time then get pooled regression task
-        times <- sort(unique(past_data$t))
+        times <- past_data$t
+        times <- seq(min(times), max(times), 1)
         all_tasks <- lapply(times, self$get_regression_task, target_node = target_node, scale = scale, drop_censored = drop_censored, is_time_variant = is_time_variant )
 
         all_nodes <- lapply(all_tasks, function(task) task$nodes)
@@ -271,8 +282,8 @@ ltmle3_Task <- R6Class(
         assertthat::assert_that(all(time_is_node))
         assertthat::assert_that(all.equal(unique(unlist(all_nodes, use.names = F)), unlist(all_nodes[[1]], use.names = F)))
         #If they contain the same nodes we can merge
-        pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$data))
-        nodes <- all_nodes[1]
+        pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$get_data()))
+        nodes <- all_nodes[[1]]
         # Make sure time is included as covariate
         nodes$covariates <- union("t", nodes$covariates)
 
@@ -302,16 +313,11 @@ ltmle3_Task <- R6Class(
       # Find ids with observation row at this time. E.g. those who were monitored at this time
       # These people are implicitely in the at-risk set.
       risk_set <- c()
-      monitored_ids <- past_data[, any(.SD==time), by = id, .SDcols = c("t")]
-      monitored_ids <- monitored_ids[which(monitored_ids[[2]]), id]
-      if(target_node_object$node_type != "counting_process"){
-        risk_set <- unlist(c(risk_set, monitored_ids))
+      #monitored_ids <- past_data[, any(.SD==time), by = id, .SDcols = c("t")]
+      #monitored_ids <- monitored_ids[which(monitored_ids[[2]]), id]
 
-      } else {
-        #If counting process then we include all rows up until time of event
-        # Not being monitored implies
-        risk_set <- c(risk_set, unique(past_data$id))
-      }
+      risk_set <- c(risk_set, unique(past_data$id))
+
       # Extract those who were not monitored at this time to be dropped.
       #not_monitored_ids <- monitored_ids[-which(monitored_ids[[2]]), id][[1]]
 
@@ -338,6 +344,7 @@ ltmle3_Task <- R6Class(
 
       #This contains all people who have had some observation in the past  up until now
       all_covariate_data <- past_data
+
       if(!skip){
         summary_measures <- target_node_object$summary_functions
 
@@ -364,11 +371,9 @@ ltmle3_Task <- R6Class(
           # if any of risk_indicator_cols is 0 then person is no longer at risk
           risk_indicator_cols <-  c(at_risk_vars$at_risk_competing, at_risk_vars$at_risk)
           # Those at risk should have a row of only 1's.
-          print(all_covariate_data)
           rowsums <- rowSums(all_covariate_data[, risk_indicator_cols, with = F])
-          keep <- which(is.na(rowsums) | rowsums ==length(risk_indicator_cols))
+          keep <- which(is.na(rowsums) | rowsums == length(risk_indicator_cols))
           still_at_risk_ids <- all_covariate_data[keep, id]
-          print(length(still_at_risk_ids))
           # The risk_set shrinks
           risk_set <- intersect(risk_set, still_at_risk_ids)
 
@@ -377,7 +382,7 @@ ltmle3_Task <- R6Class(
           # last measured value of outcome for each person
           # Set outcome of those who are not at risk to last observed value
           last_val <- all_covariate_data[,at_risk_vars$last_val, with = F]
-          if(!is.null(target_node_object$node_type)){
+          if(F &!is.null(target_node_object$node_type)){
             if(target_node_object$node_type == "counting_process") {
               # If counting process then last value  should be set to zero (for hazard)
               # technically only true for those not in risk set (but only needed for those people so its fine)
@@ -392,7 +397,9 @@ ltmle3_Task <- R6Class(
           set(all_covariate_data, , at_risk_vars$last_val,  NULL)
           if(!is.null( at_risk_vars$at_risk_competing)) set(all_covariate_data, , at_risk_vars$at_risk_competing,  NULL)
           set(all_covariate_data, , at_risk_vars$at_risk,  NULL)
-
+          if(drop_censored){
+            all_covariate_data <- all_covariate_data[which(all_covariate_data$id %in% risk_set),]
+          }
 
         } else {
           setDT(all_covariate_data)
@@ -414,7 +421,6 @@ ltmle3_Task <- R6Class(
         # TODO Not sure if this is the correct use of is_time_variant
         #covariates <- union("t", covariates)
       }
-      print(all_covariate_data)
       nodes <- self$nodes
 
       node_data <- self$get_data(, unlist(nodes))
@@ -422,7 +428,6 @@ ltmle3_Task <- R6Class(
       # Keep only node_data for each individual at the time of this tmle node
       node_data <- node_data[!duplicated(node_data$id),]
       node_data$t = time
-      print(node_data)
       nodes$outcome <- outcome
       nodes$covariates <- covariates
       nodes$time <- "t"
@@ -435,11 +440,15 @@ ltmle3_Task <- R6Class(
         regression_data <-  list(outcome_data, node_data) %>% reduce(full_join, "id")
 
       } else {
-        regression_data <-  list(all_covariate_data, outcome_data, node_data) %>% reduce(full_join, "id")
+        regression_data <-  list(all_covariate_data, outcome_data, node_data) %>% reduce(dplyr::inner_join, "id")
 
       }
-      print(outcome_data)
-      regression_data$at_risk <- as.numeric(regression_data$id %in% risk_set)
+      if(private$.force_at_risk){
+        regression_data$at_risk <- 1
+      } else{
+        regression_data$at_risk <- as.numeric(regression_data$id %in% risk_set)
+
+      }
       # For those who had missing rows, set their last_val to the current value of node_var.
       set_last_val_to_current<- intersect(which(is.na(regression_data$last_val)), which(!(regression_data$id %in% risk_set)))
       if(length(set_last_val_to_current) > 0 ){
@@ -461,7 +470,7 @@ ltmle3_Task <- R6Class(
 
       return(regression_task)
     },
-    generate_counterfactual_task = function(uuid, new_data) {
+    generate_counterfactual_task = function(uuid, new_data, force_at_risk = F) {
       # for current_factor, generate counterfactual values
       node_names <- names(new_data)
 
@@ -478,14 +487,16 @@ ltmle3_Task <- R6Class(
           self$npsem[[node_name]]$time
         }
       )
+      is_pooled <- "pooled" %in% unlist(node_times)
       node_index <- lapply(
         node_times,
         function(time) {
-          which(self$get_data()$t==time)
+          if(is_pooled) return(1:nrow(self$data))
+          which(self$data$t==time)
         }
       )
 
-      old_data <- data.table::copy(self$get_data()[, unique(node_variables), with = F])
+      old_data <- data.table::copy(self$data[, unique(node_variables), with = F])
 
       lapply(seq_along(node_index), function(i){
         index <- node_index[[i]]

@@ -108,7 +108,7 @@ Other Likelihood objects:
 \if{latex}{\out{\hypertarget{method-shape_predictions}{}}}
 \subsection{Method \code{shape_predictions()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$shape_predictions(tmle_task, preds)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$shape_predictions(learner_task, preds)}\if{html}{\out{</div>}}
 }
 
 }

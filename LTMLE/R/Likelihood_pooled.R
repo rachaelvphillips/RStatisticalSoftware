@@ -117,14 +117,15 @@ Likelihood_pooled <- R6Class(
       if (is.null(likelihood_values)) {
         # if not, generate new ones
         likelihood_values <- likelihood_factor$get_likelihood(tmle_task, fold_number)
-        nodes <- names(likelihood_values)
+        print(likelihood_values)
+        nodes <- setdiff(names(likelihood_values), c("id", "t"))
         # Cache all likelihood values for all nodes in likelihood_values.
         for(node in nodes) {
-          self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values[, node, with = F], node)
+          self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values[, c("t", "id", node), with = F], node)
         }
       }
       #Subset to only likelihood values of this node
-      likelihood_values <- likelihood_values[, node, with = F]
+      likelihood_values <- likelihood_values[, c("t", "id", node), with = F]
 
       return(likelihood_values)
     },
@@ -137,8 +138,9 @@ Likelihood_pooled <- R6Class(
         all_likelihoods <- lapply(nodes, function(node) {
           self$get_likelihood(tmle_task, node, fold_number)
         })
-        likelihood_dt <- as.data.table(all_likelihoods)
-        setnames(likelihood_dt, nodes)
+        likelihood_dt <- all_likelihoods %>% reduce(full_join, c("id", "t"))#as.data.table(all_likelihoods)
+        #setnames(likelihood_dt, nodes)
+
         return(likelihood_dt)
       } else {
         return(self$get_likelihood(tmle_task, nodes[[1]], fold_number))

@@ -19,9 +19,9 @@ D <- D +
   node("T", distr = "rexp", rate = 0.05*(1 + 0.5*A - 0.3*W) )+
   node("C", distr = "rexp",  rate = 0.03*(1 + 0.4*A - 0.2*W)) +
   node("Delta", distr = "rconst", const = as.numeric(T<=C)  ) +
-  node("Ttilde", distr = "rconst", const = round(min(T,C) +1  ))
+  node("Ttilde", distr = "rconst", const = round(min(T,C,10) +1  ))
 setD <- set.DAG(D)
-dat <- sim(setD, n = 2e2)
+dat <- sim(setD, n = 1e2)
 # only grab ID, W's, A, T.tilde, Delta
 Lname <- grep("W", colnames(dat), value = TRUE)
 Aname <- grep("A", colnames(dat), value = TRUE)
@@ -30,12 +30,12 @@ df <- dat[, c("ID", Lname, Aname, "T", "C", "Delta", "Ttilde")]
 data <- df[,c( "W", "A", "Ttilde", "Delta")]
 data$id = df$ID
 
-data$t <- data$Ttilde
+data$t <- data$Ttilde 
 data = data.table(data)
 data$processA = as.numeric(data$Delta ==0)
 data$processN = as.numeric(data$Delta ==1)
 data_baseline <- data
-data_baseline$t =1
+data_baseline$t =0
 data_baseline$processA = 0
 data_baseline$processN = 0
 data_baseline$Ttilde = NA
@@ -43,12 +43,12 @@ data_baseline$Delta = NA
 data = rbind(data_baseline, data)
 data$Ttilde = NULL
 data$Delta = NULL
-data$at_risk = 1 - data$processA + data$processN
-npsem = list(define_lnode("W", c("W"), time =1), 
-     define_lnode("A", c("A"), c("W"), time =1, summary_functions = make_summary_measure_baseline(c("W"))),
+data$at_risk = 1 - (data$processA + data$processN)
+npsem = list(define_lnode("W", c("W"), time =0), 
+     define_lnode("A", c("A"), c("W"), time =0, summary_functions = make_summary_measure_baseline(c("W"))),
      
      define_lnode("processA", c("processA"),  c("A","W"), time = "pooled", summary_functions = make_summary_measure_baseline(c("A", "W")),
-                  at_risk_summary_function = make_summary_measure_last_value("at_risk", strict_past  = T), node_type = "counting_process",
+                  at_risk_summary_function = make_summary_measure_last_value("at_risk", strict_past  = F), node_type = "counting_process",
                   include_competing_risks = F),
      
 define_lnode("processN", c("processN"), c("A","W"),time = "pooled", summary_functions = make_summary_measure_baseline(c("A", "W")),
@@ -62,20 +62,53 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled", summary_func
 
 data
 ```
+
+
+
 ```{r}
 task = ltmle3_Task$new(data, npsem)
- task$get_tmle_node("processN", force_time_value = 1, format = T, include_time = T)
+
+
+ 
+ lik = generate_likelihood_surv(task)
 
 ```
 
 ```{r}
-task = ltmle3_Task$new(data, npsem)
- task$get_tmle_node("processN", force_time_value = 1, format = T)
+lik = lik$train(task)
+```
 
- task$get_regression_task("processN", force_time_value = 1, drop_censored = F)$get_data()
+```{r}
+cf_data = task$data[, processN, processA]
+cf_data$processN =1
+cf_data$processA =1
+cf_data
+cf_task = task$generate_counterfactual_task(task$uuid, new_data = cf_data)
+cf_task$data
+
+cf_task$get_regression_task("processN", force_time_value = 2)$data
+```
+```{r}
+preds=lik$get_likelihood(task, "processN")
+preds
+```
+
+```{r}
+a = task$get_regression_task("A")
+a$t
+```
+
+```{r}
+task_all = task$get_regression_task("processN",  drop_censored = F)
+task_all$internal_data$raw_data
 
 ```
 
+```{r}
+lik$get_likelihood(task, "processN")
+preds[10000:11000,]
+
+```
 
 
 ```{r}

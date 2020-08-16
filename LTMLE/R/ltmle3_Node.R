@@ -6,7 +6,7 @@ ltmle3_Node <- R6Class(
   inherit = tmle3_Node,
   public = list(
     initialize = function(name, variables, parents = c(), time = NULL, summary_functions = NULL,
-                          node_type = NULL,  at_risk_summary_function = NULL, include_competing_risks = F,  variable_type = NULL, scale = FALSE) {
+                          node_type = NULL,  at_risk_summary_function = NULL, include_competing_risks = F, variable_type = NULL, scale = FALSE) {
       if(!is.list(summary_functions)){
         summary_functions <- list(summary_functions)
       }

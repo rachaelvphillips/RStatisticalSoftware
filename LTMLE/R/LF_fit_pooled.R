@@ -58,12 +58,13 @@ LF_fit_pooled <- R6Class(
       }
 
       outcome_node <- self$name
-
+      print(outcome_node)
       # fit scaled task for bounded continuous
       learner_task <- tmle_task$get_regression_task(outcome_node, scale = TRUE, drop_censored=TRUE,
                                                     is_time_variant = self$is_time_variant)
-
+      print(outcome_node)
       learner_fit <- delayed_learner_train(self$learner, learner_task)
+
       return(learner_fit)
     },
     train = function(tmle_task, learner_fit) {
@@ -75,7 +76,7 @@ LF_fit_pooled <- R6Class(
       private$.training_task <- tmle_task
       private$.learner <- learner_fit
     },
-    shape_predictions = function(tmle_task, preds){
+    shape_predictions = function(learner_task, preds){
       # Reshapes predictions if this is a pooled_task
       # returns the predictions as n x len(self$names) data.table.
       if(length(self$name)==1){
@@ -83,7 +84,7 @@ LF_fit_pooled <- R6Class(
         setnames(preds, self$name)
         return(preds)
       }
-      ids <- tmle_task$get_node("id")
+      ids <- learner_task$get_node("id")
       preds_list  <- lapply(unique(ids), function(id){
         # Returns the vector of predictions for a single person
         preds[which(ids == id)]
@@ -136,6 +137,9 @@ LF_fit_pooled <- R6Class(
       }
 
       if(check_at_risk & "at_risk" %in% colnames(data)) {
+        # By setting check_at_risk = F then one can obtain the counterfactual predictions
+        # conditioned on everyone being at risk.
+
         names_last_val <- paste("last_val", learner_task$nodes$outcome, sep = "_")
         # TODO Support multivariate outcome
         assertthat::assert_that(all(names_last_val %in% colnames(data)), msg = "If at_risk is a column then last_val must be as well.")
@@ -147,7 +151,10 @@ LF_fit_pooled <- R6Class(
         }
 
       }
-      likelihood <- self$shape_predictions(tmle_task, likelihood)
+      likelihood <- self$shape_predictions(learner_task, likelihood)
+      print(likelihood)
+      likelihood$id <- learner_task$data$id
+      likelihood$t <- learner_task$data$t
 
 
       return(likelihood)

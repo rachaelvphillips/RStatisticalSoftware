@@ -18,6 +18,26 @@ generate_likelihood <- function(task, lrnr_binomial = Lrnr_glm$new(), lrnr_conti
   return(Likelihood_pooled$new(factor_list))
 }
 
+generate_likelihood_surv <- function(task, lrnr_binomial = Lrnr_glm$new(), lrnr_continuous = Lrnr_condensier$new() ){
+  factor_list = c()
+  for(name in names(task$npsem)){
+    node <- task$npsem[[name]]
+
+    if(name =="W"){
+      factor_list <- c(factor_list, name = LF_emp$new(name ))
+    }
+    else if(node$variable_type$type == "binomial"){
+      factor_list <- c(factor_list, name = LF_fit_pooled$new(name,  lrnr_binomial))
+    }
+    else{
+      factor_list <- c(factor_list, name = LF_fit_pooled$new(name, lrnr_continuous ))
+    }
+
+
+  }
+  return(Likelihood_pooled$new(factor_list))
+}
+
 
 generate_npsem <- function(data, baseline, time_dep_cov, trtment, outcome){
 
