@@ -13,7 +13,7 @@
 #'
 #' @format \code{\link{R6Class}} object.
 #'
-#' @template Param_base_extra
+
 #' @export
 Param_base <- R6Class(
   classname = "Param_base",
