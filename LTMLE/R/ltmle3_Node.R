@@ -6,11 +6,13 @@ ltmle3_Node <- R6Class(
   inherit = tmle3_Node,
   public = list(
     initialize = function(name, variables, parents = c(), time = NULL, summary_functions = NULL,
-                          node_type = NULL,  at_risk_summary_function = NULL, include_competing_risks = F, variable_type = NULL, scale = FALSE) {
+                          node_type = NULL,  at_risk_summary_function = NULL, include_competing_risks = F, times_to_pool = NULL, variable_type = NULL, scale = FALSE) {
       if(!is.list(summary_functions)){
         summary_functions <- list(summary_functions)
       }
-      print("hi")
+      if(time == "pooled" & is.null(times_to_pool)){
+        stop("You specified that this node represents a pooled over time likelihood factor but did not supply the times_to_pool argument.")
+      }
       # Handle counting process at risk summary functions
       if(!(is.null(node_type)) ) {
         if(node_type == "counting_process"){
@@ -53,7 +55,7 @@ ltmle3_Node <- R6Class(
       } else{
         at_risk_vars <- NULL
       }
-      private$.ltmle_params = list(time = time, summary_functions = summary_functions, node_type = node_type, at_risk_vars = at_risk_vars)
+      private$.ltmle_params = list(time = time, times_to_pool = times_to_pool, summary_functions = summary_functions, node_type = node_type, at_risk_vars = at_risk_vars)
       super$initialize(name, variables, parents,
                        variable_type, censoring_node = NULL, scale)
     },
@@ -79,6 +81,9 @@ ltmle3_Node <- R6Class(
     },
     at_risk_vars = function(){
       private$.ltmle_params$at_risk_vars
+    },
+    times_to_pool = function(){
+      private$.ltmle_params$times_to_pool
     }
 
 

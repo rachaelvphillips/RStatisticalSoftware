@@ -87,10 +87,11 @@ ltmle3_Task <- R6Class(
       }
       if(time == "pooled"){
         #If pooled then get value of variable at all times. Use the force_time argument.
-        all_times <- unique(data$t)
-        times <- seq(min(all_times), max(all_times), 1)
-
-        nodes_vals_for_all_times <- lapply(all_times, self$get_tmle_node, node_name = node_name, format=format,  include_time = T, include_id = T )
+        #all_times <- unique(data$t)
+        #times <- seq(min(all_times), max(all_times), 1)
+        times <- tmle_node$times_to_pool
+        print(times)
+        nodes_vals_for_all_times <- lapply(times, self$get_tmle_node, node_name = node_name, format=format,  include_time = T, include_id = T )
         return(do.call(rbind, nodes_vals_for_all_times))
       }
 
@@ -273,8 +274,9 @@ ltmle3_Task <- R6Class(
       past_data <- past_data[,]
       if(time == "pooled"){
         # If node is pooled across time then get pooled regression task
-        times <- past_data$t
-        times <- seq(min(times), max(times), 1)
+        times <- target_node_object$times_to_pool
+        print(times)
+        #times <- seq(min(times), max(times), 1)
         all_tasks <- lapply(times, self$get_regression_task, target_node = target_node, scale = scale, drop_censored = drop_censored, is_time_variant = is_time_variant )
 
         all_nodes <- lapply(all_tasks, function(task) task$nodes)
@@ -515,7 +517,8 @@ ltmle3_Task <- R6Class(
         self$internal_data, self$npsem,
         column_names = new_column_names,
         folds = self$folds,
-        row_index = self$row_index
+        row_index = self$row_index,
+        force_at_risk = T
       )
 
       return(new_task)
