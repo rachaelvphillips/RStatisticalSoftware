@@ -20,7 +20,7 @@ Targeted_Likelihood_pooled <- R6Class(
   classname = "Targeted_Likelihood_pooled",
   portable = TRUE,
   class = TRUE,
-  inherit = Likelihood,
+  inherit = Likelihood_pooled,
   public = list(
     initialize = function(initial_likelihood, updater = NULL, ...) {
       params <- args_to_list()
@@ -54,7 +54,7 @@ Targeted_Likelihood_pooled <- R6Class(
         updated_values <- task_updates[[task_index]]
 
         likelihood_factor <- self$factor_list[[update_node]]
-        self$cache$set_values(likelihood_factor, task, step_number + 1, fold_number, updated_values, update_node)
+        self$cache$set_values(likelihood_factor, task, step_number + 1, fold_number, updated_values, update_node = "")
       }
       # for (task in tasks_at_step) {
       #   all_submodels <- self$updater$generate_submodel_data(self, task, fold_number)
@@ -65,7 +65,7 @@ Targeted_Likelihood_pooled <- R6Class(
       #   }
       # }
     },
-    get_likelihood = function(tmle_task, node, fold_number = "full") {
+    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, to_wide = F) {
       if (node %in% self$updater$update_nodes) {
         # self$updater$get_updated_likelihood(self, tmle_task, node)
         likelihood_factor <- self$factor_list[[node]]
@@ -74,12 +74,12 @@ Targeted_Likelihood_pooled <- R6Class(
 
         if (!is.null(value_step)) {
           # if some are available, grab them
-          likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number, node = node)
+          likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number, node = "")
         } else {
           # if not, generate new ones
           likelihood_values <- self$initial_likelihood$get_likelihood(tmle_task, node, fold_number)
           value_step <- 0
-          self$cache$set_values(likelihood_factor, tmle_task, value_step, fold_number, likelihood_values, node = node)
+          self$cache$set_values(likelihood_factor, tmle_task, value_step, fold_number, likelihood_values, node = "")
         }
 
         if (value_step < self$updater$step_number) {
@@ -97,6 +97,13 @@ Targeted_Likelihood_pooled <- R6Class(
         # not a node that updates, so we can just use initial likelihood
         likelihood_values <- self$initial_likelihood$get_likelihood(tmle_task, node, fold_number)
       }
+      if(to_wide & length(unique(likelihood_values$t))==1){
+        likelihood_values$t <- NULL
+      }
+      else if(to_wide){
+        likelihood_values <- reshape(likelihood_values, idvar = "id", timevar = "t", direction = "wide")
+      }
+      if(drop_id) likelihood_values$id <- NULL
 
       return(likelihood_values)
     },

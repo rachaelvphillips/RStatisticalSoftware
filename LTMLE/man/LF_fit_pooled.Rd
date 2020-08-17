@@ -126,7 +126,12 @@ Other Likelihood objects:
 \if{latex}{\out{\hypertarget{method-get_density}{}}}
 \subsection{Method \code{get_density()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_density(tmle_task, fold_number, check_at_risk = T)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_density(
+  tmle_task,
+  fold_number,
+  check_at_risk = T,
+  to_mat = T
+)}\if{html}{\out{</div>}}
 }
 
 }

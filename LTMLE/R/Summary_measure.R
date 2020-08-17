@@ -20,14 +20,14 @@ Summary_measure <- R6Class(
   portable = TRUE,
   class = TRUE,
   public = list(
-    initialize = function(column_names, summary_function, name = "Summary", strict_past = F){
+    initialize = function(column_names, summary_function, name = "Summary", strict_past = F, args_to_pass = NULL){
         # Summary function must return data.table with nrow = 1 ...
        # for self$summarize to work correctly.
-        summary_function_wrap <- function(data){
+        summary_function_wrap <- function(data, time,  ...){
           if(all(is.na(data))) {
             return(data)
           }
-          result <- summary_function(data)
+          result <- summary_function(data, time, ...)
           if(!is.data.table(result)){
             result <- data.table(matrix(result, nrow =1))
           }
@@ -52,7 +52,7 @@ Summary_measure <- R6Class(
       data <- data[,]
 
 
-      reduced_data <- data[,func(.SD), by = id,
+      reduced_data <- data[,func(.SD, time, self$params$args_to_pass), by = id,
                            .SDcols = self$params$column_names]
 
     # This code isn't needed unless func does not return a data.table, which can't happen.
@@ -110,7 +110,7 @@ Summary_measure <- R6Class(
 
 make_summary_measure_NULL <- function(column_names = ""){
   name =  NULL
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     return(data.table(NULL))
 
   }
@@ -123,7 +123,7 @@ make_summary_measure_FULL <- function(column_names){
   column_names <- union("t", column_names)
   name =  NULL
 
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     t <- data$t
     data$t <- NULL
     data <- do.call(cbind, lapply(1:ncol(data), function(i){
@@ -142,7 +142,7 @@ make_summary_measure_FULL <- function(column_names){
 make_summary_measure_baseline <- function(column_names){
   name = paste( column_names, "baseline", sep = "_")
 
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     return(data[1,])
   }
 
@@ -153,7 +153,7 @@ make_summary_measure_baseline <- function(column_names){
 make_summary_measure_last_value <- function(column_names, strict_past = F){
   name = paste(column_names, "most_recent", sep = "_")
 
-  summary_function <- function(data){
+  summary_function <- function(data, time,...){
 
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
@@ -187,7 +187,7 @@ make_summary_measure_apply <- function(column_names, FUN, strict_past = T){
   wrap_FUN <- function(v){
     FUN(as.vector(na.omit(v)))
   }
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
         stop("Summary function error: Not all column names found in data object.")
@@ -215,7 +215,7 @@ make_summary_measure_running_median <- function(column_names){
   return(make_summary_measure_apply(column_names,name ))
 }
 make_summary_measure_relative_difference_from_t0 <- function(column_names){
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
         stop("Summary function error: Not all column names found in data object.")
@@ -237,7 +237,7 @@ make_summary_measure_relative_difference_from_t0 <- function(column_names){
 make_summary_measure_relative_difference_from_last_t <- function(column_names){
   name = paste(column_names, "rel_diff_last_t", sep = "_")
 
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
         stop("Summary function error: Not all column names found in data object.")
@@ -258,7 +258,7 @@ make_summary_measure_relative_difference_from_last_t <- function(column_names){
 make_summary_measure_competing_indicator <- function(competing, strict_past = T){
   column_names <- c(competing)
   name <- paste(paste(competing, collapse = "_"), "at_risk", sep = "_")
-  summary_function <- function(data){
+  summary_function <- function(data,...){
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){
         stop("Summary function error: Not all column names found in data object.")
@@ -276,7 +276,7 @@ make_summary_measure_competing_indicator <- function(competing, strict_past = T)
 make_summary_measure_slope <- function(column_names){
   name = paste(column_names, "slope_in_t", sep = "_")
 
-  summary_function <- function(data){
+  summary_function <- function(data,...){
 
     if(!all.equal(colnames(data), column_names)){
       if(!(all(column_names %in% colnames(data)))){

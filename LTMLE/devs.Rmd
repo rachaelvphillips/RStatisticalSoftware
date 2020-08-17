@@ -6,6 +6,17 @@
 devtools::document()
 ```
 
+
+```{r}
+time=8
+fun = function(X,time, id){
+  return(X+1
+         )
+}
+data[3:9,fun(.SD, time, id), by = id, .SDcols = "id"]
+
+```
+
 ```{r}
 
 
@@ -68,21 +79,14 @@ data
 
 ```{r}
 task = ltmle3_Task$new(data, npsem)
-task$get_regression_task("processN")$data
 
  
-# lik = generate_likelihood_surv(task)
+lik = generate_likelihood_surv(task)
 
 ```
 
 
 ```{r}
-n_samples=10
-emp_probs <- c(0.1, 0.2, 0.5, 0.4)
-emp_probs <- emp_probs/ sum(emp_probs)
-
-uniq_obs <-  c(.1,.2,.3,.4)
-uniq_obs[base::sample(seq_along(uniq_obs), size = n_samples, replace = T, prob = uniq_obs)]
 
 ```
 
@@ -92,7 +96,7 @@ lik = lik$train(task)
 ```
 
 ```{r}
-cf_data = task$data[, processN, processA]
+cf_data = task$data[, c("processN", "processA")]
 cf_data$processN =1
 cf_data$processA =1
 
@@ -101,15 +105,44 @@ cf_task$data
 
 ```
 
-
 ```{r}
-lik$get_likelihoods(cf_task)
+haz <- task$get_tmle_node("processN")
+haz
+haz <- reshape(haz, idvar = "id", timevar = "t", direction = "wide")
+
+haz
 
 ```
 
 ```{r}
-a = task$get_regression_task("A")
-a$t
+
+lik$get_likelihoods(cf_task, c("processN"), to_wide = T)
+```
+
+```{r}
+data.table((res$processN$H))
+data.table(res$processN$D)
+tlik = Targeted_Likelihood_pooled$new(lik)
+```
+```{r}
+
+param <- Param_survival$new(tlik, intervention_list = list(), outcome_node = "processN")
+
+res = param$clever_covariates(task)
+```
+
+```{r}
+dats <- likes[, c("t", "id", "processN")]
+dats<- dats[which(dats$t!=0), ]
+dats$t = dats$t
+to_wide <- function(X){
+  times <- X$t
+  X <- X[, c("processN")]
+  wide <- stack(X)
+  
+}
+dats <- dats[, reshape(.SD,  idvar = "id", timevar = "t", direction = "wide")]
+grep("processN", colnames(dats), value = T)
 ```
 
 ```{r}
@@ -119,8 +152,7 @@ task_all$internal_data$raw_data
 ```
 
 ```{r}
-lik$get_likelihood(task, "processN")
-preds[10000:11000,]
+likeslikes
 
 ```
 

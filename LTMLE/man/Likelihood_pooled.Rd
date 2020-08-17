@@ -80,7 +80,13 @@ All output behavior is identical to the standard Likelihood object.
 \if{latex}{\out{\hypertarget{method-get_likelihood}{}}}
 \subsection{Method \code{get_likelihood()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$get_likelihood(tmle_task, node, fold_number = "full")}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$get_likelihood(
+  tmle_task,
+  node,
+  fold_number = "full",
+  drop_id = F,
+  to_wide = F
+)}\if{html}{\out{</div>}}
 }
 
 }
@@ -92,7 +98,9 @@ All output behavior is identical to the standard Likelihood object.
 \if{html}{\out{<div class="r">}}\preformatted{Likelihood_pooled$get_likelihoods(
   tmle_task,
   nodes = NULL,
-  fold_number = "full"
+  fold_number = "full",
+  drop_id = F,
+  to_wide = F
 )}\if{html}{\out{</div>}}
 }
 

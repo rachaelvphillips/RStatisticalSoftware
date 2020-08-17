@@ -111,7 +111,7 @@ LF_fit_pooled <- R6Class(
       preds <- shape_predictions(tmle_task, preds)
       return(preds)
     },
-    get_density = function(tmle_task, fold_number, check_at_risk = T) {
+    get_density = function(tmle_task, fold_number, check_at_risk = T, to_mat = T) {
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
       learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
       learner <- self$learner
@@ -152,9 +152,17 @@ LF_fit_pooled <- R6Class(
 
       }
       likelihood <- self$shape_predictions(learner_task, likelihood)
-      print(likelihood)
+
       likelihood$id <- learner_task$data$id
       likelihood$t <- learner_task$data$t
+      # if(length(unique(likelihood$t))==1){
+      #   likelihood$t <- NULL
+      # }
+      # else if(to_mat){
+      #   likelihood <- reshape(likelihood, idvar = "id", timevar = "t", direction = "wide")
+      # }
+      #make sure ordered by id
+      likelihood <- likelihood[order(likelihood$id), ]
 
 
       return(likelihood)
