@@ -88,6 +88,8 @@ Param_survival <- R6Class(
       # I(A=1)
       #cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
       cf_pA <- tmle_task$get_tmle_node("A")[,A]
+      print(data.table(cf_pA))
+      print(data.table(g_A))
       #Should already be matrix. Assumed to be in order of time
       Q <- self$observed_likelihood$get_likelihoods(cf_task, c("processN"), fold_number, drop_id = T, to_wide = T)
       # TODO: make bound configurable
@@ -103,6 +105,8 @@ Param_survival <- R6Class(
 
       Q_surv <- as.matrix(self$hm_to_sm(Q))
       G_surv <- as.matrix(self$hm_to_sm(G))
+      print(data.table(Q_surv))
+      print(data.table(G_surv))
 
       # fix t-1
       G_surv <- cbind(rep(1, nrow(G_surv)),G_surv[,-ncol(G_surv)])
@@ -175,7 +179,16 @@ Param_survival <- R6Class(
 
 
 
-      return(list(processN = list(H = HA, D = D1)))
+      return(list(processN = list(H = HA, D = D1, residuals = residuals)))
+    },
+    submodel_info = function(){
+      return(list(processN = list(loss = self$loss_function, submodel = self$submodel)))
+    },
+    submodel = function(epsilon, initial, H) {
+      plogis(qlogis(initial) + H %*% epsilon)
+    },
+    loss_function = function(estimate, observed) {
+      -1 * ifelse(observed == 1, log(estimate), log(1 - estimate))
     },
     clever_covariates = function(tmle_task, fold_number = "full"){
       self$clever_covariates_internal(tmle_task, fold_number, subset_times = TRUE)

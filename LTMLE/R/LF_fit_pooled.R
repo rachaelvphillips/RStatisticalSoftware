@@ -161,9 +161,9 @@ LF_fit_pooled <- R6Class(
       # else if(to_mat){
       #   likelihood <- reshape(likelihood, idvar = "id", timevar = "t", direction = "wide")
       # }
-      #make sure ordered by id
+      #make sure ordered by id and t
       likelihood <- likelihood[order(likelihood$id), ]
-
+      likelihood <- likelihood[order(likelihood$t), ]
 
       return(likelihood)
     },

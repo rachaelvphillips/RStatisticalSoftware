@@ -42,7 +42,8 @@ Survival Curve
 
 \seealso{
 Other Parameters: 
-\code{\link{Param_base}}
+\code{\link{Param_base}},
+\code{\link{define_param}()}
 }
 \concept{Parameters}
 \keyword{data}
@@ -56,6 +57,9 @@ Other Parameters:
 \item \href{#method-long_to_mat}{\code{Param_survival$long_to_mat()}}
 \item \href{#method-hm_to_sm}{\code{Param_survival$hm_to_sm()}}
 \item \href{#method-clever_covariates_internal}{\code{Param_survival$clever_covariates_internal()}}
+\item \href{#method-submodel_info}{\code{Param_survival$submodel_info()}}
+\item \href{#method-submodel}{\code{Param_survival$submodel()}}
+\item \href{#method-loss_function}{\code{Param_survival$loss_function()}}
 \item \href{#method-clever_covariates}{\code{Param_survival$clever_covariates()}}
 \item \href{#method-estimates}{\code{Param_survival$estimates()}}
 \item \href{#method-clone}{\code{Param_survival$clone()}}
@@ -64,10 +68,7 @@ Other Parameters:
 \if{html}{
 \out{<details open ><summary>Inherited methods</summary>}
 \itemize{
-\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Param_base" data-id="loss_function">}\href{../../LTMLE/html/Param_base.html#method-loss_function}{\code{LTMLE::Param_base$loss_function()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Param_base" data-id="print">}\href{../../LTMLE/html/Param_base.html#method-print}{\code{LTMLE::Param_base$print()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Param_base" data-id="submodel">}\href{../../LTMLE/html/Param_base.html#method-submodel}{\code{LTMLE::Param_base$submodel()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Param_base" data-id="submodel_info">}\href{../../LTMLE/html/Param_base.html#method-submodel_info}{\code{LTMLE::Param_base$submodel_info()}}\out{</span>}
 }
 \out{</details>}
 }
@@ -114,6 +115,33 @@ Other Parameters:
   fold_number = "full",
   subset_times = FALSE
 )}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-submodel_info"></a>}}
+\if{latex}{\out{\hypertarget{method-submodel_info}{}}}
+\subsection{Method \code{submodel_info()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$submodel_info()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-submodel"></a>}}
+\if{latex}{\out{\hypertarget{method-submodel}{}}}
+\subsection{Method \code{submodel()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$submodel(epsilon, initial, H)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-loss_function"></a>}}
+\if{latex}{\out{\hypertarget{method-loss_function}{}}}
+\subsection{Method \code{loss_function()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$loss_function(estimate, observed)}\if{html}{\out{</div>}}
 }
 
 }

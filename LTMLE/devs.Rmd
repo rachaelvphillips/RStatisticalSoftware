@@ -120,6 +120,52 @@ lik$get_likelihoods(cf_task, c("processN"), to_wide = T)
 ```
 
 ```{r}
+lapply(res$processN, as.data.table)
+
+```
+
+
+```{r}
+H = data.table(res$processN$H)
+D = res$processN$D
+H
+pN <- tlik$get_likelihood(task, "processN", to_wide = F)
+
+
+
+eps <- D
+
+submodel = function(initial) {
+      plogis(qlogis(initial) + as.matrix(H) %*% eps)
+}
+observed <- task$get_regression_task("processN")
+
+observed <- observed$get_data(, c("id", "t", "at_risk", "processN"))
+
+loss_function = function(estimate, observed) {
+      -1 * ifelse(observed == 1, log(estimate), log(1 - estimate))
+}
+keep = which(observed$at_risk==1)
+
+pN
+observed
+newP <- pN[, lapply(.SD, submodel), .SDcols = "processN"]
+setnames(newP, "processN")
+newP
+newP$t = pN$t
+newP$id = pN$id
+
+
+
+mean(loss_function(newP$processN[keep], observed$processN[keep] ))
+mean(loss_function(pN$processN[keep], observed$processN[keep] ))
+
+pN <- newP
+
+```
+
+
+```{r}
 data.table((res$processN$H))
 data.table(res$processN$D)
 tlik = Targeted_Likelihood_pooled$new(lik)

@@ -157,7 +157,7 @@ tmle3_Update <- R6Class(
 
       # TODO: change clever covariates to allow only calculating some nodes
       clever_covariates_and_EIC_comp <- lapply(self$tmle_params, function(tmle_param) {
-        tmle_param$clever_covariates(tmle_task, fold_number)
+        tmle_param$clever_covariates(tmle_task, fold_number)[[update_node_key]]
       })
       clever_covariates <- lapply(clever_covariates_and_EIC_comp, `[[`, "H")
 
@@ -168,7 +168,7 @@ tmle3_Update <- R6Class(
       })
 
       # this could be a list of covariate lists
-      node_covariates <- lapply(clever_covariates, `[[`, update_node_key)
+      #node_covariates <- lapply(clever_covariates, `[[`, update_node_key)
       reduce_f <- function(x,y){
         out = list()
         names_out <- self$key_to_node_bundle(update_node_key)
