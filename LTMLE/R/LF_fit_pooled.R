@@ -58,11 +58,11 @@ LF_fit_pooled <- R6Class(
       }
 
       outcome_node <- self$name
-      print(outcome_node)
+
       # fit scaled task for bounded continuous
       learner_task <- tmle_task$get_regression_task(outcome_node, scale = TRUE, drop_censored=TRUE,
                                                     is_time_variant = self$is_time_variant)
-      print(outcome_node)
+
       learner_fit <- delayed_learner_train(self$learner, learner_task)
 
       return(learner_fit)

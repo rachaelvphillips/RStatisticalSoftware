@@ -90,7 +90,7 @@ ltmle3_Task <- R6Class(
         #all_times <- unique(data$t)
         #times <- seq(min(all_times), max(all_times), 1)
         times <- tmle_node$times_to_pool
-        print(times)
+
         nodes_vals_for_all_times <- lapply(times, self$get_tmle_node, node_name = node_name, format=format,  include_time = T, include_id = T )
         return(do.call(rbind, nodes_vals_for_all_times))
       }
@@ -229,6 +229,18 @@ ltmle3_Task <- R6Class(
     },
     get_regression_task = function(target_node, scale = FALSE, drop_censored = FALSE, is_time_variant = F, force_time_value = "No") {
       # TODO Not sure what is_time_variant is for.
+      if(!is.numeric(force_time_value)){
+
+        cache_key <- sprintf("%s_%s_%s", target_node, scale, is_time_variant)
+        cached_data <- get0(cache_key, private$.node_cache, inherits = FALSE)
+        if (!is.null(cached_data)) {
+          if(drop_censored){
+            cached_data <- cached_data[which(cached_data$get_data()$at_risk==1),]
+          }
+          return(cached_data)
+        }
+      }
+
 
       # If target_node specifies multiple nodes
       # then return the pooled regression task obtained from each node-specific regression task, if possible.
@@ -242,7 +254,8 @@ ltmle3_Task <- R6Class(
         assertthat::assert_that(all.equal(unique(unlist(all_nodes, use.names = F)), unlist(all_nodes[[1]], use.names = F)))
         #If they contain the same nodes we can merge
         pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$get_data()))
-
+        pooled_data <- pooled_data[order(pooled_data$id)]
+        pooled_data <- pooled_data[order(pooled_data$t)]
         nodes <- all_nodes[1]
         # Make sure time is included as covariate
         nodes$covariates <- union("t", nodes$covariates)
@@ -273,11 +286,13 @@ ltmle3_Task <- R6Class(
       past_data <- self$data
       past_data <- past_data[,]
       if(time == "pooled"){
+        # TODO summary measures ae expensive to compute. The task cache helps.
+
         # If node is pooled across time then get pooled regression task
         times <- target_node_object$times_to_pool
-        print(times)
+
         #times <- seq(min(times), max(times), 1)
-        all_tasks <- lapply(times, self$get_regression_task, target_node = target_node, scale = scale, drop_censored = drop_censored, is_time_variant = is_time_variant )
+        all_tasks <- lapply(times, self$get_regression_task, target_node = target_node, scale = scale, drop_censored = F, is_time_variant = is_time_variant )
 
         all_nodes <- lapply(all_tasks, function(task) task$nodes)
         time_is_node <- sapply(all_nodes, function(node) !is.null(node$time))
@@ -288,7 +303,8 @@ ltmle3_Task <- R6Class(
         nodes <- all_nodes[[1]]
         # Make sure time is included as covariate
         nodes$covariates <- union("t", nodes$covariates)
-
+        pooled_data <- pooled_data[order(pooled_data$id)]
+        pooled_data <- pooled_data[order(pooled_data$t)]
 
         pooled_regression_task <- sl3_Task$new(
           pooled_data,
@@ -296,6 +312,14 @@ ltmle3_Task <- R6Class(
           outcome_type = self$npsem[[target_node[1]]]$variable_type,
           folds = self$folds
         )
+
+        if(!is.numeric(force_time_value)){
+          #Store tasks
+          assign(cache_key, pooled_regression_task, private$.node_cache)
+        }
+        if(drop_censored){
+          pooled_regression_task <- pooled_regression_task[which(pooled_data$at_risk==1),]
+        }
         return(pooled_regression_task)
         }
 
@@ -423,6 +447,7 @@ ltmle3_Task <- R6Class(
         # TODO Not sure if this is the correct use of is_time_variant
         #covariates <- union("t", covariates)
       }
+
       nodes <- self$nodes
 
       node_data <- self$get_data(, unlist(nodes))
@@ -458,10 +483,12 @@ ltmle3_Task <- R6Class(
 
       }
       # Only keep rows of those in risk set
-      if(drop_censored){
-        regression_data <- regression_data[which(regression_data$id %in% risk_set),]
-      }
+
+
       regression_data$t = time
+      regression_data <- regression_data[order(regression_data$id), ]
+      regression_data <- regression_data[order(regression_data$t), ]
+      regression_data <- Shared_Data$new(regression_data, force_copy = F)
 
       regression_task <- sl3_Task$new(
         regression_data,
@@ -469,6 +496,16 @@ ltmle3_Task <- R6Class(
         outcome_type = target_node_object$variable_type,
         folds = self$folds
       )
+      if(!is.numeric(force_time_value)){
+        #Store tasks
+        assign(cache_key, regression_task, private$.node_cache)
+      }
+
+      if(drop_censored){
+        #regression_data <- regression_data[which(regression_data$id %in% risk_set),]
+
+        regression_task <- regression_task[which(regression_task$data$id %in% risk_set),]
+      }
 
       return(regression_task)
     },
@@ -490,10 +527,14 @@ ltmle3_Task <- R6Class(
         }
       )
       is_pooled <- "pooled" %in% unlist(node_times)
+
       node_index <- lapply(
         node_times,
         function(time) {
-          if(is_pooled) return(1:nrow(self$data))
+          if(is_pooled) {
+
+            return(1:nrow(self$data))
+          }
           which(self$data$t==time)
         }
       )

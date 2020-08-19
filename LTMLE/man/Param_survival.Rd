@@ -58,9 +58,12 @@ Other Parameters:
 \item \href{#method-hm_to_sm}{\code{Param_survival$hm_to_sm()}}
 \item \href{#method-clever_covariates_internal}{\code{Param_survival$clever_covariates_internal()}}
 \item \href{#method-submodel_info}{\code{Param_survival$submodel_info()}}
+\item \href{#method-offset_transform}{\code{Param_survival$offset_transform()}}
+\item \href{#method-submodel_family}{\code{Param_survival$submodel_family()}}
 \item \href{#method-submodel}{\code{Param_survival$submodel()}}
 \item \href{#method-loss_function}{\code{Param_survival$loss_function()}}
 \item \href{#method-clever_covariates}{\code{Param_survival$clever_covariates()}}
+\item \href{#method-get_EIC_component}{\code{Param_survival$get_EIC_component()}}
 \item \href{#method-estimates}{\code{Param_survival$estimates()}}
 \item \href{#method-clone}{\code{Param_survival$clone()}}
 }
@@ -113,7 +116,8 @@ Other Parameters:
 \if{html}{\out{<div class="r">}}\preformatted{Param_survival$clever_covariates_internal(
   tmle_task = NULL,
   fold_number = "full",
-  subset_times = FALSE
+  subset_times = FALSE,
+  for_fitting = T
 )}\if{html}{\out{</div>}}
 }
 
@@ -128,11 +132,29 @@ Other Parameters:
 
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-offset_transform"></a>}}
+\if{latex}{\out{\hypertarget{method-offset_transform}{}}}
+\subsection{Method \code{offset_transform()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$offset_transform(initial, observed)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-submodel_family"></a>}}
+\if{latex}{\out{\hypertarget{method-submodel_family}{}}}
+\subsection{Method \code{submodel_family()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$submodel_family()}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-submodel"></a>}}
 \if{latex}{\out{\hypertarget{method-submodel}{}}}
 \subsection{Method \code{submodel()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Param_survival$submodel(epsilon, initial, H)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$submodel(epsilon, initial, H, observed)}\if{html}{\out{</div>}}
 }
 
 }
@@ -150,7 +172,20 @@ Other Parameters:
 \if{latex}{\out{\hypertarget{method-clever_covariates}{}}}
 \subsection{Method \code{clever_covariates()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Param_survival$clever_covariates(tmle_task, fold_number = "full")}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$clever_covariates(
+  tmle_task,
+  fold_number = "full",
+  for_fitting = T
+)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-get_EIC_component"></a>}}
+\if{latex}{\out{\hypertarget{method-get_EIC_component}{}}}
+\subsection{Method \code{get_EIC_component()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$get_EIC_component(task, node)}\if{html}{\out{</div>}}
 }
 
 }

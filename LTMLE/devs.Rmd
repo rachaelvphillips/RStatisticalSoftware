@@ -8,13 +8,10 @@ devtools::document()
 
 
 ```{r}
-time=8
-fun = function(X,time, id){
-  return(X+1
-         )
-}
-data[3:9,fun(.SD, time, id), by = id, .SDcols = "id"]
 
+f = list("aa"= list("a" = "a"))
+g = list("bb" = list("b" = "b" ))
+c(g, (f))
 ```
 
 ```{r}
@@ -70,10 +67,7 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool
 ```
 
 
-```{r}
 
-data
-```
 
 
 
@@ -82,124 +76,83 @@ task = ltmle3_Task$new(data, npsem)
 
  
 lik = generate_likelihood_surv(task)
-
-```
-
-
-```{r}
-
-```
-
-
-```{r}
 lik = lik$train(task)
 ```
 
-```{r}
-cf_data = task$data[, c("processN", "processA")]
-cf_data$processN =1
-cf_data$processA =1
 
-cf_task = task$generate_counterfactual_task(task$uuid, new_data = cf_data, T)
-cf_task$data
 
-```
 
-```{r}
-haz <- task$get_tmle_node("processN")
-haz
-haz <- reshape(haz, idvar = "id", timevar = "t", direction = "wide")
 
-haz
-
-```
-
-```{r}
-
-lik$get_likelihoods(cf_task, c("processN"), to_wide = T)
-```
-
-```{r}
-lapply(res$processN, as.data.table)
-
-```
 
 
 ```{r}
-H = data.table(res$processN$H)
-D = res$processN$D
-H
-pN <- tlik$get_likelihood(task, "processN", to_wide = F)
-
-
-
-eps <- D
-
-submodel = function(initial) {
-      plogis(qlogis(initial) + as.matrix(H) %*% eps)
-}
-observed <- task$get_regression_task("processN")
-
-observed <- observed$get_data(, c("id", "t", "at_risk", "processN"))
-
-loss_function = function(estimate, observed) {
-      -1 * ifelse(observed == 1, log(estimate), log(1 - estimate))
-}
-keep = which(observed$at_risk==1)
-
-pN
-observed
-newP <- pN[, lapply(.SD, submodel), .SDcols = "processN"]
-setnames(newP, "processN")
-newP
-newP$t = pN$t
-newP$id = pN$id
-
-
-
-mean(loss_function(newP$processN[keep], observed$processN[keep] ))
-mean(loss_function(pN$processN[keep], observed$processN[keep] ))
-
-pN <- newP
-
-```
-
-
-```{r}
-data.table((res$processN$H))
-data.table(res$processN$D)
-tlik = Targeted_Likelihood_pooled$new(lik)
-```
-```{r}
-
+tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 2))
 param <- Param_survival$new(tlik, intervention_list = list(), outcome_node = "processN")
 
-res = param$clever_covariates(task)
+#subdata<- tlik$updater$generate_submodel_data(tlik, task, update_node_key = "processN")
+
+
+subdata<- tlik$updater$generate_submodel_data(tlik, task, update_node_key = "processN", drop_censored = T, for_fitting = T)
+
+ eps = tlik$updater$fit_submodel(subdata)
+eps
 ```
 
-```{r}
-dats <- likes[, c("t", "id", "processN")]
-dats<- dats[which(dats$t!=0), ]
-dats$t = dats$t
-to_wide <- function(X){
-  times <- X$t
-  X <- X[, c("processN")]
-  wide <- stack(X)
-  
-}
-dats <- dats[, reshape(.SD,  idvar = "id", timevar = "t", direction = "wide")]
-grep("processN", colnames(dats), value = T)
-```
+
+
 
 ```{r}
-task_all = task$get_regression_task("processN",  drop_censored = F)
-task_all$internal_data$raw_data
+
+
+tlik$update(as.vector(unlist(eps, use.names = F)), 0, "full", "processN")
 
 ```
 
-```{r}
-likeslikes
 
+
+```{r}
+lik$get_likelihood(task, "processN")
+tlik$get_likelihood(task, "processN")
+```
+
+
+```{r}
+ eps = tlik$updater$fit_submodel(subdata)
+coef(eps)
+preds<- predict(eps, type = "response")
+obs <- subdata$observed[[1]]
+mean(subdata$loss(preds,obs))
+mean(subdata$loss(subdata$initial[[1]],obs))
+data.table(subdata$H[[1]])
+data.table(cbind(preds, subdata$initial[[1]],subdata$observed[[1]]))
+data.table(cbind(task$get_regression_task("processN", drop_censored = T)$data[,processN],preds, subdata$observed[[1]]))
+```
+
+```{r}
+sub <- tlik$updater$fit_submodel(subdata)
+dim(sub$H)
+H <- unlist(sub$H, use.names = F)
+
+obs <- sub$observed
+init <- sub$initial
+ data.table(sub$H)
+data.table(obs)
+data.table(init)
+
+ fit = glm(observed ~ H - 1, sub,
+                                offset = qlogis(init),
+                                family = binomial(),
+                                start = rep(0, 1))
+coef(fit)
+
+```
+
+
+```{R}
+data.table(subdata$initial$processN)
+
+new=plogis(qlogis(as.vector(subdata$initial$processN)) + subdata$H$processN %*% eps)
+data.table(new)
 ```
 
 

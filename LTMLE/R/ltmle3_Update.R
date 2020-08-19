@@ -72,6 +72,7 @@ tmle3_Update <- R6Class(
       #ED <- ED_from_estimates(estimates)
       EDnormed <- ED / norm(ED, type = "2")
       collapsed_covariate <- clever_covariates %*% EDnormed
+      collapsed_covariate <-matrix(collapsed_covariate,ncol=1)
 
       return(collapsed_covariate)
     },
@@ -80,53 +81,54 @@ tmle3_Update <- R6Class(
       if(is.null(update_nodes)){
         update_nodes <- self$update_nodes
       }
+      unkeyed_nodes <- unlist(lapply(update_nodes, function(node) self$key_to_node_bundle(node)))
       current_step <- self$step_number + 1
 
       # initialize epsilons for this step
-      na_epsilons <- as.list(rep(NA, length(update_nodes)))
-      names(na_epsilons) <- update_nodes
+      na_epsilons <- as.list(rep(NA, length(unkeyed_nodes)))
+      names(na_epsilons) <- unkeyed_nodes
       private$.epsilons[[current_step]] <- na_epsilons
 
       for (update_node in update_nodes) {
-        # update_node could be keyed multinode
+        # update_node coulde keyed multinode
         # get new submodel fit
-        expanded_node <- self$key_to_node_bundle(update_nodes)
+        expanded_node <- self$key_to_node_bundle(update_node)
         submodel_data <- self$generate_submodel_data(
           likelihood, tmle_task,
           fold_number, update_node,
-          drop_censored = TRUE
+          drop_censored = TRUE, for_fitting = TRUE
         )
-
+        #This will be a named epsilon vector
         new_epsilon <- self$fit_submodel(submodel_data)
 
         # update likelihoods
         if(length(expanded_node)==1){
-          likelihood$update(new_epsilon, current_step, fold_number, update_node)
+          likelihood$update(as.vector(unlist(new_epsilon, use.names = F)), current_step, fold_number, update_node)
         } else {
           # If factors have shared epsilon
           for(node in expanded_node ){
             # TODO apply_update will fail
-            likelihood$update(new_epsilon, current_step, fold_number, node)
+            likelihood$update(new_epsilon[[node]], current_step, fold_number, node)
           }
         }
 
         if (fold_number != "full") {
           # update full fit likelihoods if we haven't already
           if(length(expanded_node)==1){
-            likelihood$update(new_epsilon, self$step_number, "full", update_node)
+            likelihood$update(as.vector(unlist(new_epsilon, use.names = F)), self$step_number, "full", update_node)
           } else {
             # If factors have shared epsilon
             for(node in expanded_node ){
-              likelihood$update(new_epsilon,self$step_number, "full", node)
+              likelihood$update(new_epsilon[[node]],self$step_number, "full", node)
             }
           }
         }
         # Update shared epsilons
         if(length(expanded_node)==1){
-          private$.epsilons[[current_step]][[update_node]] <- new_epsilon
+          private$.epsilons[[current_step]][[update_node]] <- as.vector(unlist(new_epsilon, use.names = F))
         } else {
           for(node in expanded_node ){
-            private$.epsilons[[current_step]][[node]] <- new_epsilon
+            private$.epsilons[[current_step]][[node]] <- new_epsilon[[node]]
           }
         }
       }
@@ -140,35 +142,27 @@ tmle3_Update <- R6Class(
     node_bundle_to_key = function(node_bundle){
       paste(node_bundle, sep = "%")
     },
+
+
     generate_submodel_data = function(likelihood, tmle_task,
                                       fold_number = "full",
                                       update_node_key = "Y",
-                                      drop_censored = FALSE) {
+                                      drop_censored = FALSE, for_fitting = F) {
 
       # Generates a sub_model data in list form if needed
       update_node <- self$key_to_node_bundle(update_node_key)
-      # if(length(update_node)>1){
-      #   #If multiple update nodes then pass list
-      #   list_of_submodels <- lapply(update_node, generate_submodel_data, likelihood = likelihood, fold_number = fold_number, drop_censored = drop_censored  )
-      #   names(list_of_submodels) <- update_node
-      #
-      #   return(list_of_submodels)
-      # }
 
-      # TODO: change clever covariates to allow only calculating some nodes
-      clever_covariates_and_EIC_comp <- lapply(self$tmle_params, function(tmle_param) {
-        tmle_param$clever_covariates(tmle_task, fold_number)[[update_node_key]]
+      clever_covariates_info <- lapply(self$tmle_params, function(tmle_param) {
+        tmle_param$clever_covariates(tmle_task, fold_number, for_fitting = for_fitting)[[update_node_key]]
       })
-      clever_covariates <- lapply(clever_covariates_and_EIC_comp, `[[`, "H")
-
-      EIC_comps <- lapply(clever_covariates_and_EIC_comp, `[[`, "D")
+      clever_covariates <- lapply(clever_covariates_info, `[[`, "H")
+      # Note that clever covariates are not collapsed in this function.
+      # The EIC component is absorbed into the epsilon vector
 
       submodel_info <- lapply(self$tmle_params, function(tmle_param) {
         tmle_param$submodel_info()
       })
 
-      # this could be a list of covariate lists
-      #node_covariates <- lapply(clever_covariates, `[[`, update_node_key)
       reduce_f <- function(x,y){
         out = list()
         names_out <- self$key_to_node_bundle(update_node_key)
@@ -179,112 +173,119 @@ tmle3_Update <- R6Class(
       }
       # Merge clever covariates for each node across parameters
       covariates_dt_list <- clever_covariates %>% reduce(reduce_f)
+      if(!is.list(covariates_dt_list)) covariates_dt_list <- list(covariates_dt_list)
       #covariates_dt <- do.call(cbind, node_covariates)
       # Stack EIC node-specific components for each target parameter
-      EIC_comps_stacked <- unlist(EIC_comps)
-
+      #EIC_comps_stacked <- unlist(EIC_comps)
       node_submodel_info <- lapply(submodel_info, `[[`, update_node_key)
       # TODO check that parameters share the same loss functions and submodels
       node_submodel_info <- node_submodel_info[[1]]
       loss <- node_submodel_info$loss
       submodel <- node_submodel_info$submodel
+      family <- node_submodel_info$submodel_family
+      offset_transform <- node_submodel_info$offset_transform
 
 
-      if (self$one_dimensional) {
-        observed_task <- likelihood$training_task
-        covariates_dt_list <- lapply(seq_along(covariates_dt_list),  function(i){
-          self$collapse_covariates(EIC_comps_stacked[[i]], covariates_dt_list[[i]])
-          } )
-        #covariates_dt <- self$collapse_covariates(EIC_comps_stacked, covariates_dt)
-      }
-      #TODO handle t and is coumns
       observed_list <- lapply(update_node,function(node){
-        observed <- tmle_task$get_tmle_node(node)
+        observed <- unlist(tmle_task$get_tmle_node(node)[,node, with = F], use.names = F)
         observed <- tmle_task$scale(observed, node)
       })
-
+      id_list = list()
+      t_list = list()
       initial_list <- lapply(update_node , function(node, task, fold){
+
         initial <- likelihood$get_likelihood(node, tmle_task=task, fold_number = fold )
+        id_list <<- c(id_list, list(initial$id ))
+        t_list <<- c(t_list, list(initial$t ))
+        initial <- initial[,node,with=F]
+        initial <- unlist(initial[,node,with=F], use.names=F)
         initial <- tmle_task$scale(initial, node)
         initial <- bound(initial, 0.005)
-        })
+        }, task = tmle_task, fold = fold_number)
 
 
-      # scale observed and predicted values for bounded continuous
-      #observed <- tmle_task$scale(observed, update_node)
-      #initial <- tmle_task$scale(initial, update_node)
 
-
-      # protect against qlogis(1)=Inf
-      #initial <- bound(initial, 0.005)
-
-      # TODO make sure that if there is only one node specified by update_node_key
-      # that nothing breaks and each element of submodel_data is still a list
-      # submodel data now specifies the entire updating procedure including loss and submodel
       names(observed_list) <- update_node
-      names(H) <- update_node
-      names(initial) <- update_node
+      names(covariates_dt_list) <- update_node
+      names(initial_list) <- update_node
+      names(t_list) <- update_node
+      names(id_list) <- update_node
+      at_risk_list<- lapply(update_node, function(node) which(unlist(tmle_task$get_regression_task(node)$get_data(,"at_risk"), use.names=F)==1))
 
+      if(drop_censored){
+        observed_list <- lapply(seq_along(observed_list), function(i) {observed_list[[i]][at_risk_list[[i]]]})
+        initial_list <- lapply(seq_along(initial_list), function(i) {initial_list[[i]][at_risk_list[[i]]]})
+        t_list <- lapply(seq_along(t_list), function(i) {t_list[[i]][at_risk_list[[i]]]})
+        id_list <- lapply(seq_along(id_list), function(i) {id_list[[i]][at_risk_list[[i]]]})
+        covariates_dt_list <- lapply(seq_along(covariates_dt_list), function(i) {covariates_dt_list[[i]][at_risk_list[[i]],,drop = F]})
+        at_risk_list <-  lapply(seq_along(at_risk_list), function(i) {at_risk_list[[i]][at_risk_list[[i]]]})
+      }
+      names(observed_list) <- update_node
+      names(covariates_dt_list) <- update_node
+      names(initial_list) <- update_node
+      names(t_list) <- update_node
+      names(id_list) <- update_node
+      names(at_risk_list) <- update_node
+      if(for_fitting) {
+        training_task <- likelihood$training_task
+      } else {
+        training_task <- NULL
+      }
       submodel_data <- list(
         observed = observed_list,
         H = covariates_dt_list,
         initial = initial_list,
         loss = loss,
-        submodel = submodel
-
+        submodel = submodel,
+        t_list = t_list,
+        id_list = id_list,
+        at_risk_list = at_risk_list,
+        offset_transform = offset_transform,
+        family = family,
+        key = update_node_key,
+        node = update_node,
+        training_task = training_task
       )
 
       # TODO handle this
       # Censoring/risk set could be a summary measure of past and may not be in dataset
       # Will need to extract the at_risk indicator from the regression task of each node
-      if(drop_censored){
-        censoring_node<-tmle_task$npsem[[update_node]]$censoring_node$name
-        if(!is.null(censoring_node)){
-          observed_node <- tmle_task$get_tmle_node(censoring_node)
-          subset <- which(observed_node==1)
-          submodel_data <- list(
-            observed = submodel_data$observed[subset],
-            H = submodel_data$H[subset, , drop=FALSE],
-            initial = submodel_data$initial[subset]
-          )
-        }
-      }
 
       return(submodel_data)
     },
     fit_submodel = function(submodel_data) {
+      update_node <- submodel_data$node
+
+      if (self$one_dimensional) {
+        #Collapsing is part of fitting
+        observed_task <- submodel_data$training_task
+
+        EIC_comps <- lapply(update_node, function(node){
+          unlist(lapply(self$tmle_params, function(tmle_param) {
+            tmle_param$get_EIC_component(observed_task, node)
+          }))})
 
 
-      #expected format: submodel_data <- list(
-      #   observed = observed_list,
-      #   H = covariates_dt_list,
-      #   initial = initial_list,
-      #   loss = loss,
-      #   submodel = submodel
-      #
-      # )
+        names(EIC_comps) <- submodel_data$node
+        new_H <- lapply(seq_along(submodel_data$H),  function(i){
+          self$collapse_covariates(EIC_comps[[i]], submodel_data$H[[i]])
+        } )
+        names(new_H) <-  submodel_data$node
+        submodel_data$H <- new_H
+        #covariates_dt <- self$collapse_covariates(EIC_comps_stacked, covariates_dt)
+      }
 
-
-      # pool submodel data
-      # TODO make sure the fits below use this data and not submodel_data
-      observed <- unlist(submodel_data$observed)
-      initial <- unlist(submodel_data$initial)
-      H <- do.call(rbind, covariates_dt_list)
+      observed <- unlist(submodel_data$observed, use.names=F )
+      initial <- unlist(submodel_data$initial, use.names=F )
+      H <- do.call(rbind, submodel_data$H)
       loss_function <- submodel_data$loss
       submodel <- submodel_data$submodel
+      # family and offset are part of submodel and are passed through PARAM
+      family <- submodel_data$family
+      offset <- submodel_data$offset_transform(initial, observed)
       submodel_data_pooled = list(H = H, observed = observed,  initial = initial)
-      # If list of submodel data
-      # if(all(names(submodel_data) %in% self$update_nodes)){
-      #   submodel_data_list <- submodel_data
-      #   observed_list <- lapply(submodel_data, `[[`, "observed")
-      #   H_list <- lapply(submodel_data, `[[`, "H")
-      #   initial_list <- lapply(submodel_data, `[[`, "initial")
-      #   # get pooled submodel data from which epsilon should be fit
-      #   submodel_data <- list(observed = unlist(observed_list),
-      #                         H = do.call(rbind(H_list)),
-      #                         initial = unlist(initial_list))
-      #
-      # }
+
+
 
       if (self$constrain_step) {
         ncol_H <- ncol(H)
@@ -297,10 +298,7 @@ tmle3_Update <- R6Class(
 
 
         risk <- function(epsilon) {
-          # TODO change?
           submodel_estimate <- self$apply_submodel(submodel_data, epsilon, submodel)
-          # When submodel_data is pooled list, should submodel_estimate return named list of estimates?
-
           loss <- loss_function(submodel_estimate, submodel_data$observed)
           mean(loss)
         }
@@ -332,8 +330,8 @@ tmle3_Update <- R6Class(
         if (self$fluctuation_type == "standard") {
           suppressWarnings({
             submodel_fit <- glm(observed ~ H - 1, submodel_data_pooled,
-                                offset = qlogis(initial),
-                                family = binomial(),
+                                offset = offset,
+                                family = family,
                                 start = rep(0, ncol(H))
             )
           })
@@ -341,8 +339,8 @@ tmle3_Update <- R6Class(
           if (self$one_dimensional) {
             suppressWarnings({
               submodel_fit <- glm(observed ~ -1, submodel_data_pooled,
-                                  offset = qlogis(initial),
-                                  family = binomial(),
+                                  offset = offset,
+                                  family = family,
                                   weights = as.numeric(H),
                                   start = rep(0, ncol(H))
               )
@@ -354,8 +352,8 @@ tmle3_Update <- R6Class(
             )
             suppressWarnings({
               submodel_fit <- glm(observed ~ H - 1, submodel_data_pooled,
-                                  offset = qlogis(initial),
-                                  family = binomial(),
+                                  offset = offset,
+                                  family = family,
                                   start = rep(0, ncol(H))
               )
             })
@@ -372,26 +370,32 @@ tmle3_Update <- R6Class(
         max_eps <- epsilon[which.max(abs(epsilon))]
         cat(sprintf("(max) epsilon: %e ", max_eps))
       }
-
+      if (self$one_dimensional) {
+        epsilon <- lapply(EIC_comps, function(comp) comp*epsilon)
+        names(epsilon) <- update_node
+      } else{
+        epsilon <- as.list(replicate(list(epsilon), length(update_node)))
+        names(epsilon) <- update_node
+      }
       return(epsilon)
     },
-    submodel = function(epsilon, initial, H) {
-      plogis(qlogis(initial) + H %*% epsilon)
-    },
-    loss_function = function(estimate, observed) {
-      -1 * ifelse(observed == 1, log(estimate), log(1 - estimate))
-    },
+
     apply_submodel = function(submodel_data, epsilon, submodel) {
       # TODO
-      submodel(epsilon, submodel_data$initial, submodel_data$H)
+      submodel(epsilon, submodel_data$initial, submodel_data$H, submodel_data$observed)
     },
     debundle_submodel = function(bundle, node){
       submodel_data <- list(
-      observed = bundle$observed$node,
-      H = bundle$H$node,
-      initial = bundle$initial$node,
+      observed = bundle$observed[node],
+      H = bundle$H[node],
+      initial = bundle$initial[node],
       loss = bundle$loss,
-      submodel = bundle$submodel
+      submodel = bundle$submodel,
+      t = bundle$t_list[node],
+      id = bundle$id_list[node],
+      at_risk_list = bundle$at_risk_list[node],
+      offset_transform = bundle$offset_transform,
+      family = bundle$family
       )
       return(submodel_data)
     },
@@ -400,20 +404,25 @@ tmle3_Update <- R6Class(
       # TODO However, submodel_data won't work for nodes contained in bundled nodes
       submodel_data <- self$generate_submodel_data(
         likelihood, tmle_task,
-        fold_number, update_node, drop_censored = FALSE
+        fold_number, update_node, drop_censored = FALSE, for_fitting = F
       )
+
       # TODO make sure that submodel data/clever covariates are cached.
       # Currently the above is computing the submodel data for all nodes in bundle...
       # Alternatively we could do apply_update in bundles, but then changed to Targeted_lik
       # would need to be made.
 
-      submodel_data <- debundle_submodel(submodel_data, update_node)
+      submodel_data <- self$debundle_submodel(submodel_data, update_node)
 
 
+      updated_likelihood <- self$apply_submodel(submodel_data, new_epsilon, submodel_data$submodel)
 
-      updated_likelihood <- self$apply_submodel(submodel_data, new_epsilon)
+      # This is absorbed into clever covariates
+      #updated_likelihood[-submodel_data$at_risk_list[[update_node]]] <- submodel_data$initial[[node]][-submodel_data$at_risk_list[[update_node]]]
+      t <- unlist(submodel_data$t)
+      id <- unlist(submodel_data$id)
 
-      if(any(!is.finite(updated_likelihood))){
+      if(any(!is.finite(updated_likelihood[[update_node]]))){
         stop("Likelihood was updated to contain non-finite values.\n
              This is likely a result of unbounded likelihood factors")
       }
@@ -422,6 +431,8 @@ tmle3_Update <- R6Class(
         updated_likelihood,
         update_node
       )
+      updated_likelihood <- data.table(t = t, id = id, unlist(updated_likelihood))
+      setnames(updated_likelihood, c("t", "id", update_node))
 
       return(updated_likelihood)
     },
@@ -480,7 +491,7 @@ tmle3_Update <- R6Class(
 
       if(is.null(update_spec)) {
         maxit <- private$.maxit
-        update_spec <- as.list(rep(self$update_nodes, maxit))
+        update_spec <- as.list(rep(list(self$update_nodes), maxit))
       }
       # seed current estimates
       private$.current_estimates <- lapply(self$tmle_params, function(tmle_param) {

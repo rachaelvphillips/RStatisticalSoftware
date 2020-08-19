@@ -54,7 +54,7 @@ Targeted_Likelihood_pooled <- R6Class(
         updated_values <- task_updates[[task_index]]
 
         likelihood_factor <- self$factor_list[[update_node]]
-        self$cache$set_values(likelihood_factor, task, step_number + 1, fold_number, updated_values, update_node = "")
+        self$cache$set_values(likelihood_factor, task, step_number + 1, fold_number, updated_values, update_node )
       }
       # for (task in tasks_at_step) {
       #   all_submodels <- self$updater$generate_submodel_data(self, task, fold_number)
@@ -74,12 +74,12 @@ Targeted_Likelihood_pooled <- R6Class(
 
         if (!is.null(value_step)) {
           # if some are available, grab them
-          likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number, node = "")
+          likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number, node = node)
         } else {
           # if not, generate new ones
           likelihood_values <- self$initial_likelihood$get_likelihood(tmle_task, node, fold_number)
           value_step <- 0
-          self$cache$set_values(likelihood_factor, tmle_task, value_step, fold_number, likelihood_values, node = "")
+          self$cache$set_values(likelihood_factor, tmle_task, value_step, fold_number, likelihood_values, node = node)
         }
 
         if (value_step < self$updater$step_number) {

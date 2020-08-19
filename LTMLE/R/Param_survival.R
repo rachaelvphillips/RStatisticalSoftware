@@ -47,9 +47,9 @@ Param_survival <- R6Class(
       private$.times <- times
       if(is.null(target_times)){
         target_times <- times
-        private$.targeted <- rep(TRUE, length(times))
+        private$.targeted <- rep(TRUE, length(target_times))
       } else {
-        private$.targeted <- times %in% target_times
+        private$.targeted <-  rep(TRUE, length(target_times))
       }
       private$.target_times <- target_times
       super$initialize(observed_likelihood, ..., outcome_node = outcome_node)
@@ -66,7 +66,7 @@ Param_survival <- R6Class(
       # sm <- cbind(1,sm[,-ncol(sm)])
       return(sm)
     },
-    clever_covariates_internal = function(tmle_task = NULL, fold_number = "full", subset_times = FALSE) {
+    clever_covariates_internal = function(tmle_task = NULL, fold_number = "full", subset_times = FALSE, for_fitting = T) {
       if (is.null(tmle_task)) {
         tmle_task <- self$observed_likelihood$training_task
       }
@@ -86,14 +86,14 @@ Param_survival <- R6Class(
       g_A <- unlist(g_A[,intervention_nodes, with = F])
 
       # I(A=1)
+      #TODO this
       #cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
       cf_pA <- tmle_task$get_tmle_node("A")[,A]
-      print(data.table(cf_pA))
-      print(data.table(g_A))
+
       #Should already be matrix. Assumed to be in order of time
       Q <- self$observed_likelihood$get_likelihoods(cf_task, c("processN"), fold_number, drop_id = T, to_wide = T)
       # TODO: make bound configurable
-      print(data.table())
+
 
       Q <- as.matrix(Q)
       Q <- bound(Q, 0.005)
@@ -105,8 +105,6 @@ Param_survival <- R6Class(
 
       Q_surv <- as.matrix(self$hm_to_sm(Q))
       G_surv <- as.matrix(self$hm_to_sm(G))
-      print(data.table(Q_surv))
-      print(data.table(G_surv))
 
       # fix t-1
       G_surv <- cbind(rep(1, nrow(G_surv)),G_surv[,-ncol(G_surv)])
@@ -143,6 +141,12 @@ Param_survival <- R6Class(
       # Contains columns t and id
 
       observed_N <- tmle_task$get_tmle_node("processN", include_time = T, include_id = T)
+      at_risk <- tmle_task$get_regression_task("processN", drop_censored = F)$get_data(,"at_risk")
+
+      # Only those at risk have likelihood updated.
+
+
+      if(for_fitting){
       observed_N_wide <- reshape(observed_N, idvar = "id", timevar = "t", direction = "wide")
       to_dNt <- function(v){
 
@@ -176,22 +180,50 @@ Param_survival <- R6Class(
 
       #  Compute EIC component for one step/convergence criterion
       D1 = colSums(HA*residuals)
+      new_comps <- list(list(processN = D1 ))
+      names(new_comps) <- tmle_task$uuid
+      new_comps
+      private$.D_cache <- c(private$.D_cache, new_comps)
 
-
-
-      return(list(processN = list(H = HA, D = D1, residuals = residuals)))
+      }
+      zero_rows <- which(at_risk == 0)
+      # TODO dont compute HA for all people
+      HA[zero_rows,] <- 0
+      #Returns clever covariates and EIC component
+      return(list(processN = list(H = HA)))
     },
     submodel_info = function(){
-      return(list(processN = list(loss = self$loss_function, submodel = self$submodel)))
+      #Returns list of submodel info
+      # This includes submodel function, loss function, family object (for glm), offset_transform function (for glm)
+      return(list(processN = list(submodel_family = self$submodel_family, offset_transform = self$offset_transform, loss = self$loss_function, submodel = self$submodel )))
     },
-    submodel = function(epsilon, initial, H) {
-      plogis(qlogis(initial) + H %*% epsilon)
+    offset_transform = function(initial, observed){
+      # convert initial likelihood to to hazard format
+      return(qlogis(ifelse(observed == 1, initial, 1 - initial)))
+    },
+    submodel_family = function(){
+      return(binomial())
+    },
+    submodel = function(epsilon, initial, H, observed) {
+      # Logistic submodel requires p/1-p
+      observed <- observed$processN
+      initial <- initial$processN
+      initial <- ifelse(observed ==1, initial, 1 - initial)
+      H <- H$processN
+      result <- plogis(qlogis(initial) + H %*% epsilon)
+      # convert hazard format to likelihood format
+      result <- ifelse(observed ==1, result, 1 - result)
+      list(processN = result)
     },
     loss_function = function(estimate, observed) {
-      -1 * ifelse(observed == 1, log(estimate), log(1 - estimate))
+      # Assumes estimate and observed are single (long) vectors
+      -log(estimate$processN)
     },
-    clever_covariates = function(tmle_task, fold_number = "full"){
-      self$clever_covariates_internal(tmle_task, fold_number, subset_times = TRUE)
+    clever_covariates = function(tmle_task, fold_number = "full", for_fitting = T){
+      self$clever_covariates_internal(tmle_task, fold_number, subset_times = TRUE, for_fitting = for_fitting)
+    },
+    get_EIC_component = function(task, node) {
+      return(private$.D_cache[[task$uuid]][[node]])
     },
     estimates = function(tmle_task = NULL, fold_number = "full") {
       if (is.null(tmle_task)) {
@@ -225,6 +257,7 @@ Param_survival <- R6Class(
     }
   ),
   private = list(
+    .D_cache = list(),
     .type = "survival",
     .cf_likelihood = NULL,
     .supports_outcome_censoring = TRUE,
