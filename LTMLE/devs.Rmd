@@ -66,9 +66,60 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool
 # Delta is the counting process which is 1 at death
 ```
 
+```{r}
 
+node <- "x"
+data <- x
+data
+helper <- function(x){
+  
+  id <- x$id
+  t <- x$t
+  index <- which(data$id == id &  data$t==t)
+  print(c(id,t,index))
+  if(length(index)>0){
+    #If t and id in data then replace
+    set(data, index, node, x[, node, with = F])
+  
+    return(1)
+  } else {
+    
+    #otherwise add new row
+    indices<-which(data$id == id & data$t <= t)
+    index <- indices[which.max(data[indices, "t", with = F][[1]])]
+    print(index)
+    new_row <- data[index,]
+    set(new_row, , node, x[, node, with = F])
+    set(new_row, , "t", x[, "t", with = F])
+    print(new_row)
+    data <<- rbind(data, new_row)
+    print(data)
+    return(0)
+  }
 
+}
+v = y[, helper(.SD), by = c("id", "t"), .SDcols = colnames(y)]
 
+data
+```
+
+```{r}
+sum(duplicated(newer_dat[, -c("t")]))
+
+```
+
+```{r}
+task = ltmle3_Task$new(data, npsem)
+dat = task$data
+sum(dat$t==2)
+new_dat <- task$get_tmle_node("processN", force_time_value = 2)
+new_dat$t = 2
+set(new_dat, ,"processN", 1)
+new_dat
+newer_dat = task$generate_counterfactual_task(UUIDgenerate(), new_dat)$data
+newer_dat
+sum(table(newer_dat$id)==2)
+```
 
 
 ```{r}
@@ -80,6 +131,12 @@ lik = lik$train(task)
 ```
 
 
+
+```{r}
+
+sampler <- Sampler$new(lik, c("W", "A"), "W")
+sampler$sample_from_node(task, "W", 1)
+```
 
 ```{r}
 tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))

@@ -8,6 +8,7 @@
 #' @importFrom R6 R6Class
 #' @importFrom uuid UUIDgenerate
 #' @importFrom methods is
+#' @importFrom AR AR.Sim
 #' @family Likelihood objects
 #' @keywords data
 #'
@@ -232,7 +233,7 @@ LF_fit_pooled <- R6Class(
 
               return(likelihood)
             }
-            samples <- AR.Sim(n_samples, f_X,
+            samples <- AR::AR.Sim(n_samples, f_X,
                               xlim = c(min(learner$training_task$Y), max(learner$training_task$Y))
             )
             values[, i] <- samples

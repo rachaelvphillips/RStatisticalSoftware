@@ -1,5 +1,7 @@
 
 #A general sampler from likelihood objects
+#' @importFrom AR AR.Sim
+#' @export
 
 Sampler <- R6Class(
   classname = "Sampler",
@@ -14,10 +16,10 @@ Sampler <- R6Class(
   },
   likelihood = function(){
     self$params$likelihood
-  },
+  }
   ),
   public = list(
-    initialize = function(likelihood, time_ordering){
+    initialize = function(likelihood, time_ordering, use_lf = c()){
       params <- sl3::args_to_list()
       private$.params <- params
     },
@@ -52,19 +54,26 @@ Sampler <- R6Class(
       cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), samples)
       return(cf_task)
     },
-    sample_from_node = function(tmle_task, node, n_samples, use_LF_factor = F, fold_number = "full"){
+    sample_from_node = function(tmle_task, node, n_samples = 1, use_LF_factor = node %in% self$params$use_lf, fold_number = "full"){
       #Samples from a node. Returns matrix of n by n_samples of values.
+      print(use_LF_factor)
       if(use_LF_factor){
         return(self$likelihood$factor_list[[node]]$sample(tmle_task, n_samples, fold_number))
       }
       outcome_type <- tmle_task$npsem[[node]]$variable_type
+
       times_to_pool <- tmle_task$npsem[[node]]$times_to_pool
 
       num_id <- length(unique(tmle_task$id))
       num_rows <- ifelse(is.null(times_to_pool), num_id, times_to_pool*num_id)
+      reg_task <- tmle_task$get_regression_task(node, drop_censored = T)
+      at_risk_id <- reg_task$get_data(, c("id", "t"))
+      # Only sample from those who are at_risk (so that their value may change)
+
+      num_rows <- nrow(at_risk_id)
       if(outcome_type$type == "binomial"){
-        cf_outcome <- data.table(rep(1,num_rows))
-        setnames(cf_outcome, node)
+        cf_outcome <- data.table(t= at_risk_id$t, id = at_risk_id$t, rep(1,num_rows))
+        setnames(cf_outcome, c("t", "id", node))
         cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), cf_outcome)
         p <- self$likelihood$get_likelihood(cf_task, node)[, node, with = F][[1]]
         values <- as.matrix(lapply(1:num_rows, function(i) {
@@ -75,7 +84,8 @@ Sampler <- R6Class(
         levels <- outcome_type$levels
         cf_tasks <- lapply(levels, function(level){
           cf_outcome <- data.table(rep(level,num_rows))
-          setnames(cf_outcome, node)
+          cf_outcome <- data.table(t= at_risk_id$t, id = at_risk_id$t, cf_outcome)
+          setnames(cf_outcome, c("t", "id", node))
           cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), cf_outcome)
         })
         probs <- as.matrix(lapply(cf_tasks, function(cf_task){
@@ -93,20 +103,23 @@ Sampler <- R6Class(
           stop("Sampling from continuous variables is not supported for pooled time.")
         }
         outcome <- tmle_task$get_tmle_node(node)
+        outcome_stripped <- outcome[, node, with = F][[1]]
         ids <- outcome$id
         values <- matrix(nrow = n_samples, ncol = num_rows)
         for (id in ids) {
           subject <- tmle_task[which(tmle_task$id == id)]
           f_X <- function(a) {
+
             #TODO might be more efficient to pass the regression task to likelihood so we dont recompute
             cf_data <- data.table(a)
-            setnames(cf_data, names(cf_data), self$name)
+            print(cf_data)
+            setnames(cf_data, names(cf_data), node)
             subject_a <- subject$generate_counterfactual_task(UUIDgenerate(), cf_data)
             likelihood <- self$likelihood$get_likelihood(subject_a, node)[, node, with = F][[1]]
             return(likelihood)
           }
-          samples <- AR.Sim(n_samples, f_X,
-                            xlim = c(min(outcome[, node, with = F][[1]]), max(outcome[, node, with = F][[1]]))
+          samples <- AR::AR.Sim(n_samples, f_X, Y.dist = "norm", Y.dist.par = c(mean(outcome_stripped), var(outcome_stripped)),
+                            xlim = c(min(outcome_stripped), max(outcome_stripped))
           )
           values[, i] <- samples
         }
@@ -120,6 +133,6 @@ Sampler <- R6Class(
     }
   ),
   private = list(
-    private$.params = NULL
+    .params = NULL
   )
 )
