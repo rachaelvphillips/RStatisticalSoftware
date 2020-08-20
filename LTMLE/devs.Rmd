@@ -84,7 +84,7 @@ lik = lik$train(task)
 ```{r}
 tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
 param <- Param_survival$new(tlik, intervention_list = list("A" = LF_static$new("A", value = 1)), outcome_node = "processN")
-z = param$clever_covariates_internal(task)
+param$get_EIC_var(task)
 ```
 
 

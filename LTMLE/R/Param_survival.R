@@ -202,7 +202,7 @@ Param_survival <- R6Class(
       return(list(processN = list(H = HA)))
     },
     get_EIC_var = function(tmle_task, fold_number = "full"){
-      self$compute_EIC_variance(tmle_task, fold_number, for_fitting = T, compute_EIC_variance = T)
+      self$clever_covariates_internal(tmle_task, fold_number, for_fitting = T, compute_EIC_variance = T)
     },
     estimates = function(tmle_task = NULL, fold_number = "full") {
       if (is.null(tmle_task)) {
