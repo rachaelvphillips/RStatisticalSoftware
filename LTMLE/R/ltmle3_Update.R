@@ -88,8 +88,7 @@ tmle3_Update <- R6Class(
       na_epsilons <- as.list(rep(NA, length(unkeyed_nodes)))
       names(na_epsilons) <- unkeyed_nodes
       private$.epsilons[[current_step]] <- na_epsilons
-      print("ok")
-      print(update_nodes)
+
       for (update_node in update_nodes) {
         # update_node coulde keyed multinode
         # get new submodel fit
@@ -249,9 +248,6 @@ tmle3_Update <- R6Class(
         training_task = training_task
       )
 
-      # TODO handle this
-      # Censoring/risk set could be a summary measure of past and may not be in dataset
-      # Will need to extract the at_risk indicator from the regression task of each node
 
       return(submodel_data)
     },

@@ -66,7 +66,7 @@ Targeted_Likelihood_pooled <- R6Class(
       # }
     },
     get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, to_wide = F) {
-      if (node %in% self$updater$update_nodes) {
+      if (node %in% unlist(lapply(self$updater$update_nodes,self$updater$key_to_node_bundle ))) {
         # self$updater$get_updated_likelihood(self, tmle_task, node)
         likelihood_factor <- self$factor_list[[node]]
         # first check for cached values for this task
