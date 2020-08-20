@@ -544,6 +544,7 @@ ltmle3_Task <- R6Class(
       lapply(seq_along(node_index), function(i){
         index <- node_index[[i]]
         var <- node_variables[[i]]
+
         set(old_data, index, var, new_data[,node_names[[i]],with=F])
       })
 
@@ -559,7 +560,7 @@ ltmle3_Task <- R6Class(
         column_names = new_column_names,
         folds = self$folds,
         row_index = self$row_index,
-        force_at_risk = T
+        force_at_risk = force_at_risk
       )
 
       return(new_task)

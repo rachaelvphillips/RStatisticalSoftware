@@ -129,6 +129,8 @@ Likelihood_pooled <- R6Class(
       #In case node is pooled, then grab all times
       names_of <- colnames(likelihood_values)
       keep_cols <- intersect(c("t", "id", grep(node,names_of , value = T)), names_of)
+
+
       likelihood_values <- likelihood_values[,  keep_cols, with = F]
 
       if(to_wide & length(unique(likelihood_values$t))==1){

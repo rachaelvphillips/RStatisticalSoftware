@@ -16,7 +16,9 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
 }
 \seealso{
 Other Likelihood objects: 
+\code{\link{CF_Likelihood_pooled}},
 \code{\link{LF_fit_pooled}},
+\code{\link{LF_static}},
 \code{\link{Targeted_Likelihood_pooled}}
 }
 \concept{Likelihood objects}

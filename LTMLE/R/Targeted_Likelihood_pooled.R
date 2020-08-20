@@ -44,7 +44,7 @@ Targeted_Likelihood_pooled <- R6Class(
       # todo: rethink which tasks need updates here
       # tasks_at_step <- self$cache$tasks_at_step(step_number)
       tasks_at_step <- self$cache$tasks
-
+      print(step_number)
       # first, calculate all updates
       task_updates <- lapply(tasks_at_step, self$updater$apply_update, self, fold_number, new_epsilon, update_node)
 

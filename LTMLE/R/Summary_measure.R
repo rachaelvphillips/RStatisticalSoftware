@@ -88,7 +88,7 @@ Summary_measure <- R6Class(
   ),
   private = list(
     .params = NULL,
-    .process_data = function(data, time, row_index){
+    .process_data = function(data, time, row_index = NULL){
       assertthat::assert_that(all(c("id", "t") %in% colnames(data)), msg = "Error: Column 'id' or 't' not found in data.")
       if(!is.data.table(data)){
         data = as.data.table(data)

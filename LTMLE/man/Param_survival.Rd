@@ -57,6 +57,8 @@ Other Parameters:
 \item \href{#method-long_to_mat}{\code{Param_survival$long_to_mat()}}
 \item \href{#method-hm_to_sm}{\code{Param_survival$hm_to_sm()}}
 \item \href{#method-clever_covariates_internal}{\code{Param_survival$clever_covariates_internal()}}
+\item \href{#method-get_EIC_var}{\code{Param_survival$get_EIC_var()}}
+\item \href{#method-estimates}{\code{Param_survival$estimates()}}
 \item \href{#method-submodel_info}{\code{Param_survival$submodel_info()}}
 \item \href{#method-offset_transform}{\code{Param_survival$offset_transform()}}
 \item \href{#method-submodel_family}{\code{Param_survival$submodel_family()}}
@@ -64,7 +66,6 @@ Other Parameters:
 \item \href{#method-loss_function}{\code{Param_survival$loss_function()}}
 \item \href{#method-clever_covariates}{\code{Param_survival$clever_covariates()}}
 \item \href{#method-get_EIC_component}{\code{Param_survival$get_EIC_component()}}
-\item \href{#method-estimates}{\code{Param_survival$estimates()}}
 \item \href{#method-clone}{\code{Param_survival$clone()}}
 }
 }
@@ -117,8 +118,27 @@ Other Parameters:
   tmle_task = NULL,
   fold_number = "full",
   subset_times = FALSE,
-  for_fitting = T
+  for_fitting = T,
+  compute_EIC_variance = F
 )}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-get_EIC_var"></a>}}
+\if{latex}{\out{\hypertarget{method-get_EIC_var}{}}}
+\subsection{Method \code{get_EIC_var()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$get_EIC_var(tmle_task, fold_number = "full")}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-estimates"></a>}}
+\if{latex}{\out{\hypertarget{method-estimates}{}}}
+\subsection{Method \code{estimates()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Param_survival$estimates(tmle_task = NULL, fold_number = "full")}\if{html}{\out{</div>}}
 }
 
 }
@@ -186,15 +206,6 @@ Other Parameters:
 \subsection{Method \code{get_EIC_component()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Param_survival$get_EIC_component(task, node)}\if{html}{\out{</div>}}
-}
-
-}
-\if{html}{\out{<hr>}}
-\if{html}{\out{<a id="method-estimates"></a>}}
-\if{latex}{\out{\hypertarget{method-estimates}{}}}
-\subsection{Method \code{estimates()}}{
-\subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{Param_survival$estimates(tmle_task = NULL, fold_number = "full")}\if{html}{\out{</div>}}
 }
 
 }

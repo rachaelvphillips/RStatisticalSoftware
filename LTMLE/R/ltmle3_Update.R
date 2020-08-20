@@ -88,10 +88,12 @@ tmle3_Update <- R6Class(
       na_epsilons <- as.list(rep(NA, length(unkeyed_nodes)))
       names(na_epsilons) <- unkeyed_nodes
       private$.epsilons[[current_step]] <- na_epsilons
-
+      print("ok")
+      print(update_nodes)
       for (update_node in update_nodes) {
         # update_node coulde keyed multinode
         # get new submodel fit
+
         expanded_node <- self$key_to_node_bundle(update_node)
         submodel_data <- self$generate_submodel_data(
           likelihood, tmle_task,
@@ -377,6 +379,7 @@ tmle3_Update <- R6Class(
         epsilon <- as.list(replicate(list(epsilon), length(update_node)))
         names(epsilon) <- update_node
       }
+      print(max(unlist(epsilon)))
       return(epsilon)
     },
 
@@ -402,6 +405,7 @@ tmle3_Update <- R6Class(
     apply_update = function(tmle_task, likelihood, fold_number, new_epsilon, update_node) {
       # Update_node will always be a single node (never a bundled nodes key)
       # TODO However, submodel_data won't work for nodes contained in bundled nodes
+
       submodel_data <- self$generate_submodel_data(
         likelihood, tmle_task,
         fold_number, update_node, drop_censored = FALSE, for_fitting = F
@@ -433,7 +437,6 @@ tmle3_Update <- R6Class(
       )
       updated_likelihood <- data.table(t = t, id = id, unlist(updated_likelihood))
       setnames(updated_likelihood, c("t", "id", update_node))
-
       return(updated_likelihood)
     },
     check_convergence = function(tmle_task, fold_number = "full") {
@@ -441,37 +444,43 @@ tmle3_Update <- R6Class(
       # check each component separately
       # TODO change everything
 
-      estimates <- self$current_estimates
+      #estimates <- self$current_estimates
 
       n <- length(unique(tmle_task$id))
-      if (self$convergence_type == "scaled_var") {
+      if (F & self$convergence_type == "scaled_var") {
+        # TODO need to compute EIC variance for each parameter once
         # NOTE: the point of this criterion is to avoid targeting in an overly
         #       aggressive manner, as we simply need check that the following
         #       condition is met |P_n D*| / SE(D*) =< max(1/log(n), 1/10)
         IC <- do.call(cbind, lapply(estimates, `[[`, "IC"))
         se_Dstar <- sqrt(apply(IC, 2, var) / n)
         ED_threshold <- se_Dstar / min(log(n), 10)
-      } else if (self$convergence_type == "sample_size") {
+      } else if (T & self$convergence_type == "sample_size") {
         ED_threshold <- 1 / n
       }
-
+      ED_threshold <- 1 / n
       # get |P_n D*| of any number of parameter estimates
-      ED <- ED_from_estimates(estimates)
-      # zero out any that are from nontargeted parameter components
-      ED <- ED * private$.targeted_components
-      current_step <- self$step_number
+      list_of_EIC_norms <- lapply(self$update_nodes, function(node_key) {
+        nodes <- self$key_to_node_bundle(node_key)
+        comps <- lapply(nodes, function(node){
+          unlist(lapply(self$tmle_params, function(param) param$get_EIC_component(tmle_task, node)))
+        })
+        comp <- Reduce(`+`, comps)
+        return(norm(comp, type = "2"))
+      })
 
-      private$.EDs[[current_step]] <- ED
 
 
-      ED_criterion <- abs(ED)
+      ED_criterions <- as.vector(unlist(list_of_EIC_norms))
+      print(data.table(ED_criterions))
 
       if (self$verbose) {
-        cat(sprintf("max(abs(ED)): %e\n", max(ED_criterion)))
+        cat(sprintf("max(abs(ED)): %e\n", ED_criterions))
       }
-
-
-      return(all(ED_criterion <= ED_threshold))
+      passed <- self$update_nodes[ED_criterions <= ED_threshold]
+      #Returns nodes that converged
+      print(passed)
+      return(passed)
 
     },
     update_best = function(likelihood){
@@ -494,25 +503,33 @@ tmle3_Update <- R6Class(
         update_spec <- as.list(rep(list(self$update_nodes), maxit))
       }
       # seed current estimates
-      private$.current_estimates <- lapply(self$tmle_params, function(tmle_param) {
-        tmle_param$estimates(tmle_task, update_fold)
-      })
-
+      #private$.current_estimates <- lapply(self$tmle_params, function(tmle_param) {
+       # tmle_param$estimates(tmle_task, update_fold)
+      #})
+      # TODO make sure EIC variances are computed during first iteration and stored
+      # Maybe in param object
+      converged_nodes <- c()
+      count = 1
       for (subset_nodes in update_spec) {
-
-
+        # Only update nonconverged nodes
+        subset_nodes <- setdiff(subset_nodes, converged_nodes)
+        print(count)
+        count = count+1
         self$update_step(likelihood, tmle_task, update_fold, subset_nodes)
 
         # update estimates based on updated likelihood
         # TODO current estimates not needed. we only need EIC comp from clever cov
-        private$.current_estimates <- lapply(self$tmle_params, function(tmle_param) {
-          tmle_param$estimates(tmle_task, update_fold)
-        })
+        #private$.current_estimates <- lapply(self$tmle_params, function(tmle_param) {
+         # tmle_param$estimates(tmle_task, update_fold)
+        #})
         #TODO check convergence per factor.
         # Maybe subset update_spec so that only necessary nodes are updated.
-        if (self$check_convergence(tmle_task, update_fold)) {
+        converged_nodes <- self$check_convergence(tmle_task, update_fold)
+        if(length(converged_nodes) == length(self$update_nodes)){
+          # If all nodes converged then stop
           break
         }
+
 
         if(self$use_best){
           self$update_best(likelihood)

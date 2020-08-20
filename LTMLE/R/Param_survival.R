@@ -40,9 +40,10 @@ Param_survival <- R6Class(
   inherit = Param_base,
   public = list(
     initialize = function(observed_likelihood, intervention_list, ..., outcome_node, target_times = NULL) {
-      # TODO: check outcome_node, current I(T<=t, delta=1), need I(T=t, delta=1)
+
+       # TODO: check outcome_node, current I(T<=t, delta=1), need I(T=t, delta=1)
       # W A processN processA
-      private$.cf_likelihood <- make_CF_Likelihood(observed_likelihood, intervention_list)
+      private$.cf_likelihood <- CF_Likelihood_pooled$new(observed_likelihood, intervention_list)
       times <- setdiff(sort(unique(observed_likelihood$training_task$time)),0)
       private$.times <- times
       if(is.null(target_times)){
@@ -66,7 +67,7 @@ Param_survival <- R6Class(
       # sm <- cbind(1,sm[,-ncol(sm)])
       return(sm)
     },
-    clever_covariates_internal = function(tmle_task = NULL, fold_number = "full", subset_times = FALSE, for_fitting = T) {
+    clever_covariates_internal = function(tmle_task = NULL, fold_number = "full", subset_times = FALSE, for_fitting = T, compute_EIC_variance = F) {
       if (is.null(tmle_task)) {
         tmle_task <- self$observed_likelihood$training_task
       }
@@ -77,7 +78,7 @@ Param_survival <- R6Class(
       cf_data <- tmle_task$data[, c("processN", "processA")]
       cf_data[, "processN"] <- 1
       cf_data[, "processA"] <- 1
-      cf_task = task$generate_counterfactual_task(tmle_task$uuid, new_data = cf_data, T)
+      cf_task = task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_data, T)
 
       intervention_nodes <- names(self$intervention_list)
       intervention_nodes = "A"
@@ -87,8 +88,10 @@ Param_survival <- R6Class(
 
       # I(A=1)
       #TODO this
-      #cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
-      cf_pA <- tmle_task$get_tmle_node("A")[,A]
+      cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
+      cf_pA <- unlist(cf_pA[,intervention_nodes, with = F], use.names = F)
+      print(cf_pA)
+      #cf_pA <- tmle_task$get_tmle_node("A")[,A]
 
       #Should already be matrix. Assumed to be in order of time
       Q <- self$observed_likelihood$get_likelihoods(cf_task, c("processN"), fold_number, drop_id = T, to_wide = T)
@@ -147,51 +150,71 @@ Param_survival <- R6Class(
 
 
       if(for_fitting){
-      observed_N_wide <- reshape(observed_N, idvar = "id", timevar = "t", direction = "wide")
-      to_dNt <- function(v){
+        observed_N_wide <- reshape(observed_N, idvar = "id", timevar = "t", direction = "wide")
+        to_dNt <- function(v){
 
-        dt = data.table(matrix(c(0,diff(unlist(v))), nrow = 1))
-        colnames(dt) <- paste0("d", colnames(v))
-        return(dt)
-      }
-      # Converts to dNt format
-      observed_dN_wide <- observed_N_wide[, to_dNt(.SD), by = id]
-      observed_dN_wide$id <- NULL
-
-
-
-      jump_time <- apply(observed_N_wide, 1, function(v){
-        time <- which(v==1)
-        if(length(time) ==0){
-          return(Inf)
+          dt = data.table(matrix(c(0,diff(unlist(v))), nrow = 1))
+          colnames(dt) <- paste0("d", colnames(v))
+          return(dt)
         }
-        return(min(time))
-      })
-      t_mat <- matrix(1:ncol(observed_dN_wide), ncol = ncol(observed_dN_wide), nrow = nrow(observed_dN_wide), byrow = T )
-      # TODO dont recompute this every time
-      ind = apply(((t_mat <= jump_time)),2,as.numeric)
+        # Converts to dNt format
+        observed_dN_wide <- observed_N_wide[, to_dNt(.SD), by = id]
+        observed_dN_wide$id <- NULL
 
 
-      # compute scaled and zeroed residuals vector
+
+        jump_time <- apply(observed_N_wide, 1, function(v){
+          time <- which(v==1)
+          if(length(time) ==0){
+            return(Inf)
+          }
+          return(min(time))
+        })
+        t_mat <- matrix(1:ncol(observed_dN_wide), ncol = ncol(observed_dN_wide), nrow = nrow(observed_dN_wide), byrow = T )
+        # TODO dont recompute this every time
+        ind = apply(((t_mat <= jump_time)),2,as.numeric)
 
 
-      residuals = as.vector((as.matrix(observed_dN_wide) - Q)*ind/nrow(observed_N_wide))
+        # compute scaled and zeroed residuals vector
 
 
-      #  Compute EIC component for one step/convergence criterion
-      D1 = colSums(HA*residuals)
-      new_comps <- list(list(processN = D1 ))
-      names(new_comps) <- tmle_task$uuid
-      new_comps
-      private$.D_cache <- c(private$.D_cache, new_comps)
+        residuals = as.vector((as.matrix(observed_dN_wide) - Q)*ind/nrow(observed_N_wide))
+        residuals <- HA*residuals
+
+
+        #  Compute EIC component for one step/convergence criterion
+        D1 = colSums(residuals)
+        if(compute_EIC_variance) {
+          # In general, this should be the
+          EIC_var <- colSums((HA*residuals*sqrt(nrow(observed_N_wide)))^2) - D1
+          return(list(processN = EIC_var))
+        }
+
+        private$.D_cache[[tmle_task$uuid]] <- list(processN = D1 )
+
+
 
       }
       zero_rows <- which(at_risk == 0)
       # TODO dont compute HA for all people
       HA[zero_rows,] <- 0
-      #Returns clever covariates and EIC component
+      #Returns clever covariates
       return(list(processN = list(H = HA)))
     },
+    get_EIC_var = function(tmle_task, fold_number = "full"){
+      self$compute_EIC_variance(tmle_task, fold_number, for_fitting = T, compute_EIC_variance = T)
+    },
+    estimates = function(tmle_task = NULL, fold_number = "full") {
+      if (is.null(tmle_task)) {
+        tmle_task <- self$observed_likelihood$training_task
+      }
+
+
+      result <- list(psi = psi, IC = IC_long)
+      return(result)
+      },
+
+
     submodel_info = function(){
       #Returns list of submodel info
       # This includes submodel function, loss function, family object (for glm), offset_transform function (for glm)
@@ -224,16 +247,10 @@ Param_survival <- R6Class(
     },
     get_EIC_component = function(task, node) {
       return(private$.D_cache[[task$uuid]][[node]])
-    },
-    estimates = function(tmle_task = NULL, fold_number = "full") {
-      if (is.null(tmle_task)) {
-        tmle_task <- self$observed_likelihood$training_task
-      }
-      #TODO everything
-      result <- list(psi = psi, IC = IC_long)
-      return(result)
     }
+
   ),
+
   active = list(
     # TODO: modify
     name = function() {

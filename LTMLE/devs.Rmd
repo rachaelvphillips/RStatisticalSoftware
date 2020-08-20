@@ -81,21 +81,21 @@ lik = lik$train(task)
 
 
 
-
-
+```{r}
+tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
+param <- Param_survival$new(tlik, intervention_list = list("A" = LF_static$new("A", value = 1)), outcome_node = "processN")
+z = param$clever_covariates_internal(task)
+```
 
 
 ```{r}
-tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 2))
+
 param <- Param_survival$new(tlik, intervention_list = list(), outcome_node = "processN")
 
 #subdata<- tlik$updater$generate_submodel_data(tlik, task, update_node_key = "processN")
 
 
-subdata<- tlik$updater$generate_submodel_data(tlik, task, update_node_key = "processN", drop_censored = T, for_fitting = T)
 
- eps = tlik$updater$fit_submodel(subdata)
-eps
 ```
 
 
@@ -103,11 +103,13 @@ eps
 
 ```{r}
 
-
-tlik$update(as.vector(unlist(eps, use.names = F)), 0, "full", "processN")
-
+tlik$updater$update(tlik, task)
 ```
 
+```{r}
+tlik$get_likelihood(task, "processN")
+lik$get_likelihood(task, "processN")
+```
 
 
 ```{r}
