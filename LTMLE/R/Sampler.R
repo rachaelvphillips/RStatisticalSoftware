@@ -49,6 +49,7 @@ Sampler <- R6Class(
     next_in_chain = function(tmle_task, node){
       #Takes a task and node name and then generated a new task
       # with the node values replaced with sampled values.
+      #TODO if there are time pooled nodes then this doesnt work.
       samples <- self$sample_from_node(tmle_task, node, 1)
       samples <- as.data.table(samples)
       setnames(samples, node)
