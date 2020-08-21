@@ -156,7 +156,8 @@ ltmle3_Task <- R6Class(
         orig_data <- data
 
         last_obs_value <- function(X){
-          max_time_index <- which.max(X$t)
+          max_time_index <- nrow(X)
+
           return(X[max_time_index,])
         }
         # Handle that those whose outcome was not subject to change and do not have a row in dataset
@@ -170,28 +171,8 @@ ltmle3_Task <- R6Class(
         data$t = time
       }
 
-
-
-
-
-      # # Check those who were not subject to change/monitoring (e.g. missing row at this time)
-      # not_monitored <- setdiff(all_ids, id)
-      # if(length(not_monitored)>0){
-      #   # Get last observed value of outcome, could happen at different times for each person
-      #   data_not_monitored <- orig_data[which(orig_data$id %in% not_monitored), ]
-      #   last_obs_value <- function(X){
-      #     max_time_index <- which.max(X$t)
-      #     return(X[max_time_index, ,])
-      #   }
-      #   data_not_monitored <- orig_data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
-      #   # Match up column order
-      #   data_not_monitored <- data_not_monitored[, colnames(data),with = F]
-      #   #merge data by rows
-      #   data <- rbind(data, data_not_monitored)
-      #
-      # }
       #Order by id
-      data <- data[order(data$id),]
+      #data <- data[order(data$id),]
 
       id <- data$id
       data$id <- NULL
@@ -244,6 +225,10 @@ ltmle3_Task <- R6Class(
     },
     get_regression_task = function(target_node, scale = FALSE, drop_censored = FALSE, is_time_variant = F, force_time_value = "No") {
       # TODO Not sure what is_time_variant is for.
+
+
+
+
       if(!is.numeric(force_time_value)){
 
         cache_key <- sprintf("%s_%s_%s", target_node, scale, is_time_variant)
@@ -340,6 +325,30 @@ ltmle3_Task <- R6Class(
 
       parent_names <- target_node_object$parents
       parent_nodes <- npsem[parent_names]
+
+      if(is.null(target_node_object$summary_functions)){
+        # No summary functions so simply stack node values of parents
+        parent_data <- do.call(cbind, lapply(parent_names, self$get_tmle_node, include_id = F, include_time = F, format = T))
+        outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
+
+        data <- cbind(parent_data, outcome_data)
+        data$at_risk <- self$get_tmle_node(target_node_object$at_risk_node_name, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
+        # TODO last value
+        #data[, paste0("last_val",  setdiff(colnames(outcome_data), c("id", "t"))), with = F] <-
+        # TODO custom nodes not handled
+        regression_task <- sl3_Task$new(
+          Shared_Data$new(data, force_copy = F),
+          id = "id",
+          time = "t",
+          covariates = colnames(parent_data),
+          outcome = setdiff(colnames(outcome_data), c("id", "t")),
+          outcome_type = target_node_object$variable_type,
+          folds = self$folds
+        )
+        return(regression_task)
+      }
+
+
       all_vars <- unique(unlist(lapply(npsem, `[[`, "variables")))
 
       times <- as.vector(sapply(parent_nodes, function(node) node$time))
@@ -349,29 +358,12 @@ ltmle3_Task <- R6Class(
       # Note that those with missing rows will be included in outcome_data.
       # There value will be set to last measured value.
       outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
-      #Subset to data up until current time
+
       past_data <- past_data[past_data$t <= time,]
-      # Find ids with observation row at this time. E.g. those who were monitored at this time
-      # These people are implicitely in the at-risk set.
+
       risk_set <- c()
-      #monitored_ids <- past_data[, any(.SD==time), by = id, .SDcols = c("t")]
-      #monitored_ids <- monitored_ids[which(monitored_ids[[2]]), id]
 
       risk_set <- c(risk_set, unique(past_data$id))
-
-      # Extract those who were not monitored at this time to be dropped.
-      #not_monitored_ids <- monitored_ids[-which(monitored_ids[[2]]), id][[1]]
-
-      # Ensure that variables explicitely mentioned as nodes in npsem are not included in data
-      # For example W -> A where W and A both happen at time t. Then the node W should not observe
-      # ... the value of A at time t. Setting to NA ensures not future data leakage for summary measures.
-
-      #TODO compatibility of summary measures and npsem are not checked
-
-      #strict_past_vars <- setdiff(all_vars, c("t", "id", past_same_time_vars))
-      # Safeguard to ensure no future data leakage
-      # Needed for summary functions that depend on both current time values and past time values
-      #set(past_data,  which(past_data$t == time), strict_past_vars, NA)
 
       skip <- F
       if(length(parent_covariates) == 0){

@@ -36,7 +36,7 @@ Sampler <- R6Class(
       return(tmle_task)
 
     },
-    compute_conditional_mean = function(tmle_task, start_node, end_node, num_iter = 100){
+    compute_conditional_mean = function(tmle_task, start_node, end_node, num_iter = 10){
       # Computes conditional mean of end_node given the (strict) past of start_node via monte carlo simulation
       # The sampling begins with start_node.
       outcomes = matrix(nrow = length(unique(tmle_task$id)), ncol = num_iter)

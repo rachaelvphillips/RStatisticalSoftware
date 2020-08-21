@@ -104,7 +104,7 @@ data
 ```
 
 ```{r}
-sum(duplicated(newer_dat[, -c("t")]))
+data
 
 ```
 
@@ -137,18 +137,34 @@ lik = generate_likelihood_surv(task)
 lik = lik$train(task)
 ```
 
+```{r}
+task = ltmle3_Task$new(data, npsem)
+task$data
+target_node = "processN"
+parent_data <- do.call(cbind, lapply(c("W", "A"), task$get_tmle_node, include_id = F, include_time = F, format = T))
+
+outcome_data <- task$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = T, force_time_value = 2)
+
+dat <- cbind(parent_data, outcome_data)
+dat
+
+```
+
+
 
 ```{r}
+task = ltmle3_Task$new(data, npsem)
+#task$data
+v=lapply(1:11, function(i) task$get_tmle_node("processN", force_time_value = 1))
 
-as.data.table(matrix(1, nrow = 2, ncol = 1))
 ```
 
 
 ```{r}
 
 sampler <- Sampler$new(lik, c("W", "A", "processN"), "W")
-#data.table(sampler$sample_from_node(task, "processN"))
-sampler$sample(task, "W", "processN")$data
+data.table(sampler$sample_from_node(task, "A"))
+#sampler$compute_conditional_mean(task, "W", "A")
 ```
 
 ```{r}

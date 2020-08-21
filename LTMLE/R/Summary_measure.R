@@ -45,11 +45,20 @@ Summary_measure <- R6Class(
     },
     summarize = function(data, time, add_id = T){
 
-      data <- private$.process_data(data, time, NULL)
+      #data <- private$.process_data(data, time, NULL)
+      #ssertthat::assert_that(all(c("id", "t") %in% colnames(data)), msg = "Error: Column 'id' or 't' not found in data.")
+      if(!is.data.table(data)){
+        data = as.data.table(data)
+      }
 
+      if(self$params$strict_past) {
+        data <- data[which(data$t < time), ]
+      } else {
+        data <- data[,]
+      }
       func <- private$.params$summary_function
       # Needed since pass by promise would break next line apparently
-      data <- data[,]
+
 
 
       reduced_data <- data[,func(.SD, time, self$params$args_to_pass), by = id,
