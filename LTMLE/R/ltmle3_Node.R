@@ -14,36 +14,7 @@ ltmle3_Node <- R6Class(
         stop("You specified that this node represents a pooled over time likelihood factor but did not supply the times_to_pool argument.")
       }
       # Handle counting process at risk summary functions
-      if(F&!(is.null(node_type)) ) {
-        # if(node_type == "counting_process"){
-        #   # If counting process ensure that self is in risk set
-        #   competing_set <- unique(variables)
-        #   at_risk_summary_function$set_name(paste(paste(variables, collapse = "_"), "at_risk", sep = "_") )
-        #   # Add last value of this counting process and at risk indicator to summary_functions
-        #   # TODO check for duplicate summary functions
-        #   last_val_summary <- make_summary_measure_last_value(variables, strict_past = T)
-        #   last_val_summary$set_name(paste(paste(variables, collapse = "_"), "at_risk_last_val", sep = "_") )
-        #   at_risk_competing_summary <- NULL
-        #
-        #
-        #   # Store variables to be omitted from training set
-        #   if(!is.null(at_risk_summary_function)) {
-        #     at_risk_name <- at_risk_summary_function$name
-        #   } else {
-        #     at_risk_name <- NULL
-        #   }
-        #   if(include_competing_risks){
-        #     at_risk_competing_summary <- make_summary_measure_competing_indicator(competing = competing_set, strict_past = T)
-        #     at_risk_vars <- list(last_val = last_val_summary$name, at_risk_competing = at_risk_competing_summary$name, at_risk = at_risk_name)
-        #     summary_functions <- c(summary_functions, last_val_summary, at_risk_competing_summary, at_risk_summary_function)
-        #   } else {
-        #
-        #   at_risk_vars <- list(last_val = last_val_summary$name, at_risk_competing = NULL, at_risk = at_risk_name)
-        #   summary_functions <- c(summary_functions, last_val_summary, at_risk_summary_function)
-        # }
-        #
-        # }
-      } else if (!is.null(at_risk_summary_function)){
+      if (!is.null(at_risk_summary_function)){
         at_risk_summary_function$set_name(paste(paste(variables, collapse = "_"), "at_risk", sep = "_") )
 
         at_risk_name <- at_risk_summary_function$name

@@ -11,5 +11,10 @@ Description: What the package does (one paragraph).
 License: What license it uses
 Encoding: UTF-8
 LazyData: true
-Depends: R6, tmle3, sl3, tidyr, delayed, assertthat, origami
+Imports: R6, RcppNumerical
+Depends: R, Rcpp, tmle3,  sl3, tidyr, delayed, assertthat, origami, data.table
+LinkingTo:
+  Rcpp,
+  RcppEigen,
+  RcppNumerical
 RoxygenNote: 7.1.1

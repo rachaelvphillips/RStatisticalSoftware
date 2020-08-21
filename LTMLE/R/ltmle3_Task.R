@@ -1,5 +1,6 @@
 #' @importFrom purrr reduce
 #' @importFrom dplyr full_join
+#' @importFrom tmle3 tmle3_Task
 #' @export
 ltmle3_Task <- R6Class(
   classname = "ltmle3_Task",
@@ -115,42 +116,6 @@ ltmle3_Task <- R6Class(
 
       if(FALSE & format == TRUE & !is.null(tmle_node$node_type) ){
         if(tmle_node$node_type == "counting_process") {
-          # Convert counting process format to hazard outcome format
-
-          to_hazard <- function(v) {
-
-            first_jump <- which(unlist(v[,node_var, with = F])==1)
-            v[,node_var] = 0
-            if(length(first_jump)>0){
-              v[first_jump, node_var] =1
-            }
-            return(v)
-          }
-
-          data_as_haz <- data[, to_hazard(.SD), by = id, .SDcols = c("t", node_var)]
-
-
-          #data_as_haz$t <- data$t
-          data <- data_as_haz
-
-
-          all_ids <- unique(data$id)
-          orig_data <- data
-
-          last_obs_value <- function(X){
-            max_time_index <- which.max(X$t)
-            return(X[max_time_index,])
-          }
-          # Handle that those whose outcome was not subject to change do not have a row in dataset
-          # Therefore, extract last observed value of node_var up until this time.
-
-          data <- data[data$t <= time, ]
-          # get last observed value for each person (either at this time if there is a row or not)
-          data <- data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
-          # If person was not monitored at this time then there hazard is 0.
-          data[which(data$t!= time), node_var] <- 0
-          # set time to current time
-          data$t = time
 
         }
       } else {

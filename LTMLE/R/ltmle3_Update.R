@@ -375,7 +375,7 @@ tmle3_Update <- R6Class(
         epsilon <- as.list(replicate(list(epsilon), length(update_node)))
         names(epsilon) <- update_node
       }
-      print(max(unlist(epsilon)))
+
       return(epsilon)
     },
 
@@ -443,18 +443,22 @@ tmle3_Update <- R6Class(
       #estimates <- self$current_estimates
 
       n <- length(unique(tmle_task$id))
-      if (F & self$convergence_type == "scaled_var") {
+      if ( self$convergence_type == "scaled_var") {
         # TODO need to compute EIC variance for each parameter once
         # NOTE: the point of this criterion is to avoid targeting in an overly
         #       aggressive manner, as we simply need check that the following
         #       condition is met |P_n D*| / SE(D*) =< max(1/log(n), 1/10)
-        IC <- do.call(cbind, lapply(estimates, `[[`, "IC"))
-        se_Dstar <- sqrt(apply(IC, 2, var) / n)
-        ED_threshold <- se_Dstar / min(log(n), 10)
-      } else if (T & self$convergence_type == "sample_size") {
-        ED_threshold <- 1 / n
+        estimates <- private$.EIC_sd
+
+        norm_weights <- estimates
+        ED_threshold <- 1 / sqrt(n)/log(n)
+
+      } else if (self$convergence_type == "sample_size") {
+
+
+        ED_threshold <- 1 / sqrt(n)/log(n)
       }
-      ED_threshold <- 1 / n
+      #ED_threshold <- 1 / sqrt(n)/log(n)
       # get |P_n D*| of any number of parameter estimates
       list_of_EIC_norms <- lapply(self$update_nodes, function(node_key) {
         nodes <- self$key_to_node_bundle(node_key)
@@ -462,7 +466,14 @@ tmle3_Update <- R6Class(
           unlist(lapply(self$tmle_params, function(param) param$get_EIC_component(tmle_task, node)))
         })
         comp <- Reduce(`+`, comps)
-        return(norm(comp, type = "2"))
+        if (self$convergence_type == "sample_size"){
+          wghts <- 1/sqrt(length(comp) )
+        } else {
+          wghts <- 1/norm_weights[[node_key]]
+          wghts <- wghts/ sqrt(sum(wghts^2))
+        }
+
+        return(norm(comp*(wghts), type = "2"))
       })
 
 
@@ -475,7 +486,7 @@ tmle3_Update <- R6Class(
       }
       passed <- self$update_nodes[ED_criterions <= ED_threshold]
       #Returns nodes that converged
-      print(passed)
+
       return(passed)
 
     },
@@ -493,7 +504,17 @@ tmle3_Update <- R6Class(
       # to be updates at the iteration. This allows user to specify specific targeting strategies
       # TODO handle early convergence
       update_fold <- self$update_fold
+      vars <- lapply(self$tmle_params, function(param) param$get_EIC_var(tmle_task, update_fold))
 
+      list_of_EIC_vars <- lapply(self$update_nodes, function(node_key) {
+
+        sd_eic <- sqrt(unlist(lapply(vars, `[[`, node_key)))
+
+
+        return(sd_eic)
+      })
+      names(list_of_EIC_vars) <- self$update_nodes
+      private$.EIC_sd <- list_of_EIC_vars
       if(is.null(update_spec)) {
         maxit <- private$.maxit
         update_spec <- as.list(rep(list(self$update_nodes), maxit))
@@ -509,7 +530,7 @@ tmle3_Update <- R6Class(
       for (subset_nodes in update_spec) {
         # Only update nonconverged nodes
         subset_nodes <- setdiff(subset_nodes, converged_nodes)
-        print(count)
+
         count = count+1
         self$update_step(likelihood, tmle_task, update_fold, subset_nodes)
 
@@ -639,6 +660,7 @@ tmle3_Update <- R6Class(
     .use_best = NULL,
     .verbose = FALSE,
     .targeted_components = NULL,
-    .current_estimates = NULL
+    .current_estimates = NULL,
+    .EIC_sd = NULL
   )
 )

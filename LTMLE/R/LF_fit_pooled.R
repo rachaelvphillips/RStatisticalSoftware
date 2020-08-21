@@ -34,9 +34,10 @@
 #' \describe{
 #'     \item{\code{learner}}{The learner or learner fit object}
 #'     }
+#'TODO If outcome is multivariate then this assumes learner will handle the multi outcome and return predictions as a matrix
+
 #' @export
-#'
-#' TODO If outcome is multivariate then this assumes learner will handle the multi outcome and return predictions as a matrix
+
 LF_fit_pooled <- R6Class(
   classname = "LF_fit_pooled",
   portable = TRUE,

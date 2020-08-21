@@ -36,12 +36,14 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
 \describe{
     \item{\code{learner}}{The learner or learner fit object}
     }
+TODO If outcome is multivariate then this assumes learner will handle the multi outcome and return predictions as a matrix
 }
 
 \seealso{
 Other Likelihood objects: 
 \code{\link{CF_Likelihood_pooled}},
 \code{\link{LF_collapsed}},
+\code{\link{LF_emp}},
 \code{\link{LF_static}},
 \code{\link{Targeted_Likelihood_pooled}}
 }

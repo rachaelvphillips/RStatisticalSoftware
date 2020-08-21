@@ -4,15 +4,12 @@
 
 
 devtools::document()
+
 ```
 
 
-```{r}
 
-f = list("aa"= list("a" = "a"))
-g = list("bb" = list("b" = "b" ))
-c(g, (f))
-```
+
 
 ```{r}
 
@@ -66,49 +63,6 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool
 # Delta is the counting process which is 1 at death
 ```
 
-```{r}
-
-node <- "x"
-data <- x
-data
-helper <- function(x){
-  
-  id <- x$id
-  t <- x$t
-  index <- which(data$id == id &  data$t==t)
-  print(c(id,t,index))
-  if(length(index)>0){
-    #If t and id in data then replace
-    set(data, index, node, x[, node, with = F])
-  
-    return(1)
-  } else {
-    
-    #otherwise add new row
-    indices<-which(data$id == id & data$t <= t)
-    index <- indices[which.max(data[indices, "t", with = F][[1]])]
-    print(index)
-    new_row <- data[index,]
-    set(new_row, , node, x[, node, with = F])
-    set(new_row, , "t", x[, "t", with = F])
-    print(new_row)
-    data <<- rbind(data, new_row)
-    print(data)
-    return(0)
-  }
-
-}
-v = y[, helper(.SD), by = c("id", "t"), .SDcols = colnames(y)]
-
-data
-```
-
-```{r}
-data
-
-```
-
-
 
 
 
@@ -116,47 +70,13 @@ data
 
 ```{r}
 task = ltmle3_Task$new(data, npsem)
-
+task$data
  
 lik = generate_likelihood_surv(task)
 lik = lik$train(task)
 ```
 
 
-
-
-
-```{r}
-library(hal9001)
-library(data.table)
-density = function(x, z){
-  dunif(x, 2, 4)
-}
-n=200
-dat <- matrix(c(rbinom(n,5,0.5), rbinom(n,5,0.5)), ncol = 2)
-data.table(dat)
-basis_list <- hal9001::enumerate_basis(dat, 2)
-
-basis_to_function = function(basis){
-  f = function(y,x){
-    as.numeric(all(c(y,x)>= basis$cutoffs) )
-  }
-  g <- function(y,x=2){
-    integrand = function(x,y) {f(y,x)*density(y,x)}
-    print(f(3,2))
-    print(density(3,2))
-    res = f(y,x) - integrate(integrand, lower = 2, upper = 4, x=x)$value
- 
-    return(res)
-  }
-  return(g)
-}
-func = basis_to_function(basis_list[[18]])
-basis_list[[18]]
-func(3)
-#integrate(Vectorize(func), lower = 2, upper =4)
-
-```
 
 
 
@@ -178,6 +98,10 @@ data
 dat
 ```
 
+```{r}
+1/sqrt(100)/log(100)
+
+```
 
 ```{r}
 task = ltmle3_Task$new(data, npsem)
@@ -185,7 +109,7 @@ task = ltmle3_Task$new(data, npsem)
  
 lik = generate_likelihood_surv(task)
 lik = lik$train(task)
-tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 10))
+tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
 param <- Param_survival$new(tlik, intervention_list = list("A" = LF_static$new("A", value = 1)), outcome_node = "processN")
 tlik$updater$update(tlik, task)
 ```
@@ -220,142 +144,4 @@ tlik$get_likelihood(task ,"processN")
 tlik$get_likelihood(tasknew ,"processN", verify_in_sync = F)
 lik$get_likelihood(tasknew ,"processN")
 ```
-
-
-```{R}
-data.table(subdata$initial$processN)
-
-new=plogis(qlogis(as.vector(subdata$initial$processN)) + subdata$H$processN %*% eps)
-data.table(new)
-```
-
-
-```{r}
-
-# Generate simple causal model
-library(simcausal)
-
-D <- DAG.empty()
-D <- D +
-  node("L0", distr = "runif", min =0, max = 1) +
-  node("A0", distr = "rbinom", size = 1, prob = 0.5) +
-  node("L1", distr = "runif", min =0, max = 1 + 0.5*A0) +
-  node("A1", distr = "rbinom", size = 1, prob = L0/8 + .15 + .5 * as.numeric(A0 > .75)) +
-  node("Y", distr = "rnorm", mean = A1 + 0.5* A0 - L0 - 0.5*L1  )
-setD <- set.DAG(D)
-dat <- sim(setD, n = 2e2)
-# only grab ID, W's, A, T.tilde, Delta
-Lname <- grep("L", colnames(dat), value = TRUE)
-Aname <- grep("A", colnames(dat), value = TRUE)
-df <- dat[, c("ID", Lname, Aname, "Y")]
-df
-# The simulator will generate death at time 0.
-# our package only allow positive integer time, so I add one to all times
-name0 <- grep("0", colnames(dat), value = TRUE)
-name1 <- grep("1", colnames(dat), value = TRUE)
-df1 = df[,name0]
-df1$t <- rep(1, nrow(df1))
-colnames(df1) = c("L", "A", "t")
-df2 = df[,name1]
-df2$t <- rep(2, nrow(df2))
-colnames(df2) = c("L", "A", "t")
-final <- rbind(df1, df2)
-final$Y <- c(rep(NA, nrow(df1)), df$Y)
-final$id <- c(df$ID, df$ID)
-final <- data.table(final[,c("id", "t", "L", "A", "Y")])
-final
-```
-
-
-
-
-
-```{r}
-final$A_at_risk = c(rep(1,200), rep(1,200))
-
-npsem <- generate_npsem(final, "L", "L", "A", "Y")
-
-task = ltmle3_Task$new(final, npsem)
-
-tsk = task$get_regression_task("A1", drop_censored = F)
-tsk$get_data()
-tsk$X
-likelihood <- generate_likelihood(task)
-
-```
-
-
-
-
-
-```{r}
-k=likelihood$train(task)
-(likelihood$get_likelihood(task, "Y"))
-
-```
-
-
-```{r}
-reduce_f <- function(x,y){
- 
-  out = list()
-  names_out <- names(x)
-  for(i in seq_along(x)){
-   
-    out[[names_out[i]]] <- cbind(x[[i]], y[[i]])
-  }
-  return(out)
-}
-list(list(a=1,b=2,c=3), list(a=1,b=2,c=3)) %>% reduce(reduce_f)
-```
-
-
-```{r}
-probs
-collapse_nodes <- list("P" = c("L0", "L1", "A0", "A1", "Y"))
-factors = c(k$factor_list$A0, k$factor_list$A1)
-
-collapsed_k = Collapsed_Likelihood$new(k,collapse_nodes )
-collapsed_k$factor_list
-
-collapsed_k$get_likelihoods(task)
-collapsed_k$get_hidden_nodes("P")
-```
-
-```{r}
-collapsed_k$factor_list
-
-```
-
-```{r}
-c=LF_emp$new(c("a","b"))
-c$name
-```
-
-```{r}
-
-lik = generate_likelihood(task)
-lik$validate_task(task)
-
-lik$train(task)
-```
-
-```{r}
-task$weights
-
-```
-
-
-```{r}
-lik1 = lik$train(task)
-
-lik1$get_likelihoods(task)
-lik1$get_likelihoods(task, "L0")
-```
-
-```{r}
-
-devtools::document()
-```
-
 

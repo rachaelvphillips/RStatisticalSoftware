@@ -1,0 +1,48 @@
+---
+title: "EICHal"
+output: html_document
+---
+
+
+
+```{r}
+
+library(hal9001)
+library(data.table)
+density = function(y, x){
+  dunif(y, 0, 1)
+}
+n=10000
+dat <- matrix(c(runif(n,0,1), runif(n,0,1)), ncol = 2)
+data.table(dat)
+basis_list <- hal9001::enumerate_basis(dat, 2)
+basis_list_y <- basis_list[sapply(basis_list, function(b) {1 %in% b$cols})]
+basis_to_function = function(basis){
+  basis <- basis
+  f = function(y,x){
+    as.numeric(all(c(y,x)[basis$cols]>= basis$cutoffs) )
+   
+  }
+  g = function(y,x=0.2){
+    
+    integrand = function(y) {
+      f(y,x)*density(y,x)}
+    integrand <- Vectorize(integrand)
+    res = f(y,x) - integrate(integrand, lower = 0.01, upper = .99)$value
+    return(res)
+  }
+  return(g)
+}
+func = basis_to_function(basis_list[[250]])
+func(0.5)
+list_of_functions <- lapply(basis_list_y, basis_to_function)
+#integrate(Vectorize(func), lower = 2, upper =4)
+vals <- lapply(list_of_functions, function(f){f(y=0.5, x=0.2)})
+```
+
+
+```{r}
+
+integrate(c(2,2), list(cols = c(1,2,3), cutoffs = c(1,1,1)), lower = 0, upper = 4)
+
+```

@@ -8,6 +8,7 @@
 #' @importFrom R6 R6Class
 #' @importFrom uuid UUIDgenerate
 #' @importFrom methods is
+#' @importFrom tmle3 LF_base
 #' @family Likelihood objects
 #' @keywords data
 #'
@@ -30,7 +31,7 @@ LF_emp <- R6Class(
   classname = "Lf_emp",
   portable = TRUE,
   class = TRUE,
-  inherit = LF_base,
+  inherit = tmle3::LF_base,
   active = list(
     empirical_fit = function()
       private$.empirical_fit

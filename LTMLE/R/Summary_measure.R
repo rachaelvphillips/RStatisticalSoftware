@@ -52,10 +52,11 @@ Summary_measure <- R6Class(
       }
 
       if(self$params$strict_past) {
-        data <- data[which(data$t < time), ]
+        data <- data[which(data$t < time),]
       } else {
         data <- data[,]
       }
+
       func <- private$.params$summary_function
       # Needed since pass by promise would break next line apparently
 

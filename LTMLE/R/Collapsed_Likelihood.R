@@ -8,7 +8,7 @@ Collapsed_Likelihood <- R6Class(
   classname = "Collapsed_Likelihood",
   portable = TRUE,
   class = TRUE,
-  inherit = Likelihood,
+  inherit = Likelihood_pooled,
   active = list(
     nodes = function() {
       return(names(private$.collapse_by))

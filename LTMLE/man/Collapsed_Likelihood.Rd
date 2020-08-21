@@ -15,7 +15,7 @@ meaning that some factors of the underlying likelihood are collapsed into one fa
 multiplication of probabilities.
 }
 \section{Super classes}{
-\code{\link[sl3:Lrnr_base]{sl3::Lrnr_base}} -> \code{\link[tmle3:Likelihood]{tmle3::Likelihood}} -> \code{Collapsed_Likelihood}
+\code{\link[sl3:Lrnr_base]{sl3::Lrnr_base}} -> \code{\link[LTMLE:Likelihood_pooled]{LTMLE::Likelihood_pooled}} -> \code{Collapsed_Likelihood}
 }
 \section{Methods}{
 \subsection{Public methods}{
@@ -41,14 +41,14 @@ multiplication of probabilities.
 \item \out{<span class="pkg-link" data-pkg="sl3" data-topic="Lrnr_base" data-id="subset_covariates">}\href{../../sl3/html/Lrnr_base.html#method-subset_covariates}{\code{sl3::Lrnr_base$subset_covariates()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="sl3" data-topic="Lrnr_base" data-id="train">}\href{../../sl3/html/Lrnr_base.html#method-train}{\code{sl3::Lrnr_base$train()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="sl3" data-topic="Lrnr_base" data-id="train_sublearners">}\href{../../sl3/html/Lrnr_base.html#method-train_sublearners}{\code{sl3::Lrnr_base$train_sublearners()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="add_factors">}\href{../../tmle3/html/Likelihood.html#method-add_factors}{\code{tmle3::Likelihood$add_factors()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="base_train">}\href{../../tmle3/html/Likelihood.html#method-base_train}{\code{tmle3::Likelihood$base_train()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="get_likelihood">}\href{../../tmle3/html/Likelihood.html#method-get_likelihood}{\code{tmle3::Likelihood$get_likelihood()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="get_likelihoods">}\href{../../tmle3/html/Likelihood.html#method-get_likelihoods}{\code{tmle3::Likelihood$get_likelihoods()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="get_possible_counterfactuals">}\href{../../tmle3/html/Likelihood.html#method-get_possible_counterfactuals}{\code{tmle3::Likelihood$get_possible_counterfactuals()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="print">}\href{../../tmle3/html/Likelihood.html#method-print}{\code{tmle3::Likelihood$print()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="sample">}\href{../../tmle3/html/Likelihood.html#method-sample}{\code{tmle3::Likelihood$sample()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Likelihood" data-id="validate_task">}\href{../../tmle3/html/Likelihood.html#method-validate_task}{\code{tmle3::Likelihood$validate_task()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="add_factors">}\href{../../LTMLE/html/Likelihood_pooled.html#method-add_factors}{\code{LTMLE::Likelihood_pooled$add_factors()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="base_train">}\href{../../LTMLE/html/Likelihood_pooled.html#method-base_train}{\code{LTMLE::Likelihood_pooled$base_train()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="get_likelihood">}\href{../../LTMLE/html/Likelihood_pooled.html#method-get_likelihood}{\code{LTMLE::Likelihood_pooled$get_likelihood()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="get_likelihoods">}\href{../../LTMLE/html/Likelihood_pooled.html#method-get_likelihoods}{\code{LTMLE::Likelihood_pooled$get_likelihoods()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="get_possible_counterfactuals">}\href{../../LTMLE/html/Likelihood_pooled.html#method-get_possible_counterfactuals}{\code{LTMLE::Likelihood_pooled$get_possible_counterfactuals()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="print">}\href{../../LTMLE/html/Likelihood_pooled.html#method-print}{\code{LTMLE::Likelihood_pooled$print()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="sample">}\href{../../LTMLE/html/Likelihood_pooled.html#method-sample}{\code{LTMLE::Likelihood_pooled$sample()}}\out{</span>}
+\item \out{<span class="pkg-link" data-pkg="LTMLE" data-topic="Likelihood_pooled" data-id="validate_task">}\href{../../LTMLE/html/Likelihood_pooled.html#method-validate_task}{\code{LTMLE::Likelihood_pooled$validate_task()}}\out{</span>}
 }
 \out{</details>}
 }

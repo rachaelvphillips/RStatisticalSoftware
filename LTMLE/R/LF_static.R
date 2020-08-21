@@ -38,7 +38,7 @@ LF_static <- R6Class(
   classname = "LF_static",
   portable = TRUE,
   class = TRUE,
-  inherit = LF_base,
+  inherit = tmle3::LF_base,
   public = list(
     initialize = function(name, type = "density", value, ...) {
       super$initialize(name, ..., type = type)

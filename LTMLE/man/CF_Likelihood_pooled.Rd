@@ -16,6 +16,7 @@ Inherits from \code{\link{Likelihood}}. Other factors (including their updates) 
 \seealso{
 Other Likelihood objects: 
 \code{\link{LF_collapsed}},
+\code{\link{LF_emp}},
 \code{\link{LF_fit_pooled}},
 \code{\link{LF_static}},
 \code{\link{Targeted_Likelihood_pooled}}

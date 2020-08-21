@@ -111,12 +111,3 @@ CF_Likelihood_pooled <- R6Class(
     .cf_tasks = NULL
   )
 )
-
-#' @param ... Passes all arguments to the constructor. See documentation for the
-#'  Constructor below.
-#'
-#' @rdname CF_Likelihood
-#'
-#' @export
-#
-make_CF_Likelihood <- CF_Likelihood$new

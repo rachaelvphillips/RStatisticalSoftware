@@ -179,14 +179,15 @@ Param_survival <- R6Class(
 
 
         residuals = as.vector((as.matrix(observed_dN_wide) - Q)*ind/nrow(observed_N_wide))
-        residuals <- HA*residuals
+
+        clever_dot_HA <- HA*residuals
 
 
         #  Compute EIC component for one step/convergence criterion
-        D1 = colSums(residuals)
+        D1 = colSums(clever_dot_HA)
         if(compute_EIC_variance) {
           # In general, this should be the
-          EIC_var <- colSums((HA*residuals*sqrt(nrow(observed_N_wide)))^2) - D1
+          EIC_var <- colSums((clever_dot_HA*nrow(observed_N_wide) - D1)^2)/nrow(observed_N_wide)
           return(list(processN = EIC_var))
         }
 

@@ -68,7 +68,7 @@ Targeted_Likelihood_pooled <- R6Class(
     update_task = function(tmle_task, fold_number = "full"){
       # Takes a task and syncs it with current update status of likelihood
       epsilons <- self$updater$epsilons
-      step_count = 0
+      step_count <- 0
       for(eps_step in epsilons){
         for(node in names(eps_step)){
 
@@ -77,7 +77,7 @@ Targeted_Likelihood_pooled <- R6Class(
 
           step_number <- self$cache$get_update_step(likelihood_factor, tmle_task, fold_number, node = node)
           if(is.null(step_number)){
-            step_number = 0
+            step_number <- 0
           }
           if(step_number > step_count){
             next
@@ -86,7 +86,7 @@ Targeted_Likelihood_pooled <- R6Class(
           self$cache$set_values(likelihood_factor, tmle_task, step_number + 1, fold_number, updated_likelihoods, node)
 
         }
-        step_count = step_count + 1
+        step_count <- step_count + 1
 
       }
 
