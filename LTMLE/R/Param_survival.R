@@ -90,7 +90,7 @@ Param_survival <- R6Class(
       #TODO this
       cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
       cf_pA <- unlist(cf_pA[,intervention_nodes, with = F], use.names = F)
-      print(cf_pA)
+
       #cf_pA <- tmle_task$get_tmle_node("A")[,A]
 
       #Should already be matrix. Assumed to be in order of time

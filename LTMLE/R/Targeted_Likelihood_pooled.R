@@ -67,8 +67,6 @@ Targeted_Likelihood_pooled <- R6Class(
     },
     update_task = function(tmle_task, fold_number = "full"){
       # Takes a task and syncs it with current update status of likelihood
-
-
       epsilons <- self$updater$epsilons
       step_count = 0
       for(eps_step in epsilons){
@@ -119,7 +117,7 @@ Targeted_Likelihood_pooled <- R6Class(
             "node: ", node, " fold_number: ", fold_number, "\n",
             "cached_step: ", value_step, "\n",
             "update_step: ", self$updater$step_number, "\n",
-            "call update_task function to sync task with updates. "
+            "call update_task function to sync task with updates. \n"
           )
         }
         # todo: maybe update here, or error if not already updated
