@@ -31,6 +31,7 @@ Other Likelihood objects:
 \itemize{
 \item \href{#method-new}{\code{Targeted_Likelihood_pooled$new()}}
 \item \href{#method-update}{\code{Targeted_Likelihood_pooled$update()}}
+\item \href{#method-update_task}{\code{Targeted_Likelihood_pooled$update_task()}}
 \item \href{#method-get_likelihood}{\code{Targeted_Likelihood_pooled$get_likelihood()}}
 \item \href{#method-add_factors}{\code{Targeted_Likelihood_pooled$add_factors()}}
 \item \href{#method-clone}{\code{Targeted_Likelihood_pooled$clone()}}
@@ -85,6 +86,15 @@ Other Likelihood objects:
 
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-update_task"></a>}}
+\if{latex}{\out{\hypertarget{method-update_task}{}}}
+\subsection{Method \code{update_task()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{Targeted_Likelihood_pooled$update_task(tmle_task, fold_number = "full")}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-get_likelihood"></a>}}
 \if{latex}{\out{\hypertarget{method-get_likelihood}{}}}
 \subsection{Method \code{get_likelihood()}}{
@@ -94,7 +104,8 @@ Other Likelihood objects:
   node,
   fold_number = "full",
   drop_id = F,
-  to_wide = F
+  to_wide = F,
+  verify_in_sync = T
 )}\if{html}{\out{</div>}}
 }
 

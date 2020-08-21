@@ -55,14 +55,16 @@ ltmle3_Task <- R6Class(
         }
         data <- setorder(data, id)
         data <- setorder(data, t)
-        shared_data <- Shared_Data$new(data, force_copy = F)
+        shared_data <- data
       } else{
         shared_data <- data
       }
 
       # Missing values may not be censoring, just information that the value hasn't changed since last time point
       # Censoring should not be handled automatically.
+
       super$initialize(shared_data, npsem, id = "id", time = "t", add_censoring_indicators = F,  ...)
+      private$.uuid <- digest::digest(self$data)
     },
     get_tmle_node = function(node_name, format = FALSE, include_time = F, include_id = T, force_time_value = "No") {
      # returns node value
@@ -516,90 +518,90 @@ ltmle3_Task <- R6Class(
 
       return(regression_task)
     },
-    generate_counterfactual_task = function(uuid, new_data, force_at_risk = NULL) {
+    generate_counterfactual_task = function(uuid, new_data, force_at_risk = NULL, through_data=F) {
+      if(!through_data){
+        if(!("t" %in% colnames(new_data))){
 
-      if(!("t" %in% colnames(new_data))){
-
-        #If not in id/t format. Then convert to id/t format and handle node names
-        node <-  setdiff(colnames(new_data), c("id", "t"))
-        dat <- self$get_tmle_node(node, include_time = T, include_id = T)
-        node_vars <- sapply(
-          node,
-          function(node_name) {
-            self$npsem[[node_name]]$variables
-          }
-        )
-
-        set(dat, , node, new_data[,node,with=F])
-        setnames(dat, node, node_vars)
-        new_data <- dat
-      }
-
-      data <- data.table::copy(self$data)
-      if(all(c("id", "t") %in% colnames(new_data))){
-        #This is needed
-        node <-  setdiff(colnames(new_data), c("id", "t"))
-        helper <- function(x){
-          id <- x$id
-          t <- x$t
-          index <- which(data$id == id &  data$t==t)
-
-          if(length(index)>0){
-            #If t and id in data then replace
-            if(data[index,node, with = F][[1]]==x[, node, with = F][[1]]){
-              #If same value do nothing
-              return()
+          #If not in id/t format. Then convert to id/t format and handle node names
+          node <-  setdiff(colnames(new_data), c("id", "t"))
+          dat <- self$get_tmle_node(node, include_time = T, include_id = T)
+          node_vars <- sapply(
+            node,
+            function(node_name) {
+              self$npsem[[node_name]]$variables
             }
-            set(data, index, node, x[, node, with = F])
-            return(1)
-          } else {
-            #otherwise add new row
-            #first extract most recent row for values of other variables
-            indices<-which(data$id == id & data$t <= t)
-            index <- indices[which.max(data[indices, "t", with = F][[1]])]
-            new_row <- data[index,]
-            if(new_row[,node, with = F][[1]]==x[, node, with = F][[1]]){
-              #If same value do nothing
-              return()
-            }
-            #set new node value and time value
-            set(new_row, , node, x[, node, with = F])
-            set(new_row, , "t", x[, "t", with = F])
-            data <<- rbind(data, new_row)
-            return(0)
-          }
+          )
 
+          set(dat, , node, new_data[,node,with=F])
+          setnames(dat, node, node_vars)
+          new_data <- dat
         }
-        #This will update the data object with new values of new_data
-        new_data[, helper(.SD), by = c("t", "id"), .SDcols = colnames(new_data)]
 
-        #Shouldn't be needed but clean duplicate rows.
-        data <- data[!duplicated(data[, -c("t")])]
+        data <- data.table::copy(self$data)
+        if(all(c("id", "t") %in% colnames(new_data))){
+          #This is needed
+          node <-  setdiff(colnames(new_data), c("id", "t"))
+          helper <- function(x){
+            id <- x$id
+            t <- x$t
+            index <- which(data$id == id &  data$t==t)
 
-        setorder(data, id)
-        setorder(data, t)
+            if(length(index)>0){
+              #If t and id in data then replace
+              if(data[index,node, with = F][[1]]==x[, node, with = F][[1]]){
+                #If same value do nothing
+                return()
+              }
+              set(data, index, node, x[, node, with = F])
+              return(1)
+            } else {
+              #otherwise add new row
+              #first extract most recent row for values of other variables
+              indices<-which(data$id == id & data$t <= t)
+              index <- indices[which.max(data[indices, "t", with = F][[1]])]
+              new_row <- data[index,]
+              if(new_row[,node, with = F][[1]]==x[, node, with = F][[1]]){
+                #If same value do nothing
+                return()
+              }
+              #set new node value and time value
+              set(new_row, , node, x[, node, with = F])
+              set(new_row, , "t", x[, "t", with = F])
+              data <<- rbind(data, new_row)
+              return(0)
+            }
 
-        #shared_data <- Shared_Data$new(data, force_copy = F)
+          }
+          #This will update the data object with new values of new_data
+          new_data[, helper(.SD), by = c("t", "id"), .SDcols = colnames(new_data)]
 
-        new_task <- self$clone()
+          #Shouldn't be needed but clean duplicate rows.
+          data <- data[!duplicated(data[, -c("t")])]
+
+          setorder(data, id)
+          setorder(data, t)
+
+          #shared_data <- Shared_Data$new(data, force_copy = F)
+
+          new_task <- self$clone()
 
 
-        new_task$initialize(
-          data, self$npsem,
-          column_names = self$column_names,
-          folds = self$folds,
-          row_index = self$row_index,
-          t = "t",
-          id = "id",
-          nodes = self$nodes,
-          force_at_risk = ifelse(is.null(force_at_risk), self$force_at_risk, force_at_risk),
-          extra_summary_measure_columns = private$.non_data_columns
-        )
-        return(new_task)
+          new_task$initialize(
+            data, self$npsem,
+            column_names = self$column_names,
+            folds = self$folds,
+            row_index = self$row_index,
+            t = "t",
+            id = "id",
+            nodes = self$nodes,
+            force_at_risk = ifelse(is.null(force_at_risk), self$force_at_risk, force_at_risk),
+            extra_summary_measure_columns = private$.non_data_columns
+          )
+          return(new_task)
+        }
+
+
       }
-
-
-
 
       # for current_factor, generate counterfactual values
       node_names <- names(new_data)
@@ -644,8 +646,9 @@ ltmle3_Task <- R6Class(
       #setnames(new_data, node_names, node_variables)
 
       new_task <- self$clone()
+
       new_column_names <- new_task$add_columns(new_data, uuid)
-      stop("NO")
+
       new_task$initialize(
         self$internal_data, self$npsem,
         column_names = new_column_names,
@@ -656,5 +659,6 @@ ltmle3_Task <- R6Class(
 
       return(new_task)
     }
+
   )
 )

@@ -14,7 +14,7 @@ ltmle3_Node <- R6Class(
         stop("You specified that this node represents a pooled over time likelihood factor but did not supply the times_to_pool argument.")
       }
       # Handle counting process at risk summary functions
-      if(!(is.null(node_type)) ) {
+      if(F&!(is.null(node_type)) ) {
         # if(node_type == "counting_process"){
         #   # If counting process ensure that self is in risk set
         #   competing_set <- unique(variables)
@@ -55,7 +55,7 @@ ltmle3_Node <- R6Class(
       } else{
         at_risk_vars <- NULL
       }
-      private$.ltmle_params = list(at_risk_variable = at_risk_variable, time = time, times_to_pool = times_to_pool, summary_functions = summary_functions, node_type = node_type, at_risk_vars = at_risk_vars)
+      private$.ltmle_params = list(at_risk_node_name = at_risk_node_name, time = time, times_to_pool = times_to_pool, summary_functions = summary_functions, node_type = node_type, at_risk_vars = at_risk_vars)
       super$initialize(name, variables, parents,
                        variable_type, censoring_node = NULL, scale)
     },

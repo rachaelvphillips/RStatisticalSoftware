@@ -78,7 +78,7 @@ Param_survival <- R6Class(
       cf_data <- tmle_task$data[, c("processN", "processA")]
       cf_data[, "processN"] <- 1
       cf_data[, "processA"] <- 1
-      cf_task = task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_data, T)
+      cf_task = task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_data, T, T)
 
       intervention_nodes <- names(self$intervention_list)
       intervention_nodes = "A"

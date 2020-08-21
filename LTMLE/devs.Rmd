@@ -108,23 +108,8 @@ data
 
 ```
 
-```{r}
-dat = task$data
-sum(dat$t==2)
-new_dat <- task$get_tmle_node("processN", include_time = T)
-new_dat
-set(new_dat, ,"processN", 1)
 
 
-new_dat
-newer_dat = task$generate_counterfactual_task(UUIDgenerate(), new_dat)
-
-newer_dat
-```
-
-```{r}
-newer_dat[1:10]$get_regression_task("processN")$data
-```
 
 
 
@@ -137,102 +122,103 @@ lik = generate_likelihood_surv(task)
 lik = lik$train(task)
 ```
 
-```{r}
-task = ltmle3_Task$new(data, npsem)
-task$data
-target_node = "processN"
-parent_data <- do.call(cbind, lapply(c("W", "A"), task$get_tmle_node, include_id = F, include_time = F, format = T))
 
-outcome_data <- task$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = T, force_time_value = 2)
-
-dat <- cbind(parent_data, outcome_data)
-dat
-
-```
 
 
 
 ```{r}
-task = ltmle3_Task$new(data, npsem)
-#task$data
-v=lapply(1:11, function(i) task$get_tmle_node("processN", force_time_value = 1))
+library(hal9001)
+library(data.table)
+density = function(x, z){
+  dunif(x, 2, 4)
+}
+n=200
+dat <- matrix(c(rbinom(n,5,0.5), rbinom(n,5,0.5)), ncol = 2)
+data.table(dat)
+basis_list <- hal9001::enumerate_basis(dat, 2)
+
+basis_to_function = function(basis){
+  f = function(y,x){
+    as.numeric(all(c(y,x)>= basis$cutoffs) )
+  }
+  g <- function(y,x=2){
+    integrand = function(x,y) {f(y,x)*density(y,x)}
+    print(f(3,2))
+    print(density(3,2))
+    res = f(y,x) - integrate(integrand, lower = 2, upper = 4, x=x)$value
+ 
+    return(res)
+  }
+  return(g)
+}
+func = basis_to_function(basis_list[[18]])
+basis_list[[18]]
+func(3)
+#integrate(Vectorize(func), lower = 2, upper =4)
 
 ```
+
+
 
 
 ```{r}
 
 sampler <- Sampler$new(lik, c("W", "A", "processN"), "W")
-data.table(sampler$sample_from_node(task, "A"))
+sampler$sample_from_node(task, "A")
 #sampler$compute_conditional_mean(task, "W", "A")
 ```
 
+
+
 ```{r}
-tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
+dat <- data.table::copy(data)
+dat$A = 1
+new_task = ltmle3_Task$new(dat, npsem)
+data
+dat
+```
+
+
+```{r}
+task = ltmle3_Task$new(data, npsem)
+
+ 
+lik = generate_likelihood_surv(task)
+lik = lik$train(task)
+tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 10))
 param <- Param_survival$new(tlik, intervention_list = list("A" = LF_static$new("A", value = 1)), outcome_node = "processN")
-param$get_EIC_var(task)
-```
-
-
-```{r}
-
-param <- Param_survival$new(tlik, intervention_list = list(), outcome_node = "processN")
-
-#subdata<- tlik$updater$generate_submodel_data(tlik, task, update_node_key = "processN")
-
-
-
-```
-
-
-
-
-```{r}
-
 tlik$updater$update(tlik, task)
 ```
 
-```{r}
-tlik$get_likelihood(task, "processN")
-lik$get_likelihood(task, "processN")
-```
+
 
 
 ```{r}
-lik$get_likelihood(task, "processN")
-tlik$get_likelihood(task, "processN")
-```
-
-
-```{r}
- eps = tlik$updater$fit_submodel(subdata)
-coef(eps)
-preds<- predict(eps, type = "response")
-obs <- subdata$observed[[1]]
-mean(subdata$loss(preds,obs))
-mean(subdata$loss(subdata$initial[[1]],obs))
-data.table(subdata$H[[1]])
-data.table(cbind(preds, subdata$initial[[1]],subdata$observed[[1]]))
-data.table(cbind(task$get_regression_task("processN", drop_censored = T)$data[,processN],preds, subdata$observed[[1]]))
+epslion_history <- tlik$updater$epsilons
+epslion_history[[1]]
 ```
 
 ```{r}
-sub <- tlik$updater$fit_submodel(subdata)
-dim(sub$H)
-H <- unlist(sub$H, use.names = F)
+lik$get_likelihood(new_task ,"processN")
 
-obs <- sub$observed
-init <- sub$initial
- data.table(sub$H)
-data.table(obs)
-data.table(init)
+tlik$get_likelihood(new_task ,"processN", verify_in_sync = T)
+```
+```{r}
+new_task$uuid
+task$uuid
+```
 
- fit = glm(observed ~ H - 1, sub,
-                                offset = qlogis(init),
-                                family = binomial(),
-                                start = rep(0, 1))
-coef(fit)
+```{r}
+#tlik$get_likelihood(tasknew ,"processN", verify_in_sync = T)
+tlik$update_task(new_task)
 
+```
+
+```{r}
+tlik$get_likelihood(task ,"processN")
+
+tlik$get_likelihood(tasknew ,"processN", verify_in_sync = F)
+lik$get_likelihood(tasknew ,"processN")
 ```
 
 

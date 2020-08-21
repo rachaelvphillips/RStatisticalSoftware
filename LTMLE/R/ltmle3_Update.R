@@ -195,7 +195,7 @@ tmle3_Update <- R6Class(
       t_list = list()
       initial_list <- lapply(update_node , function(node, task, fold){
 
-        initial <- likelihood$get_likelihood(node, tmle_task=task, fold_number = fold )
+        initial <- likelihood$get_likelihood(node, tmle_task=task, fold_number = fold, verify_in_sync = F )
         id_list <<- c(id_list, list(initial$id ))
         t_list <<- c(t_list, list(initial$t ))
         initial <- initial[,node,with=F]
