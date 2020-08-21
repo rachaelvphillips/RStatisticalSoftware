@@ -28,6 +28,12 @@ ltmle3_Task <- R6Class(
       # Assumes offset are constant in time
       # return offset
       super$offset[keep][order(id)]
+    },
+    extra_summary_measure_columns = function(){
+      private$.non_data_columns
+    },
+    force_at_risk = function(){
+      private$.force_at_risk
     }
   ),
   public = list(
@@ -37,17 +43,26 @@ ltmle3_Task <- R6Class(
       # add columns
       private$.force_at_risk = force_at_risk
       private$.non_data_columns = extra_summary_measure_columns
-      if(id!="id"){
-        data[,"id", with = F] <- data[,id, with = F]
-        id = "id"
+
+      if(!inherits(data, "Shared_Data")){
+        if(id!="id"){
+          data[,"id", with = F] <- data[,id, with = F]
+          id = "id"
+        }
+        if(time!="t"){
+          data[, "t", with = F] <- data[,time, with = F]
+          time = "t"
+        }
+        data <- setorder(data, id)
+        data <- setorder(data, t)
+        shared_data <- Shared_Data$new(data, force_copy = F)
+      } else{
+        shared_data <- data
       }
-      if(time!="t"){
-        data[, "t", with = F] <- data[,time, with = F]
-        time = "t"
-      }
+
       # Missing values may not be censoring, just information that the value hasn't changed since last time point
       # Censoring should not be handled automatically.
-      super$initialize(data, npsem, id = "id", time = "t", add_censoring_indicators = F,  ...)
+      super$initialize(shared_data, npsem, id = "id", time = "t", add_censoring_indicators = F,  ...)
     },
     get_tmle_node = function(node_name, format = FALSE, include_time = F, include_id = T, force_time_value = "No") {
      # returns node value
@@ -509,7 +524,8 @@ ltmle3_Task <- R6Class(
 
       return(regression_task)
     },
-    generate_counterfactual_task = function(uuid, new_data, force_at_risk = F) {
+    generate_counterfactual_task = function(uuid, new_data, force_at_risk = NULL) {
+
       if(!("t" %in% colnames(new_data))){
 
         #If not in id/t format. Then convert to id/t format and handle node names
@@ -535,9 +551,10 @@ ltmle3_Task <- R6Class(
           id <- x$id
           t <- x$t
           index <- which(data$id == id &  data$t==t)
+
           if(length(index)>0){
             #If t and id in data then replace
-            if(data[,node, with = F][[1]]==x[, node, with = F][[1]]){
+            if(data[index,node, with = F][[1]]==x[, node, with = F][[1]]){
               #If same value do nothing
               return()
             }
@@ -563,20 +580,28 @@ ltmle3_Task <- R6Class(
         }
         #This will update the data object with new values of new_data
         new_data[, helper(.SD), by = c("t", "id"), .SDcols = colnames(new_data)]
+
         #Shouldn't be needed but clean duplicate rows.
         data <- data[!duplicated(data[, -c("t")])]
-        shared_data <- Shared_Data$new(data, force_copy = F)
-        setorder(data, "id")
-        setorder(data, "t")
+
+        setorder(data, id)
+        setorder(data, t)
+
+        #shared_data <- Shared_Data$new(data, force_copy = F)
+
         new_task <- self$clone()
 
 
         new_task$initialize(
-          shared_data, self$npsem,
+          data, self$npsem,
           column_names = self$column_names,
           folds = self$folds,
           row_index = self$row_index,
-          force_at_risk = force_at_risk
+          t = "t",
+          id = "id",
+          nodes = self$nodes,
+          force_at_risk = ifelse(is.null(force_at_risk), self$force_at_risk, force_at_risk),
+          extra_summary_measure_columns = private$.non_data_columns
         )
         return(new_task)
       }
@@ -628,7 +653,7 @@ ltmle3_Task <- R6Class(
 
       new_task <- self$clone()
       new_column_names <- new_task$add_columns(new_data, uuid)
-
+      stop("NO")
       new_task$initialize(
         self$internal_data, self$npsem,
         column_names = new_column_names,

@@ -123,7 +123,7 @@ LF_fit_pooled <- R6Class(
 
       }
       observed <- outcome_type$format(learner_task$Y)
-      data <-  learner_task$get_data()
+      data <-  learner_task$get_data()[learner_task$row_index,]
 
       if (outcome_type$type == "binomial") {
         likelihood <- ifelse(observed == 1, preds, 1 - preds)

@@ -109,17 +109,24 @@ sum(duplicated(newer_dat[, -c("t")]))
 ```
 
 ```{r}
-task = ltmle3_Task$new(data, npsem)
 dat = task$data
 sum(dat$t==2)
-new_dat <- task$get_tmle_node("processN", force_time_value = 2)
-new_dat$t = 2
-set(new_dat, ,"processN", 1)
+new_dat <- task$get_tmle_node("processN", include_time = T)
 new_dat
-newer_dat = task$generate_counterfactual_task(UUIDgenerate(), new_dat)$data
+set(new_dat, ,"processN", 1)
+
+
+new_dat
+newer_dat = task$generate_counterfactual_task(UUIDgenerate(), new_dat)
+
 newer_dat
-sum(table(newer_dat$id)==2)
 ```
+
+```{r}
+newer_dat[1:10]$get_regression_task("processN")$data
+```
+
+
 
 
 ```{r}
@@ -131,11 +138,17 @@ lik = lik$train(task)
 ```
 
 
+```{r}
+
+as.data.table(matrix(1, nrow = 2, ncol = 1))
+```
+
 
 ```{r}
 
-sampler <- Sampler$new(lik, c("W", "A"), "W")
-sampler$sample_from_node(task, "W", 1)
+sampler <- Sampler$new(lik, c("W", "A", "processN"), "W")
+#data.table(sampler$sample_from_node(task, "processN"))
+sampler$sample(task, "W", "processN")$data
 ```
 
 ```{r}
