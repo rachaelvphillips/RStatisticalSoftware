@@ -293,7 +293,7 @@ ltmle3_Task <- R6Class(
       parent_names <- target_node_object$parents
       parent_nodes <- npsem[parent_names]
 
-      if(is.null(target_node_object$summary_functions)){
+      if(F&is.null(unlist(target_node_object$summary_functions))){
         # No summary functions so simply stack node values of parents
         parent_data <- do.call(cbind, lapply(parent_names, self$get_tmle_node, include_id = F, include_time = F, format = T))
         outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
@@ -333,8 +333,11 @@ ltmle3_Task <- R6Class(
       risk_set <- c(risk_set, unique(past_data$id))
 
       skip <- F
-      if(length(parent_covariates) == 0){
-        past_data <- (NULL)
+      if(length(parent_covariates) == 0 & is.null(unlist(target_node_object$summary_functions))){
+        past_data <- data.table(rep(NA, nrow(outcome_data)))
+        setnames(past_data, paste0("last_val_", setdiff(colnames(outcome_data), c("t", "id"))))
+        past_data$id <- outcome_data$id
+
         covariates <- c()
         skip <- T
 
@@ -438,7 +441,7 @@ ltmle3_Task <- R6Class(
       # If one is interested in getting predictions for people not observed at this time
       # then one must add a row with the desired outcome.
       if(skip) {
-        regression_data <-  list(outcome_data, node_data) %>% reduce(full_join, "id")
+        regression_data <-  list(all_covariate_data, outcome_data, node_data) %>% reduce(full_join, "id")
 
       } else {
         regression_data <-  list(all_covariate_data, outcome_data, node_data) %>% reduce(dplyr::inner_join, "id")
@@ -503,6 +506,7 @@ ltmle3_Task <- R6Class(
         }
 
         data <- data.table::copy(self$data)
+
         if(all(c("id", "t") %in% colnames(new_data))){
           #This is needed
           node <-  setdiff(colnames(new_data), c("id", "t"))
@@ -553,7 +557,6 @@ ltmle3_Task <- R6Class(
 
           new_task$initialize(
             data, self$npsem,
-            column_names = self$column_names,
             folds = self$folds,
             row_index = self$row_index,
             t = "t",

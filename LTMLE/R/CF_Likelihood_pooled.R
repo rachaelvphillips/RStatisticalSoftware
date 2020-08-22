@@ -33,8 +33,10 @@ CF_Likelihood_pooled <- R6Class(
       names(intervention_list) <- intervention_nodes
       private$.intervention_list <- intervention_list
       private$.intervention_nodes <- intervention_nodes
+
       private$.cf_tasks <- self$enumerate_cf_tasks(observed_likelihood$training_task)
       #params <- args_to_list()
+
       super$initialize(factor_list = intervention_list)
     },
     enumerate_cf_tasks = function(tmle_task) {
@@ -50,6 +52,7 @@ CF_Likelihood_pooled <- R6Class(
       # get factors for nodes
       # todo: need to do this sequentially and build the task up based on time ordering
       # because dynamic rules depend on past rule values
+
       all_values <- lapply(intervention_list, function(likelihood_factor) {
         likelihood_factor$cf_values(tmle_task)
       })

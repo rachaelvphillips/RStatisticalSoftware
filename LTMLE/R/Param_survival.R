@@ -43,6 +43,7 @@ Param_survival <- R6Class(
 
        # TODO: check outcome_node, current I(T<=t, delta=1), need I(T=t, delta=1)
       # W A processN processA
+
       private$.cf_likelihood <- CF_Likelihood_pooled$new(observed_likelihood, intervention_list)
       times <- setdiff(sort(unique(observed_likelihood$training_task$time)),0)
       private$.times <- times
@@ -53,6 +54,7 @@ Param_survival <- R6Class(
         private$.targeted <-  rep(TRUE, length(target_times))
       }
       private$.target_times <- target_times
+
       super$initialize(observed_likelihood, ..., outcome_node = outcome_node)
     },
     long_to_mat = function(x,id, time){
@@ -209,9 +211,22 @@ Param_survival <- R6Class(
       if (is.null(tmle_task)) {
         tmle_task <- self$observed_likelihood$training_task
       }
-
-
-      result <- list(psi = psi, IC = IC_long)
+      #TODO compute estimates and EIC
+      # computes counterfactual survival curve via montecarlo, needed for stochastic intervention
+      data_cf <- data.table(matrix(0, nrow = 10000, ncol = ncol(data)))
+      setnames(data_cf, colnames(data))
+      data_cf$id = 1:10000
+      data_cf$t = 0
+      task_cf = ltmle3_Task$new(data_cf, npsem, force_at_risk = T)
+      lik = self$cf_likelihood
+      sampler = Sampler$new(lik, c("W",  "A"), "W")
+      tsk = sampler$sample(task_cf, "W", "A")
+      #Make sure task is up to date with targetting
+      tlik$update_task(tsk)
+      liks = lik$get_likelihood(tsk, "processN")
+      liks_surv = liks[, cbind(t,cumprod(.SD)), by = id, .SDcols = "processN"]
+      liks_surv = liks_surv[, lapply(.SD, mean), by = t, .SDcols = c("processN")]
+      result <- list(psi = liks_surv, IC = NULL)
       return(result)
       },
 

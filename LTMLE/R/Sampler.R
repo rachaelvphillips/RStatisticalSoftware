@@ -128,6 +128,7 @@ Sampler <- R6Class(
             values[, i] <- samples
             next
           } else {
+            #TODO this errors
             subject <- tmle_task[which(tmle_task$id == id)]
             f_X <- function(a) {
 

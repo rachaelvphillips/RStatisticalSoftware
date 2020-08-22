@@ -2,7 +2,7 @@
 ```{r, include=F}
 #remotes::install_github("Larsvanderlaan/tmle3", ref = "devel")
 
-
+library(R6)
 devtools::document()
 
 ```
@@ -82,20 +82,24 @@ lik = lik$train(task)
 
 
 ```{r}
+dat = data.table(W = rep(1,100), A = rep(1,100), id = 1:100, t=rep(0,100))
+
+taskf=ltmle3_Task$new(dat, npsem[1:2], extra_summary_measure_columns=NULL)
+
+task1 = task$generate_counterfactual_task(UUIDgenerate(), data.table(processN = rep(1,200), processA = rep(1,200)), through_data = T, force_at_risk = T)
+
 
 sampler <- Sampler$new(lik, c("W", "A", "processN"), "W")
-sampler$sample_from_node(task, "A")
+lik$get_likelihood(sampler$sample(taskf, "A", "A"), "A",to_wide = T)
+  
 #sampler$compute_conditional_mean(task, "W", "A")
 ```
 
 
 
 ```{r}
-dat <- data.table::copy(data)
-dat$A = 1
-new_task = ltmle3_Task$new(dat, npsem)
-data
-dat
+task = ltmle3_Task$new(data, npsem)
+task$get_regression_task("W")$get_data()
 ```
 
 ```{r}
@@ -108,29 +112,55 @@ task = ltmle3_Task$new(data, npsem)
 
  
 lik = generate_likelihood_surv(task)
+
 lik = lik$train(task)
+
+
+```
+
+
+```{r}
 tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
 param <- Param_survival$new(tlik, intervention_list = list("A" = LF_static$new("A", value = 1)), outcome_node = "processN")
-tlik$updater$update(tlik, task)
+#tlik$updater$update(tlik, task)
 ```
 
 
 
 
 ```{r}
-epslion_history <- tlik$updater$epsilons
-epslion_history[[1]]
+data_cf <- data.table(matrix(0, nrow = 10000, ncol = ncol(data)))
+setnames(data_cf, colnames(data))
+data_cf$id = 1:10000
+data_cf$t = 0
+data_cf$at_risk = 1
+task_cf = ltmle3_Task$new(data_cf, npsem)
+sampler = Sampler$new(lik, c("W",  "A"), "W")
+tsk = sampler$sample(task_cf, "W", "A")
+
+
+
+liks = lik$get_likelihood(tsk, "processN")
+
+liks_surv = liks[, cbind(t,cumprod(.SD)), by = id, .SDcols = "processN"]
+liks_surv = liks_surv[, lapply(.SD, mean), by = t, .SDcols = c("processN")]
 ```
+
+
+
+
+```{r}
+liks
+liks_surv
+```
+
 
 ```{r}
 lik$get_likelihood(new_task ,"processN")
 
 tlik$get_likelihood(new_task ,"processN", verify_in_sync = T)
 ```
-```{r}
-new_task$uuid
-task$uuid
-```
+
 
 ```{r}
 #tlik$get_likelihood(tasknew ,"processN", verify_in_sync = T)
@@ -144,4 +174,50 @@ tlik$get_likelihood(task ,"processN")
 tlik$get_likelihood(tasknew ,"processN", verify_in_sync = F)
 lik$get_likelihood(tasknew ,"processN")
 ```
+
+
+```{r}
+
+# Generate simple causal model
+library(simcausal)
+
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min =-1, max = 1) +
+  node("A", distr = "rbinom", size = 1, prob = 0.5 + W/4 ) +
+    node("L1", distr = "rbinom", size = 1, prob = 0.5 + A/4 ) + 
+    node("A1", distr = "rbinom", size = 1, prob = 0.5 + L1/4 ) +
+    node("L2", distr = "rbinom", size = 1, prob = 0.5 + A1/4 ) + 
+    node("A2", distr = "rbinom", size = 1, prob = 0.5 + L2/4 ) +
+    node("L3", distr = "rbinom", size = 1, prob = 0.5 + A2/4 ) + 
+    node("A3", distr = "rbinom", size = 1, prob = 0.5 + L3/4 ) +
+    node("L4", distr = "rbinom", size = 1, prob = 0.5 + A3/4 ) + 
+    node("A4", distr = "rbinom", size = 1, prob = 0.5 + L4/4 ) +
+  node("Y", distr = "rbinom", size = 1, prob = 0.5 + A4/4 )
+ 
+setD <- set.DAG(D)
+dat <- sim(setD, n = 100)
+dat
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
