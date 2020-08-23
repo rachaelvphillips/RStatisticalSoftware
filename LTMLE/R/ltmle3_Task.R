@@ -9,12 +9,20 @@ ltmle3_Task <- R6Class(
   inherit = tmle3_Task,
   private = list(
     .force_at_risk = F,
-    .non_data_columns = NULL
+    .non_data_columns = NULL,
+    .thin = NULL
   ),
   active = list(
     data = function() {
       all_variables <- unlist(lapply(self$npsem, `[[`, "variables"))
-      self$get_data(columns = unique(c(private$.non_data_columns, "id" , "t", all_variables)))
+
+      if(is.null(private$.non_data_columns)){
+        columns <- unique(c(private$.non_data_columns, "id" , "t", all_variables))
+      } else{
+        columns <- unique(c( "id" , "t", all_variables))
+
+      }
+      self$get_data(columns =columns)
     },
     weights = function() {
       # Assumes weights are constant in time
@@ -30,6 +38,9 @@ ltmle3_Task <- R6Class(
       # return offset
       super$offset[keep][order(id)]
     },
+    thin = function(){
+      private$.thin
+    },
     extra_summary_measure_columns = function(){
       private$.non_data_columns
     },
@@ -38,12 +49,13 @@ ltmle3_Task <- R6Class(
     }
   ),
   public = list(
-    initialize = function(data, npsem, id = "id", time = "t", extra_summary_measure_columns = "at_risk", force_at_risk = F,  ...) {
+    initialize = function(data, npsem, id = "id", time = "t", extra_summary_measure_columns = "at_risk", force_at_risk = F, thin = T, ...) {
 
       #If time and id are not named as "t" and "id" then
       # add columns
       private$.force_at_risk = force_at_risk
       private$.non_data_columns = extra_summary_measure_columns
+      private$.thin = thin
 
       if(!inherits(data, "Shared_Data")){
         if(id!="id"){
@@ -96,7 +108,7 @@ ltmle3_Task <- R6Class(
         return(data.table(NULL))
       }
 
-      data <- self$get_data(self$row_index, c("t", "id", node_var))
+      data <- self$get_data(, c("t", "id", node_var))
 
       if(is.numeric(force_time_value)){
         time <- force_time_value
@@ -129,13 +141,19 @@ ltmle3_Task <- R6Class(
         }
         # Handle that those whose outcome was not subject to change and do not have a row in dataset
         # Therefore, extract last observed value of node_var up until this time.
-        data <- data[data$t <= time, ]
+        if(self$thin){
+        data <- data[data$t <= time, c("id", "t", node_var), with = F]
         # get last observed value for each person (either at this time if there is a row or not)
         # TODO If people are censored then they will end up having data drawn here (last observed value)
         # TODO Should we treat censoring and at_risk sets differently?
         data <- data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
         # set time to current time
         data$t = time
+        } else {
+          data <- data[data$t == time, c("id", "t", node_var), with = F]
+
+        }
+
       }
 
       #Order by id
@@ -216,6 +234,7 @@ ltmle3_Task <- R6Class(
 
         all_tasks <- lapply(target_node, self$get_regression_task, scale, drop_censored , is_time_variant)
         all_nodes <- lapply(all_tasks, function(task) task$nodes)
+
         time_is_node <- sapply(all_nodes, function(node) !is.null(node$time))
         assertthat::assert_that(all(time_is_node))
         assertthat::assert_that(all.equal(unique(unlist(all_nodes, use.names = F)), unlist(all_nodes[[1]], use.names = F)))
@@ -223,10 +242,9 @@ ltmle3_Task <- R6Class(
         pooled_data <- do.call(rbind, lapply(all_tasks, function(task) task$get_data()))
         pooled_data <- pooled_data[order(pooled_data$id)]
         pooled_data <- pooled_data[order(pooled_data$t)]
-        nodes <- all_nodes[1]
+        nodes <- all_nodes[[1]]
         # Make sure time is included as covariate
         nodes$covariates <- union("t", nodes$covariates)
-
 
         pooled_regression_task <- sl3_Task$new(
           pooled_data,
@@ -293,25 +311,53 @@ ltmle3_Task <- R6Class(
       parent_names <- target_node_object$parents
       parent_nodes <- npsem[parent_names]
 
-      if(F&is.null(unlist(target_node_object$summary_functions))){
+      if(is.null(unlist(target_node_object$summary_functions))){
         # No summary functions so simply stack node values of parents
-        parent_data <- do.call(cbind, lapply(parent_names, self$get_tmle_node, include_id = F, include_time = F, format = T))
-        outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
 
-        data <- cbind(parent_data, outcome_data)
-        data$at_risk <- self$get_tmle_node(target_node_object$at_risk_node_name, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
+        parent_data <- do.call(cbind, lapply(parent_names, self$get_tmle_node, include_id = F, include_time = F, format = T))
+
+        outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = T, force_time_value = force_time_value)
+
+        data <- cbind(outcome_data,parent_data)
+        covariates <- colnames(parent_data)
+        outcome = setdiff(colnames(outcome_data), c("id", "t"))
+        if((time == "pooled")){
+          covariates <- c(covariates, "t")
+        }
+
+        if(!is.null(target_node_object$at_risk_node_name)){
+          data$at_risk <- self$get_tmle_node(, format = TRUE, include_id = T, include_time = (time == "pooled"), force_time_value = force_time_value)
+
+        }
+        outcome_index <-  match(outcome, colnames(outcome_data))
+        if(length(parent_data)>0){
+          cov_index <- ncol(outcome_data) + match(covariates, colnames(parent_data))
+        } else {
+         cov_index <- c()
+
+        }
+        #Due to time indexing, we do not have unique column names.
+        #In order to support pooling across time, we shouldn't use node names as column names
+        #important that outcome variable name doesnt change
+        setnames(data, make.unique(colnames(data)))
+        covariates <- colnames(data)[cov_index]
+        outcome <- colnames(data)[outcome_index]
+        data$at_risk <- 1
+        set(data, ,paste0("last_val_", outcome), NA)
         # TODO last value
         #data[, paste0("last_val",  setdiff(colnames(outcome_data), c("id", "t"))), with = F] <-
         # TODO custom nodes not handled
+
         regression_task <- sl3_Task$new(
           Shared_Data$new(data, force_copy = F),
           id = "id",
           time = "t",
-          covariates = colnames(parent_data),
-          outcome = setdiff(colnames(outcome_data), c("id", "t")),
+          covariates = covariates,
+          outcome = outcome,
           outcome_type = target_node_object$variable_type,
           folds = self$folds
         )
+
         return(regression_task)
       }
 
@@ -487,12 +533,15 @@ ltmle3_Task <- R6Class(
       return(regression_task)
     },
     generate_counterfactual_task = function(uuid, new_data, force_at_risk = NULL, through_data=F) {
+
       if(!through_data){
+
         if(!("t" %in% colnames(new_data))){
 
           #If not in id/t format. Then convert to id/t format and handle node names
           node <-  setdiff(colnames(new_data), c("id", "t"))
           dat <- self$get_tmle_node(node, include_time = T, include_id = T)
+          node <-  setdiff(colnames(new_data), c("id", "t"))
           node_vars <- sapply(
             node,
             function(node_name) {
@@ -500,12 +549,14 @@ ltmle3_Task <- R6Class(
             }
           )
 
-          set(dat, , node, new_data[,node,with=F])
-          setnames(dat, node, node_vars)
+          set(dat, , unlist(node_vars, use.names = F), new_data[,node,with=F])
+
+          #setnames(dat, node, node_vars)
           new_data <- dat
         }
 
-        data <- data.table::copy(self$data)
+
+        data <- data.table::copy(self$get_data())
 
         if(all(c("id", "t") %in% colnames(new_data))){
           #This is needed
@@ -521,6 +572,7 @@ ltmle3_Task <- R6Class(
                 #If same value do nothing
                 return()
               }
+
               set(data, index, node, x[, node, with = F])
               return(1)
             } else {
@@ -541,15 +593,16 @@ ltmle3_Task <- R6Class(
             }
 
           }
+
           #This will update the data object with new values of new_data
           new_data[, helper(.SD), by = c("t", "id"), .SDcols = colnames(new_data)]
 
           #Shouldn't be needed but clean duplicate rows.
+          if(self$thin){
           data <- data[!duplicated(data[, -c("t")])]
-
-          setorder(data, id)
-          setorder(data, t)
-
+          }
+          #setorder(data, id)
+          #setorder(data, t)
           #shared_data <- Shared_Data$new(data, force_copy = F)
 
           new_task <- self$clone()
@@ -563,7 +616,8 @@ ltmle3_Task <- R6Class(
             id = "id",
             nodes = self$nodes,
             force_at_risk = ifelse(is.null(force_at_risk), self$force_at_risk, force_at_risk),
-            extra_summary_measure_columns = private$.non_data_columns
+            extra_summary_measure_columns = private$.non_data_columns,
+            thin = self$thin
           )
           return(new_task)
         }
@@ -617,12 +671,14 @@ ltmle3_Task <- R6Class(
 
       new_column_names <- new_task$add_columns(new_data, uuid)
 
+
       new_task$initialize(
         self$internal_data, self$npsem,
         column_names = new_column_names,
         folds = self$folds,
         row_index = self$row_index,
-        force_at_risk = force_at_risk
+        force_at_risk = force_at_risk,
+        thin = self$thin
       )
 
       return(new_task)

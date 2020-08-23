@@ -64,7 +64,9 @@ LF_emp <- R6Class(
       # TODO: this only makes sense if the tmle_task is the same as the training one
       # This computes the true empirical density, including when there are ties.
       observedfull <-  tmle_task$get_tmle_node(self$name, format = T, include_id = T, include_time = T)
-      observed <- unlist(observedfull[, self$name, with = F])
+
+      observed <- unlist(observedfull[, setdiff(colnames(observedfull), c("id", "t")), with = F])
+
       # TODO dont need weights for prediction??
       #weights <- tmle_task$get_regression_task(self$name)$weights
       emp_probs <-  private$.empirical_fit$emp_probs
@@ -86,6 +88,7 @@ LF_emp <- R6Class(
       setnames(probs, self$name)
       probs$id = observedfull$id
       probs$t = observedfull$t
+
      # probs$t = NULL
       return(probs)
     },

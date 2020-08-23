@@ -1,6 +1,9 @@
 
 #A general sampler from likelihood objects
 #' @importFrom AR AR.Sim
+#' @param likelihood The likelihood object to sample from
+#' @param time_ordering A character vector of node names which represents the time ordering to sample form.
+#' @param use_lf A character vector of node names whose likelihood factor should be used for sampling (e.g. nodes estimated with LF_emp)
 #' @export
 
 Sampler <- R6Class(
@@ -36,10 +39,10 @@ Sampler <- R6Class(
       return(tmle_task)
 
     },
-    compute_conditional_mean = function(tmle_task, start_node, end_node, num_iter = 10){
+    compute_conditional_mean = function(tmle_task, start_node, end_node, num_iter = 100){
       # Computes conditional mean of end_node given the (strict) past of start_node via monte carlo simulation
       # The sampling begins with start_node.
-      outcomes <- matrix(nrow = length(unique(tmle_task$id)), ncol = num_iter)
+      outcomes = matrix(nrow = length(unique(tmle_task$id)), ncol = num_iter)
       for(i in 1:num_iter){
         new_task <- self$sample(tmle_task, start_node, end_node)
         outcomes[,i] <- new_task$get_tmle_node(end_node)[,end_node,with=F][[1]]
@@ -49,56 +52,36 @@ Sampler <- R6Class(
     next_in_chain = function(tmle_task, node){
       #Takes a task and node name and then generated a new task
       # with the node values replaced with sampled values.
-      #TODO if there are time pooled nodes then this doesnt work.
-      samples <- self$sample_from_node(tmle_task, node, 1)
-      samples <- as.data.table(samples)
+      samples <- data.table(self$sample_from_node(tmle_task, node, 1))
       setnames(samples, node)
       cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), samples)
       return(cf_task)
     },
-    sample_from_node = function(tmle_task, node, n_samples = 1, force_time_value = "NO", use_LF_factor = node %in% self$params$use_lf, fold_number = "full"){
+    sample_from_node = function(tmle_task, node, n_samples = 1, use_LF_factor = node %in% self$params$use_lf, fold_number = "full"){
       #Samples from a node. Returns matrix of n by n_samples of values.
 
       if(use_LF_factor){
         return(self$likelihood$factor_list[[node]]$sample(tmle_task, n_samples, fold_number))
       }
       outcome_type <- tmle_task$npsem[[node]]$variable_type
-
       times_to_pool <- tmle_task$npsem[[node]]$times_to_pool
 
       num_id <- length(unique(tmle_task$id))
-      #num_rows <- ifelse(is.null(times_to_pool), num_id, times_to_pool*num_id)
-      reg_task <- tmle_task$get_regression_task(node, drop_censored = F, force_time_value = force_time_value)
 
-      node_variable <- reg_task$nodes$outcome
-      at_risk_id <- reg_task$get_data(, c("id", "t", "at_risk", paste0("last_val_", reg_task$nodes$outcome)))
-      # Only sample from those who are at_risk (so that their value may change)
-
-      num_rows <- nrow(at_risk_id)
-
+      num_rows <- ifelse(is.null(times_to_pool), num_id, length(times_to_pool)*num_id)
       if(outcome_type$type == "binomial"){
-        # TODO If node is pooled across time and at_risk set changes then this must be done sequentially.
-        # However using force_time_value arg, this can be handled.
-        cf_outcome <- data.table(t= at_risk_id$t, id = at_risk_id$id, rep(1,num_rows))
-        setnames(cf_outcome, c("t", "id", node_variable))
-
-        cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), cf_outcome)
-        p <- self$likelihood$get_likelihood(cf_task, node)
-        if(is.numeric(force_time_value)){
-          p <- p[which(cf_task$get_regression_task(node)$data$t == force_time_value),]
-        }
-        p <- p[match(p$id, at_risk_id$id), node, with = F][[1]]
-        values <- do.call(cbind, lapply(1:num_rows, function(i) {
-          as.vector(rbinom(1, 1, p[i]))
+        cf_outcome <- 1
+        cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_outcome, single_value_node= node)
+        p <- self$likelihood$get_likelihood(cf_task, node)[, node, with = F][[1]]
+        values <- as.matrix(lapply(1:num_rows, function(i) {
+          rbinom(n_samples, 1, p[i])
         }))
-
       }
       else if (outcome_type$type == "categorical"){
         levels <- outcome_type$levels
         cf_tasks <- lapply(levels, function(level){
           cf_outcome <- data.table(rep(level,num_rows))
-          cf_outcome <- data.table(t= at_risk_id$t, id = at_risk_id$t, cf_outcome)
-          setnames(cf_outcome, c("t", "id", node))
+          setnames(cf_outcome, node)
           cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), cf_outcome)
         })
         probs <- as.matrix(lapply(cf_tasks, function(cf_task){
@@ -112,40 +95,29 @@ Sampler <- R6Class(
           })
       }
       else if (outcome_type$type == "continuous") {
-        #TODO those who aren't at risk have degenerate likelihood
         if(!is.null(times_to_pool)){
           stop("Sampling from continuous variables is not supported for pooled time.")
         }
-        #outcome <- tmle_task$get_tmle_node(node)
-        ids <- at_risk_id$id
-
+        outcome <- tmle_task$get_tmle_node(node)
+        outcome_stripped <- outcome[, node, with = F][[1]]
+        ids <- outcome$id
         values <- matrix(nrow = n_samples, ncol = num_rows)
-        for (i in seq_along(ids)) {
-          id <- ids[i]
-          if(at_risk_id$at_risk[i]==0){
-            #If this individual is not at risk then sample is just the last value
-            samples <- rep(n_samples, at_risk_id$last_val[i] )
-            values[, i] <- samples
-            next
-          } else {
-            #TODO this errors
-            subject <- tmle_task[which(tmle_task$id == id)]
-            f_X <- function(a) {
+        for (id in ids) {
+          subject <- tmle_task[which(tmle_task$id == id)]
+          f_X <- function(a) {
 
-              #TODO might be more efficient to pass the regression task to likelihood so we dont recompute
-              cf_data <- data.table(a)
-
-              setnames(cf_data, names(cf_data), node)
-              subject_a <- subject$generate_counterfactual_task(UUIDgenerate(), cf_data)
-              likelihood <- self$likelihood$get_likelihood(subject_a, node)[, node, with = F][[1]]
-              return(likelihood)
-            }
-            samples <- AR::AR.Sim(n_samples, f_X, Y.dist = "norm", Y.dist.par = c(mean(outcome_stripped), var(outcome_stripped)),
-                                  xlim = c(min(outcome_stripped), max(outcome_stripped))
-            )
-            values[, i] <- samples
+            #TODO might be more efficient to pass the regression task to likelihood so we dont recompute
+            cf_data <- data.table(a)
+            print(cf_data)
+            setnames(cf_data, names(cf_data), node)
+            subject_a <- subject$generate_counterfactual_task(UUIDgenerate(), cf_data)
+            likelihood <- self$likelihood$get_likelihood(subject_a, node)[, node, with = F][[1]]
+            return(likelihood)
           }
-
+          samples <- AR::AR.Sim(n_samples, f_X, Y.dist = "norm", Y.dist.par = c(mean(outcome_stripped), var(outcome_stripped)),
+                            xlim = c(min(outcome_stripped), max(outcome_stripped))
+          )
+          values[, i] <- samples
         }
 
       } else {

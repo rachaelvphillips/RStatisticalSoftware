@@ -27,13 +27,13 @@ Likelihood_pooled <- R6Class(
   ),
   private = list(
     .train_sublearners = function(tmle_task) {
-      factor_fits <- lapply(self$factor_list, function(factor) {
+      factor_fits <- lapply(self$factor_list_pooled, function(factor) {
         factor$delayed_train(tmle_task) })
       result <- bundle_delayed(factor_fits)
       return(result)
     },
     .train = function(tmle_task, factor_fits) {
-      factor_list <- self$factor_list
+      factor_list <- self$factor_list_pooled
       for (i in seq_along(factor_list)) {
         factor_list[[i]]$train(tmle_task, factor_fits[[i]])
       }
@@ -116,7 +116,9 @@ Likelihood_pooled <- R6Class(
 
       if (is.null(likelihood_values)) {
         # if not, generate new ones
+
         likelihood_values <- likelihood_factor$get_likelihood(tmle_task, fold_number)
+
         #nodes <- setdiff(names(likelihood_values), c("id", "t"))
         #names_of <- colnames(likelihood_values)
         #keep_cols <- intersect(c("t", "id", grep(node,names_of , value = T)), names_of)
@@ -138,6 +140,7 @@ Likelihood_pooled <- R6Class(
       }
       else if(to_wide){
         likelihood_values <- reshape(likelihood_values, idvar = "id", timevar = "t", direction = "wide")
+
       }
       if(drop_id) likelihood_values$id <- NULL
       return(likelihood_values)
@@ -151,11 +154,27 @@ Likelihood_pooled <- R6Class(
         all_likelihoods <- lapply(nodes, function(node) {
           self$get_likelihood(tmle_task, node, fold_number, to_wide = to_wide)
         })
-        if("t" %in% colnames(all_likelihoods[[1]])){
+        contains_t <- all(unlist(lapply(all_likelihoods, function(lik){
+          "t" %in% colnames(lik)
+        })))
+        # TODO this could have weird behavior if some return t and some don't
+        if(contains_t){
           likelihood_dt <- all_likelihoods %>% reduce(full_join, c("id", "t"))#as.data.table(all_likelihoods)
         } else{
-          likelihood_dt <- all_likelihoods %>% reduce(full_join, c("id"))#as.data.table(all_likelihoods)
+          all_likelihoods <- lapply(all_likelihoods, function(lik){
+            if(!(all(c("id", "t") %in% colnames(lik)))){
+              if("t" %in% colnames(lik)) lik$t <- NULL
+              return(lik)
+            }
+            if(length(unique(lik$t))==1){
+              if("t" %in% colnames(lik)) lik$t <- NULL
+              return(lik)
+            }
+            reshape(lik, idvar = "id", timevar = "t", direction = "wide")
+          })
 
+          likelihood_dt <- all_likelihoods %>% reduce(full_join, c("id"))#as.data.table(all_likelihoods)
+          if("t" %in% colnames(likelihood_dt)) likelihood_dt$t <- NULL
         }
         #setnames(likelihood_dt, nodes)
         if(drop_id) likelihood_dt$id <- NULL

@@ -106,7 +106,8 @@ Other Likelihood objects:
   fold_number = "full",
   drop_id = F,
   to_wide = F,
-  verify_in_sync = T
+  verify_in_sync = T,
+  add_to_cache = T
 )}\if{html}{\out{</div>}}
 }
 

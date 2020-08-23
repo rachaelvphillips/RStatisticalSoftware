@@ -134,7 +134,7 @@ Other Likelihood objects:
   tmle_task,
   fold_number,
   check_at_risk = T,
-  to_mat = T
+  to_wide = T
 )}\if{html}{\out{</div>}}
 }
 

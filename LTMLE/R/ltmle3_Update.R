@@ -153,10 +153,10 @@ tmle3_Update <- R6Class(
       # Generates a sub_model data in list form if needed
       update_node <- self$key_to_node_bundle(update_node_key)
 
-      clever_covariates_info <- lapply(self$tmle_params, function(tmle_param) {
+      clever_covariates <- lapply(self$tmle_params, function(tmle_param) {
         tmle_param$clever_covariates(tmle_task, fold_number, for_fitting = for_fitting)[[update_node_key]]
       })
-      clever_covariates <- lapply(clever_covariates_info, `[[`, "H")
+      #clever_covariates <- lapply(clever_covariates_info, `[[`, "H")
       # Note that clever covariates are not collapsed in this function.
       # The EIC component is absorbed into the epsilon vector
 
@@ -165,15 +165,19 @@ tmle3_Update <- R6Class(
       })
 
       reduce_f <- function(x,y){
+
         out = list()
         names_out <- self$key_to_node_bundle(update_node_key)
-        for(i in seq_along(x)){
+        for(i in seq_along(names_out)){
           out[[names_out[i]]] <- cbind(x[[i]], y[[i]])
         }
         return(out)
       }
       # Merge clever covariates for each node across parameters
+
+
       covariates_dt_list <- clever_covariates %>% reduce(reduce_f)
+
       if(!is.list(covariates_dt_list)) covariates_dt_list <- list(covariates_dt_list)
       #covariates_dt <- do.call(cbind, node_covariates)
       # Stack EIC node-specific components for each target parameter
@@ -414,8 +418,11 @@ tmle3_Update <- R6Class(
 
       submodel_data <- self$debundle_submodel(submodel_data, update_node)
 
-
+      # For those not at risk, the probability should be 1 or 0. Note zeroing clever covariate does not help...
+      # Since the probs are bounded away from 1.
+      # TODO absorb at risk into the submodel function
       updated_likelihood <- self$apply_submodel(submodel_data, new_epsilon, submodel_data$submodel)
+      updated_likelihood[[update_node]][-submodel_data$at_risk_list[[update_node]]] <- unlist(likelihood$get_likelihood(tmle_task, update_node, fold_number )[-submodel_data$at_risk_list[[update_node]], update_node, with = F][[1]])
 
       # This is absorbed into clever covariates
       #updated_likelihood[-submodel_data$at_risk_list[[update_node]]] <- submodel_data$initial[[node]][-submodel_data$at_risk_list[[update_node]]]

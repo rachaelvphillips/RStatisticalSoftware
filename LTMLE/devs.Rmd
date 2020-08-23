@@ -2,14 +2,17 @@
 ```{r, include=F}
 #remotes::install_github("Larsvanderlaan/tmle3", ref = "devel")
 
-library(R6)
-devtools::document()
 
+devtools::document()
 ```
 
 
+```{r}
 
-
+f = list("aa"= list("a" = "a"))
+g = list("bb" = list("b" = "b" ))
+c(g, (f)) 
+```
 
 ```{r}
 
@@ -70,109 +73,109 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool
 
 ```{r}
 task = ltmle3_Task$new(data, npsem)
-task$data
+
  
 lik = generate_likelihood_surv(task)
 lik = lik$train(task)
 ```
 
+```{r}
+uniq_obs <- lik$factor_list[["W"]]$empirical_fit$uniq_obs
+emp_probs <-  lik$factor_list[["W"]]$empirical_fit$emp_probs
+uniq_obs[base::sample(seq_along(uniq_obs), 1, prob = emp_probs)]
+lik$factor_list[["W"]]$sample(NULL, 1)
+```
 
+```{r}
+task = ltmle3_Task$new(data, npsem)
 
-
+cf <- data.table("processN" = rep(1, 100))
+cf
+t <- task$generate_counterfactual_task(UUIDgenerate(), 1, single_value_node = "processN" )
+t$data
+```
 
 
 ```{r}
-dat = data.table(W = rep(1,100), A = rep(1,100), id = 1:100, t=rep(0,100))
-
-taskf=ltmle3_Task$new(dat, npsem[1:2], extra_summary_measure_columns=NULL)
-
-task1 = task$generate_counterfactual_task(UUIDgenerate(), data.table(processN = rep(1,200), processA = rep(1,200)), through_data = T, force_at_risk = T)
-
 
 sampler <- Sampler$new(lik, c("W", "A", "processN"), "W")
-lik$get_likelihood(sampler$sample(taskf, "A", "A"), "A",to_wide = T)
-  
-#sampler$compute_conditional_mean(task, "W", "A")
+sampler$sample_from_node(task, "processN", 10)
 ```
-
-
-
-```{r}
-task = ltmle3_Task$new(data, npsem)
-task$get_regression_task("W")$get_data()
-```
-
-```{r}
-1/sqrt(100)/log(100)
-
-```
-
-```{r}
-task = ltmle3_Task$new(data, npsem)
-
- 
-lik = generate_likelihood_surv(task)
-
-lik = lik$train(task)
-
-
-```
-
 
 ```{r}
 tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
 param <- Param_survival$new(tlik, intervention_list = list("A" = LF_static$new("A", value = 1)), outcome_node = "processN")
-#tlik$updater$update(tlik, task)
+param$get_EIC_var(task)
+```
+
+
+```{r}
+
+param <- Param_survival$new(tlik, intervention_list = list(), outcome_node = "processN")
+
+#subdata<- tlik$updater$generate_submodel_data(tlik, task, update_node_key = "processN")
+
+
+
 ```
 
 
 
 
 ```{r}
-data_cf <- data.table(matrix(0, nrow = 10000, ncol = ncol(data)))
-setnames(data_cf, colnames(data))
-data_cf$id = 1:10000
-data_cf$t = 0
-data_cf$at_risk = 1
-task_cf = ltmle3_Task$new(data_cf, npsem)
-sampler = Sampler$new(lik, c("W",  "A"), "W")
-tsk = sampler$sample(task_cf, "W", "A")
 
-
-
-liks = lik$get_likelihood(tsk, "processN")
-
-liks_surv = liks[, cbind(t,cumprod(.SD)), by = id, .SDcols = "processN"]
-liks_surv = liks_surv[, lapply(.SD, mean), by = t, .SDcols = c("processN")]
+tlik$updater$update(tlik, task)
 ```
 
-
-
-
 ```{r}
-liks
-liks_surv
+tlik$get_likelihood(task, "processN")
+lik$get_likelihood(task, "processN")
 ```
 
 
 ```{r}
-lik$get_likelihood(new_task ,"processN")
-
-tlik$get_likelihood(new_task ,"processN", verify_in_sync = T)
+lik$get_likelihood(task, "processN")
+tlik$get_likelihood(task, "processN")
 ```
 
 
 ```{r}
-#tlik$get_likelihood(tasknew ,"processN", verify_in_sync = T)
-tlik$update_task(new_task)
-
+ eps = tlik$updater$fit_submodel(subdata)
+coef(eps)
+preds<- predict(eps, type = "response")
+obs <- subdata$observed[[1]]
+mean(subdata$loss(preds,obs))
+mean(subdata$loss(subdata$initial[[1]],obs))
+data.table(subdata$H[[1]])
+data.table(cbind(preds, subdata$initial[[1]],subdata$observed[[1]]))
+data.table(cbind(task$get_regression_task("processN", drop_censored = T)$data[,processN],preds, subdata$observed[[1]]))
 ```
 
 ```{r}
-tlik$get_likelihood(task ,"processN")
+sub <- tlik$updater$fit_submodel(subdata)
+dim(sub$H)
+H <- unlist(sub$H, use.names = F)
 
-tlik$get_likelihood(tasknew ,"processN", verify_in_sync = F)
-lik$get_likelihood(tasknew ,"processN")
+obs <- sub$observed
+init <- sub$initial
+ data.table(sub$H)
+data.table(obs)
+data.table(init)
+
+ fit = glm(observed ~ H - 1, sub,
+                                offset = qlogis(init),
+                                family = binomial(),
+                                start = rep(0, 1))
+coef(fit)
+
+```
+
+
+```{R}
+data.table(subdata$initial$processN)
+
+new=plogis(qlogis(as.vector(subdata$initial$processN)) + subdata$H$processN %*% eps)
+data.table(new)
 ```
 
 
@@ -183,41 +186,60 @@ library(simcausal)
 
 D <- DAG.empty()
 D <- D +
-  node("W", distr = "runif", min =-1, max = 1) +
-  node("A", distr = "rbinom", size = 1, prob = 0.5 + W/4 ) +
-    node("L1", distr = "rbinom", size = 1, prob = 0.5 + A/4 ) + 
-    node("A1", distr = "rbinom", size = 1, prob = 0.5 + L1/4 ) +
-    node("L2", distr = "rbinom", size = 1, prob = 0.5 + A1/4 ) + 
-    node("A2", distr = "rbinom", size = 1, prob = 0.5 + L2/4 ) +
-    node("L3", distr = "rbinom", size = 1, prob = 0.5 + A2/4 ) + 
-    node("A3", distr = "rbinom", size = 1, prob = 0.5 + L3/4 ) +
-    node("L4", distr = "rbinom", size = 1, prob = 0.5 + A3/4 ) + 
-    node("A4", distr = "rbinom", size = 1, prob = 0.5 + L4/4 ) +
-  node("Y", distr = "rbinom", size = 1, prob = 0.5 + A4/4 )
- 
+  node("L0", distr = "runif", min =0, max = 1) +
+  node("A0", distr = "rbinom", size = 1, prob = 0.5) +
+  node("L1", distr = "runif", min =0, max = 1 + 0.5*A0) +
+  node("A1", distr = "rbinom", size = 1, prob = L0/8 + .15 + .5 * as.numeric(A0 > .75)) +
+  node("Y", distr = "rnorm", mean = A1 + 0.5* A0 - L0 - 0.5*L1  )
 setD <- set.DAG(D)
-dat <- sim(setD, n = 100)
-dat
+dat <- sim(setD, n = 2e2)
+# only grab ID, W's, A, T.tilde, Delta
+Lname <- grep("L", colnames(dat), value = TRUE)
+Aname <- grep("A", colnames(dat), value = TRUE)
+df <- dat[, c("ID", Lname, Aname, "Y")]
+df
+# The simulator will generate death at time 0.
+# our package only allow positive integer time, so I add one to all times
+name0 <- grep("0", colnames(dat), value = TRUE)
+name1 <- grep("1", colnames(dat), value = TRUE)
+df1 = df[,name0]
+df1$t <- rep(1, nrow(df1))
+colnames(df1) = c("L", "A", "t")
+df2 = df[,name1]
+df2$t <- rep(2, nrow(df2))
+colnames(df2) = c("L", "A", "t")
+final <- rbind(df1, df2)
+final$Y <- c(rep(NA, nrow(df1)), df$Y)
+final$id <- c(df$ID, df$ID)
+final <- data.table(final[,c("id", "t", "L", "A", "Y")])
+final
 ```
 
 
 
 
 
+```{r}
+final$A_at_risk = c(rep(1,200), rep(1,200))
+
+npsem <- generate_npsem(final, "L", "L", "A", "Y")
+
+task = ltmle3_Task$new(final, npsem)
+
+tsk = task$get_regression_task("A1", drop_censored = F)
+tsk$get_data()
+tsk$X
+likelihood <- generate_likelihood(task)
+
+```
 
 
 
 
 
+```{r}
+k=likelihood$train(task)
+(likelihood$get_likelihood(task, "Y"))
 
-
-
-
-
-
-
-
-
-
-
+```
 

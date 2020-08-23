@@ -76,22 +76,23 @@ Param_survival <- R6Class(
       # Intervene on censoring/riskset so that hazard probabilities are returned
       # In particular, set the counting processes to 1 and specify that risk set should not be checked
 
-
+      #TODO store
       cf_data <- tmle_task$data[, c("processN", "processA")]
       cf_data[, "processN"] <- 1
       cf_data[, "processA"] <- 1
       cf_task = task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_data, T, T)
-
+      #cf_task <- self$cf_likelihood$enumerate_cf_tasks(tmle_task)[[1]]
       intervention_nodes <- names(self$intervention_list)
-      intervention_nodes = "A"
-      g_A <- self$observed_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
 
-      g_A <- unlist(g_A[,intervention_nodes, with = F])
+      g_A <- self$observed_likelihood$get_likelihoods(cf_task, "A", fold_number, drop_id = T)
 
+      g_A <- unlist(g_A[,"A", with = F])
+      g_A <- bound(g_A, c(0.005,1))
       # I(A=1)
       #TODO this
-      cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, intervention_nodes, fold_number, drop_id = T)
-      cf_pA <- unlist(cf_pA[,intervention_nodes, with = F], use.names = F)
+      cf_pA <- self$cf_likelihood$get_likelihoods(cf_task, "A", fold_number, drop_id = T)
+
+      cf_pA <- unlist(cf_pA[,"A", with = F], use.names = F)
 
       #cf_pA <- tmle_task$get_tmle_node("A")[,A]
 
@@ -101,12 +102,13 @@ Param_survival <- R6Class(
 
 
       Q <- as.matrix(Q)
-      Q <- bound(Q, 0.005)
+      Q <- bound(Q, c(0.005,1))
 
 
       G <- self$observed_likelihood$get_likelihoods(cf_task, c("processA"), fold_number, drop_id = T, to_wide = T)
-      G <- as.matrix(G)
 
+      G <- as.matrix(G)
+      G <- bound(G, c(0.005,1))
 
       Q_surv <- as.matrix(self$hm_to_sm(Q))
       G_surv <- as.matrix(self$hm_to_sm(G))
@@ -202,7 +204,7 @@ Param_survival <- R6Class(
       # TODO dont compute HA for all people
       HA[zero_rows,] <- 0
       #Returns clever covariates
-      return(list(processN = list(H = HA)))
+      return(list(processN =  list(HA)))
     },
     get_EIC_var = function(tmle_task, fold_number = "full"){
       self$clever_covariates_internal(tmle_task, fold_number, for_fitting = T, compute_EIC_variance = T)
@@ -247,6 +249,7 @@ Param_survival <- R6Class(
       # Logistic submodel requires p/1-p
       observed <- observed$processN
       initial <- initial$processN
+
       initial <- ifelse(observed ==1, initial, 1 - initial)
       H <- H$processN
       result <- plogis(qlogis(initial) + H %*% epsilon)

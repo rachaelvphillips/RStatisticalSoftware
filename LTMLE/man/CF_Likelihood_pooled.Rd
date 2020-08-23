@@ -75,7 +75,7 @@ Other Likelihood objects:
 \if{latex}{\out{\hypertarget{method-enumerate_cf_tasks}{}}}
 \subsection{Method \code{enumerate_cf_tasks()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{CF_Likelihood_pooled$enumerate_cf_tasks(tmle_task)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{CF_Likelihood_pooled$enumerate_cf_tasks(tmle_task, force_at_risk = T)}\if{html}{\out{</div>}}
 }
 
 }

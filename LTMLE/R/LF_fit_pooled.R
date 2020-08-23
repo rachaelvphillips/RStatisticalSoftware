@@ -113,18 +113,21 @@ LF_fit_pooled <- R6Class(
       preds <- shape_predictions(tmle_task, preds)
       return(preds)
     },
-    get_density = function(tmle_task, fold_number, check_at_risk = T, to_mat = T) {
+    get_density = function(tmle_task, fold_number, check_at_risk = T, to_wide = T) {
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
 
       learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
 
       learner <- self$learner
+
       preds <- learner$predict_fold(learner_task, fold_number)
+
       outcome_type <- self$learner$training_task$outcome_type
       Y <- learner_task$Y
       if(any(is.na(Y))){
 
       }
+
       observed <- outcome_type$format(learner_task$Y)
       data <-  learner_task$get_data()
 
@@ -157,10 +160,18 @@ LF_fit_pooled <- R6Class(
         }
 
       }
-      likelihood <- self$shape_predictions(learner_task, likelihood)
-
+      likelihood <- data.table(likelihood)
       likelihood$id <- learner_task$data$id
       likelihood$t <- learner_task$data$t
+
+      setnames(likelihood, c(learner_task$nodes$outcome, "id", "t"))
+      if(to_wide){
+
+        likelihood <- reshape(likelihood, idvar = "id", timevar = "t", direction = "wide")
+        setnames(likelihood, c("id", self$name))
+
+      }
+
       # if(length(unique(likelihood$t))==1){
       #   likelihood$t <- NULL
       # }
@@ -168,8 +179,8 @@ LF_fit_pooled <- R6Class(
       #   likelihood <- reshape(likelihood, idvar = "id", timevar = "t", direction = "wide")
       # }
       #make sure ordered by id and t
-      likelihood <- likelihood[order(likelihood$id), ]
-      likelihood <- likelihood[order(likelihood$t), ]
+      #likelihood <- likelihood[order(likelihood$id), ]
+      #likelihood <- likelihood[order(likelihood$t), ]
 
       return(likelihood)
     },

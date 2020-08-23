@@ -92,7 +92,7 @@ Targeted_Likelihood_pooled <- R6Class(
 
 
     },
-    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, to_wide = F, verify_in_sync = T) {
+    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, to_wide = F, verify_in_sync = T, add_to_cache = T) {
       if (node %in% unlist(lapply(self$updater$update_nodes,self$updater$key_to_node_bundle ))) {
         # self$updater$get_updated_likelihood(self, tmle_task, node)
         likelihood_factor <- self$factor_list[[node]]
@@ -106,7 +106,9 @@ Targeted_Likelihood_pooled <- R6Class(
           # if not, generate new ones
           likelihood_values <- self$initial_likelihood$get_likelihood(tmle_task, node, fold_number)
           value_step <- 0
-          self$cache$set_values(likelihood_factor, tmle_task, value_step, fold_number, likelihood_values, node = node)
+          if(add_to_cache){
+            self$cache$set_values(likelihood_factor, tmle_task, value_step, fold_number, likelihood_values, node = node)
+          }
         }
 
         if (value_step < self$updater$step_number & verify_in_sync) {
