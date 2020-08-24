@@ -70,12 +70,15 @@ Sampler <- R6Class(
 
       num_rows <- ifelse(is.null(times_to_pool), num_id, length(times_to_pool)*num_id)
       if(outcome_type$type == "binomial"){
-        cf_outcome <- 1
-        cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_outcome, single_value_node= node)
+        cf_outcome <- data.table(A=rep(1, num_rows))
+
+        setnames(cf_outcome, node)
+        cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), new_data = cf_outcome)
         p <- self$likelihood$get_likelihood(cf_task, node)[, node, with = F][[1]]
-        values <- as.matrix(lapply(1:num_rows, function(i) {
-          rbinom(n_samples, 1, p[i])
-        }))
+
+        values <- matrix(unlist(lapply(1:num_rows, function(i) {
+          as.vector(rbinom(n_samples, 1, p[i]))
+        })), ncol = num_rows)
       }
       else if (outcome_type$type == "categorical"){
         levels <- outcome_type$levels

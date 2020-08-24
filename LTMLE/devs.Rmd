@@ -11,7 +11,7 @@ devtools::document()
 
 f = list("aa"= list("a" = "a"))
 g = list("bb" = list("b" = "b" ))
-c(g, (f)) 
+c(g, (f))
 ```
 
 ```{r}
@@ -72,6 +72,7 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool
 
 
 ```{r}
+data
 task = ltmle3_Task$new(data, npsem)
 
  
@@ -79,28 +80,10 @@ lik = generate_likelihood_surv(task)
 lik = lik$train(task)
 ```
 
-```{r}
-uniq_obs <- lik$factor_list[["W"]]$empirical_fit$uniq_obs
-emp_probs <-  lik$factor_list[["W"]]$empirical_fit$emp_probs
-uniq_obs[base::sample(seq_along(uniq_obs), 1, prob = emp_probs)]
-lik$factor_list[["W"]]$sample(NULL, 1)
-```
-
-```{r}
-task = ltmle3_Task$new(data, npsem)
-
-cf <- data.table("processN" = rep(1, 100))
-cf
-t <- task$generate_counterfactual_task(UUIDgenerate(), 1, single_value_node = "processN" )
-t$data
-```
 
 
-```{r}
 
-sampler <- Sampler$new(lik, c("W", "A", "processN"), "W")
-sampler$sample_from_node(task, "processN", 10)
-```
+
 
 ```{r}
 tlik = Targeted_Likelihood_pooled$new(lik, updater = tmle3_Update$new(one_dimensional = T,constrain_step=T, delta_epsilon = 0.1, maxit = 100))
@@ -171,75 +154,84 @@ coef(fit)
 ```
 
 
-```{R}
-data.table(subdata$initial$processN)
-
-new=plogis(qlogis(as.vector(subdata$initial$processN)) + subdata$H$processN %*% eps)
-data.table(new)
-```
-
 
 ```{r}
 
-# Generate simple causal model
-library(simcausal)
-
-D <- DAG.empty()
-D <- D +
-  node("L0", distr = "runif", min =0, max = 1) +
-  node("A0", distr = "rbinom", size = 1, prob = 0.5) +
-  node("L1", distr = "runif", min =0, max = 1 + 0.5*A0) +
-  node("A1", distr = "rbinom", size = 1, prob = L0/8 + .15 + .5 * as.numeric(A0 > .75)) +
-  node("Y", distr = "rnorm", mean = A1 + 0.5* A0 - L0 - 0.5*L1  )
-setD <- set.DAG(D)
-dat <- sim(setD, n = 2e2)
-# only grab ID, W's, A, T.tilde, Delta
-Lname <- grep("L", colnames(dat), value = TRUE)
-Aname <- grep("A", colnames(dat), value = TRUE)
-df <- dat[, c("ID", Lname, Aname, "Y")]
-df
-# The simulator will generate death at time 0.
-# our package only allow positive integer time, so I add one to all times
-name0 <- grep("0", colnames(dat), value = TRUE)
-name1 <- grep("1", colnames(dat), value = TRUE)
-df1 = df[,name0]
-df1$t <- rep(1, nrow(df1))
-colnames(df1) = c("L", "A", "t")
-df2 = df[,name1]
-df2$t <- rep(2, nrow(df2))
-colnames(df2) = c("L", "A", "t")
-final <- rbind(df1, df2)
-final$Y <- c(rep(NA, nrow(df1)), df$Y)
-final$id <- c(df$ID, df$ID)
-final <- data.table(final[,c("id", "t", "L", "A", "Y")])
-final
+ # Generate simple causal model
+ library(simcausal)
+n=10000
+ D <- DAG.empty()
+ D <- D +
+   node("W", distr = "rbinom", size = 1, prob = 0.5 )  +
+   node("A", distr = "rbinom", size = 1, prob = 0.5 + W/4 ) +
+     node("L1", distr = "rbinom", size = 1, prob = 0.5 + A/4 ) + 
+     node("A1", distr = "rbinom", size = 1, prob = 0.5 + L1/4 ) +
+     node("L2", distr = "rbinom", size = 1, prob = 0.5 + A1/4 ) + 
+     node("A2", distr = "rbinom", size = 1, prob = 0.5 + L2/4 ) +
+     node("L3", distr = "rbinom", size = 1, prob = 0.5 + A2/4 ) + 
+     node("A3", distr = "rbinom", size = 1, prob = 0.5 + L3/4 ) +
+     node("L4", distr = "rbinom", size = 1, prob = 0.5 + A3/4 ) + 
+     node("A4", distr = "rbinom", size = 1, prob = 0.5 + L4/4 ) +
+   node("Y", distr = "rbinom", size = 1, prob = 0.5 + A4/4 )
+  
+ setD <- set.DAG(D)
+ dat <- sim(setD, n = n)
+dat
+L=unlist(dat[,stringr::str_detect(colnames(dat), "[WL]")], use.names = F)
+A=unlist(dat[,stringr::str_detect(colnames(dat), "[A]")], use.names = F)
+Y = dat$Y
+dat=data.table(id = rep(1:n, 5), L = L, A = A, Y = Y, 
+           t = c(rep(0, n), rep(1, n),rep(2, n),rep(3, n),rep(4, n)))
 ```
-
-
-
-
 
 ```{r}
-final$A_at_risk = c(rep(1,200), rep(1,200))
-
-npsem <- generate_npsem(final, "L", "L", "A", "Y")
-
-task = ltmle3_Task$new(final, npsem)
-
-tsk = task$get_regression_task("A1", drop_censored = F)
-tsk$get_data()
-tsk$X
-likelihood <- generate_likelihood(task)
-
+lrnr = Lrnr_glm$new()
+factor_list = list(LF_emp$new("W"),
+LF_fit_pooled$new("A", lrnr),
+LF_fit_pooled$new(c("A1", "A2", "A3", "A4"),lrnr),
+LF_fit_pooled$new(c("L1", "L2", "L3", "L4"),lrnr),
+LF_fit_pooled$new("Y",lrnr))
+npsem = list(define_lnode("W", "L", c(), time = 0),
+     define_lnode("A", "A", c("W"), time = 0),
+     define_lnode("L1", "L", c("A"), time = 1),
+      define_lnode("L2", "L", c("A1"), time = 2),
+      define_lnode("L3", "L", c("A2"), time = 3),
+      define_lnode("L4", "L", c("A3"), time = 4),
+      define_lnode("A1", "A", c("L1"), time = 1),
+      define_lnode("A2", "A", c("L2"), time = 2),
+      define_lnode("A3", "A", c("L3"), time = 3),
+      define_lnode("A4", "A", c("L4"), time = 4),
+     define_lnode("Y", "Y", c("A4"), time = 4)
+     
+     
+     
+     )
+lik = Likelihood_pooled$new(factor_list)
 ```
-
-
-
-
 
 ```{r}
-k=likelihood$train(task)
-(likelihood$get_likelihood(task, "Y"))
+matrix(list(as.vector(c(1,2)), as.vector(c(2,3))))
+```
+```{r}
+task = ltmle3_Task$new(dat, npsem, extra_summary_measure_columns = NULL, thin =F)
+t=proc.time()
+f=task$get_regression_task("Y")
+#lik_tr = lik$train(task)
+#lik_tr$get_likelihoods(task)
+t-proc.time()
+sr = Sampler$new(lik_tr, c("W", "A", "L1", "A1",  "L2", "A2" , "L3", "A3" , "L4", "A4", "Y"), "W")
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
 

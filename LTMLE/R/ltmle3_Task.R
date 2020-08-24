@@ -16,7 +16,7 @@ ltmle3_Task <- R6Class(
     data = function() {
       all_variables <- unlist(lapply(self$npsem, `[[`, "variables"))
 
-      if(is.null(private$.non_data_columns)){
+      if(!is.null(private$.non_data_columns)){
         columns <- unique(c(private$.non_data_columns, "id" , "t", all_variables))
       } else{
         columns <- unique(c( "id" , "t", all_variables))
@@ -146,7 +146,8 @@ ltmle3_Task <- R6Class(
         # get last observed value for each person (either at this time if there is a row or not)
         # TODO If people are censored then they will end up having data drawn here (last observed value)
         # TODO Should we treat censoring and at_risk sets differently?
-        data <- data[, last_obs_value(.SD), by = id, .SDcols = c("t", node_var)]
+        #data <- data[, dplyr::slice_tail(.SD), by = id, .SDcols = c("t", node_var)]
+        data <- data %>% dplyr::group_by(id) %>% dplyr::slice_tail()
         # set time to current time
         data$t = time
         } else {
