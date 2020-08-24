@@ -149,7 +149,7 @@ LF_fit_pooled <- R6Class(
         # By setting check_at_risk = F then one can obtain the counterfactual predictions
         # conditioned on everyone being at risk.
 
-        names_last_val <- paste("last_val", learner_task$nodes$outcome, sep = "_")
+        names_last_val <-"last_val"
         # TODO Support multivariate outcome
         assertthat::assert_that(all(names_last_val %in% colnames(data)), msg = "If at_risk is a column then last_val must be as well.")
         not_at_risk <- which(data$at_risk == 0)

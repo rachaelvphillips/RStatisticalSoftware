@@ -195,6 +195,7 @@ Param_survival <- R6Class(
           return(list(processN = EIC_var))
         }
 
+
         private$.D_cache[[tmle_task$uuid]] <- list(processN = D1 )
 
 
@@ -204,6 +205,7 @@ Param_survival <- R6Class(
       # TODO dont compute HA for all people
       HA[zero_rows,] <- 0
       #Returns clever covariates
+      A%B%C = list(H1, H2, H3)
       return(list(processN =  list(HA)))
     },
     get_EIC_var = function(tmle_task, fold_number = "full"){
