@@ -32,19 +32,20 @@ ltmle3_Node <- R6Class(
 
     },
   risk_set = function(data, time){
+    #Assumes data == data[t <= time,] and time is single number
     #Computes, for this node, the id's of those in data at risk of changing their value at this time
     at_risk_map <- self$at_risk_map
     missing_not_at_risk <- private$.ltmle_params$missing_row_implies_not_at_risk
     if(missing_not_at_risk){
-      keep_id <- unique(data[data$t %in% c(time), id])
-      data <- data[data$id %in% keep_id & data$t <= time,]
+      keep_id <- unique(data[data == time, id])
+      data <- data[data$id %in% keep_id,]
     }
     if(is.null(at_risk_map)) risk_set <- unique(data$id)
     if(is.character(self$at_risk_map)) {
       if(missing_not_at_risk){
         #If those missing rows are not at risk
         #then only check for those with rows at this time
-        risk_set <- data[data$t %in% c(time) & data[,at_risk_map,with = F, drop = T]==1, "id", with = F, drop = T][[1]]
+        risk_set <- data[t == time & data[,at_risk_map,with = F, drop = T]==1, "id", with = F, drop = T][[1]]
       } else{
         #Otherwise find the last value of risk indicator
         data <- data[!duplicated(data$id, fromLast = T), c("id", at_risk_map), with = F]
@@ -52,8 +53,10 @@ ltmle3_Node <- R6Class(
         risk_set <- data$id[data[[at_risk_map]] ==1]
       }
     } else{
-      risk_set <- data[which(at_risk_map$summarize(data,time)[,at_risk_map$name, with = F, drop = T]==1), c("id"), with = F, drop = T][[1]]
+      risk_set <-data[which(at_risk_map$summarize(data,time)[,at_risk_map$name, with = F, drop = T]==1), c("id"), with = F, drop = T][[1]]
+
     }
+    return(unlist(risk_set, use.names = F))
 
   }
   ),

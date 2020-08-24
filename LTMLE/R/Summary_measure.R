@@ -54,7 +54,7 @@ Summary_measure <- R6Class(
       if(self$params$strict_past) {
         data <- data[which(data$t < time),]
       } else {
-        data <- data[,]
+        data <- data[which(data$t <= time),]
       }
 
       func <- private$.params$summary_function

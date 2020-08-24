@@ -5,7 +5,10 @@
 
 devtools::document()
 ```
-
+```{r}
+setkey(data, id ,t)
+key(data[, c("t", "id"), with = F])
+```
 
 ```{r}
 
