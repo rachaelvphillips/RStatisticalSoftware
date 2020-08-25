@@ -50,12 +50,8 @@ LF_static <- R6Class(
     },
     get_density = function(tmle_task, fold_number) {
       observed <- tmle_task$get_tmle_node(self$name, include_time = T, include_id = T)
-
-      likelihood <- data.table(as.numeric(self$value == unlist(observed[,self$name, with = F ])))
-      likelihood$t <- observed$t
-      likelihood$id <- observed$id
+      set(observed, , self$name, data.table(as.numeric(self$value == unlist(observed[,self$name, with = F ]))))
       setnames(likelihood, c(self$name, "t", "id"))
-
       return(likelihood)
     },
     cf_values = function(tmle_task) {

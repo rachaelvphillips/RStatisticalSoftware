@@ -107,14 +107,16 @@ key(rbind(task$data, task$data))
 
 ```{r}
 dat <- data[,]
+setkey(dat, "id", "t")
 dat
 dats <- dat[1, c("id", "t", "processN")]
 dats$processN =1
 dats$id = 0
 dat
-dat[.(1,0), processN := 100]
-
+f=dat[1]
+f[rep(1,100)]
 ```
+
 
 
 ```{r}
@@ -122,7 +124,7 @@ task = ltmle3_Task$new(data, npsem )
 key(task$data)
 task$get_tmle_node("processN", include_time = T, expand = T, force_time_value = 5)
 task$get_regression_task("processN" , expand = T)$data
-#task$get_regression_task("processN", expand_to_full = T)$get_data()
+
 ```
 
 

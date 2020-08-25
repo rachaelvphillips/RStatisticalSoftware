@@ -10,7 +10,7 @@ Likelihood_pooled <- R6Class(
   inherit = Lrnr_base,
   active = list(
     factor_list_pooled = function(){
-      self$params$factor_list_pooled
+      return(self$params$factor_list_pooled)
     },
     factor_list = function() {
       return(self$params$factor_list)
@@ -107,7 +107,7 @@ Likelihood_pooled <- R6Class(
         stop("factor_list and task$npsem must have matching names")
       }
     },
-    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, to_wide = F) {
+    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, drop_time = F, to_wide = F) {
       likelihood_factor <- self$factor_list[[node]]
       # first check for cached values for this task
 
@@ -130,7 +130,7 @@ Likelihood_pooled <- R6Class(
       #Subset to only likelihood values of this node
       #In case node is pooled, then grab all times
       names_of <- colnames(likelihood_values)
-      keep_cols <- intersect(c("t", "id", grep(node,names_of , value = T)), names_of)
+      keep_cols <- intersect(c("t", "id", grep(node, names_of, value = T)), names_of)
 
 
       likelihood_values <- likelihood_values[,  keep_cols, with = F]
@@ -142,10 +142,11 @@ Likelihood_pooled <- R6Class(
         likelihood_values <- reshape(likelihood_values, idvar = "id", timevar = "t", direction = "wide")
 
       }
-      if(drop_id) likelihood_values$id <- NULL
+      if(drop_id & "id" %in% colnames(likelihood_values)) likelihood_values$id <- NULL
+      if(drop_time & "t" %in% colnames(likelihood_values)) likelihood_values$t <- NULL
       return(likelihood_values)
     },
-    get_likelihoods = function(tmle_task, nodes = NULL, fold_number = "full", drop_id = F, to_wide = F) {
+    get_likelihoods = function(tmle_task, nodes = NULL, fold_number = "full", drop_id = F, drop_time = F, to_wide = F) {
       if (is.null(nodes)) {
         nodes <- self$nodes
       }
@@ -157,7 +158,6 @@ Likelihood_pooled <- R6Class(
         contains_t <- all(unlist(lapply(all_likelihoods, function(lik){
           "t" %in% colnames(lik)
         })))
-        # TODO this could have weird behavior if some return t and some don't
         if(contains_t){
           likelihood_dt <- all_likelihoods %>% reduce(full_join, c("id", "t"))#as.data.table(all_likelihoods)
         } else{
@@ -178,10 +178,10 @@ Likelihood_pooled <- R6Class(
         }
         #setnames(likelihood_dt, nodes)
         if(drop_id) likelihood_dt$id <- NULL
+        if(drop_time & t %in% colnames(likelihood_dt)) likelihood_dt$t <- NULL
         return(likelihood_dt)
       } else {
-        likelihood <- self$get_likelihood(tmle_task, nodes[[1]], fold_number, to_wide = to_wide)
-        if(drop_id) likelihood$id <- NULL
+        likelihood <- self$get_likelihood(tmle_task, nodes[[1]], fold_number, to_wide = to_wide, drop_id = drop_id, drop_time = drop_time, drop = T)
         return(likelihood)
       }
     },

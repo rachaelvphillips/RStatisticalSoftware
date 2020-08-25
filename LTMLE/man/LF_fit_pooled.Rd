@@ -134,7 +134,10 @@ Other Likelihood objects:
   tmle_task,
   fold_number,
   check_at_risk = T,
-  to_wide = T
+  to_wide = T,
+  drop_id = F,
+  drop_time = F,
+  drop = T
 )}\if{html}{\out{</div>}}
 }
 

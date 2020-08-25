@@ -6,7 +6,7 @@ ltmle3_Node <- R6Class(
   inherit = tmle3_Node,
   public = list(
     initialize = function(name, variables, parents = c(), time = NULL, summary_functions = NULL,
-                          node_type = NULL, at_risk_map = NULL, missing_row_implies_not_at_risk = T, times_to_pool = NULL, variable_type = NULL, scale = FALSE) {
+                          at_risk_map = NULL, missing_row_implies_not_at_risk = T, times_to_pool = NULL, variable_type = NULL, scale = FALSE) {
       if(!is.list(summary_functions)){
         summary_functions <- list(summary_functions)
       }
@@ -19,7 +19,7 @@ ltmle3_Node <- R6Class(
           at_risk_map$set_name(paste(paste(variables, collapse = "_"), "at_risk", sep = "_") )
         }
       }
-      private$.ltmle_params = list(missing_row_implies_not_at_risk = missing_row_implies_not_at_risk, at_risk_map = at_risk_map, time = time, times_to_pool = times_to_pool, summary_functions = summary_functions, node_type = node_type)
+      private$.ltmle_params = list(missing_row_implies_not_at_risk = missing_row_implies_not_at_risk, at_risk_map = at_risk_map, time = time, times_to_pool = times_to_pool, summary_functions = summary_functions)
       super$initialize(name, variables, parents,
                        variable_type, censoring_node = NULL, scale)
     },
@@ -69,9 +69,6 @@ ltmle3_Node <- R6Class(
     },
     time = function(){
       private$.ltmle_params$time
-    },
-    node_type = function(){
-      private$.ltmle_params$node_type
     },
     at_risk_map = function(){
       private$.ltmle_params$at_risk_map

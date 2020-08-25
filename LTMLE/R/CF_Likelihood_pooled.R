@@ -63,7 +63,6 @@ CF_Likelihood_pooled <- R6Class(
       cf_task <- tmle_task
       for(vals in all_values){
         cf_task <- cf_task$generate_counterfactual_task(UUIDgenerate(),vals, force_at_risk=force_at_risk)
-
       }
       #cf_data <- as.data.table(all_values)
       #cf_task <- tmle_task$generate_counterfactual_task(UUIDgenerate(), cf_data, force_at_risk = force_at_risk )

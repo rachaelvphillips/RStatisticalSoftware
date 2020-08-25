@@ -24,23 +24,6 @@ ltmle3_Task <- R6Class(
       }
       self$get_data(columns =columns)
     },
-    weights = function() {
-      # Assumes weights are constant in time
-      keep <- !duplicated(self$data$id)
-      id <- self$data$id[keep]
-      #Return weights in order of id
-      super$weights[keep][order(id)]
-    },
-    offset = function() {
-      keep <- !duplicated(self$data$id)
-      id <- self$data$id[keep]
-      # Assumes offset are constant in time
-      # return offset
-      super$offset[keep][order(id)]
-    },
-    thin = function(){
-      private$.thin
-    },
     extra_summary_measure_columns = function(){
       private$.non_data_columns
     },
@@ -49,15 +32,21 @@ ltmle3_Task <- R6Class(
     }
   ),
   public = list(
-    initialize = function(data, npsem, id = "id", time = "t", extra_summary_measure_columns = "at_risk", force_at_risk = F, thin = T, ...) {
+    initialize = function(data, npsem, id = "id", time = "t", extra_summary_measure_columns = "at_risk", force_at_risk = F, ...) {
 
       #If time and id are not named as "t" and "id" then
       # add columns
       private$.force_at_risk = force_at_risk
       private$.non_data_columns = extra_summary_measure_columns
-      private$.thin = thin
+
 
       if(!inherits(data, "Shared_Data")){
+        if(is.null(id)){
+          set(data, , "id", 1:nrow(data))
+        }
+        if(is.null(time)){
+          set(data, , "t", rep(0,nrow(data)))
+        }
         if(id!="id"){
           data[,"id", with = F] <- data[,id, with = F]
           id = "id"
@@ -79,7 +68,8 @@ ltmle3_Task <- R6Class(
       private$.uuid <- digest::digest(self$data)
     },
     get_tmle_node = function(node_name, format = FALSE, include_time = F, include_id = T, force_time_value = "No", expand = F, compute_risk_set = T) {
-     # returns node value
+     if(private$.force_at_risk) expand <- T
+      # returns node value
      # note if row is missing for person at time specified by node
       # then it is assumed the individual was not monitored and was not subject to change
       # the last known value of the node (at previous time) will be used instead
@@ -123,7 +113,7 @@ ltmle3_Task <- R6Class(
         at_risk_map <- tmle_node$at_risk_map
         time <- tmle_node$times_to_pool
         if(expand  | !is.null(tmle_node$at_risk_map) | !tmle_node$missing_not_at_risk){
-          data <- print(lapply(time, self$get_tmle_node, node_name= node_name, format = format, include_time = T, include_id = T, expand = expand))
+          data <- lapply(time, self$get_tmle_node, node_name= node_name, format = format, include_time = T, include_id = T, expand = expand)
           #setkey(data, id , t)
           return(data)
         }
@@ -136,7 +126,7 @@ ltmle3_Task <- R6Class(
 
         data <- self$data[t <= time, ]
 
-        if(compute_risk_set){
+        if(compute_risk_set & !private$.force_at_risk){
           risk_set <- tmle_node$risk_set(data, time)
         }
         data <- data[, c("id", "t", node_var), with = F]
@@ -145,8 +135,12 @@ ltmle3_Task <- R6Class(
           # Get most recent value for all
           data <- data[, last(.SD), by = id]
           if(compute_risk_set){
-            data$at_risk <- as.numeric(data$id %in% risk_set)
-            set(data, ,"last_val", unlist(self$data[t <= time - 1, last(.SD), by = id, .SDcols = c(node_var)][[2]], use.names = F))
+            if(private$.force_at_risk) {
+              data$at_risk <- 1
+            } else {
+              data$at_risk <- as.numeric(data$id %in% risk_set)
+            }
+            set(data, , paste0("last_val_",node_var) , self$data[t <= time - 1, last(.SD), by = id, .SDcols = c(node_var)], use.names = F)
           }
 
         } else {
@@ -269,7 +263,7 @@ ltmle3_Task <- R6Class(
         outcome_data <- self$get_tmle_node(target_node, format = TRUE, include_id = T, include_time = T, force_time_value = force_time_value, expand = expand)
         data <- merge(outcome_data, parent_data, by = id, all.x = T)
         covariates <- colnames(parent_data)
-        outcome = setdiff(colnames(outcome_data), c("id", "t", "last_val", "at_risk"))
+        outcome = setdiff(colnames(outcome_data), c("id", "t", grep("last_val", colnames(outcome_data), value = T), "at_risk"))
         if((time == "pooled")){
           covariates <- c(covariates, "t")
         }
@@ -335,15 +329,9 @@ ltmle3_Task <- R6Class(
       # Keep only node_data for each individual at the time of this tmle node
       node_data <- node_data[node_data$id %in% outcome_data$id, last(.SD), by = id]
 
-      node_data$t = time
+      node_data$t <- time
       nodes$outcome <- outcome
       nodes$covariates <- covariates
-      nodes$time <- "t"
-      # Merge all data by id. Full join so all rows are kept and NA's added.
-      # NA rows will necessarily be dropped if drop_censored = T.
-      # Otherwise only the outcome variables should be NA for unobserved/unmonitored outcomes.
-      # If one is interested in getting predictions for people not observed at this time
-      # then one must add a row with the desired outcome.
 
       regression_data <-  list(all_covariate_data, outcome_data, node_data) %>% reduce(merge, "id")
       regression_data$t = time
@@ -362,32 +350,47 @@ ltmle3_Task <- R6Class(
 
       return(regression_task)
     },
-    generate_counterfactual_task = function(uuid, new_data, force_at_risk = NULL, through_data=F) {
+    generate_counterfactual_task = function(uuid, new_data, force_at_risk = NULL, through_data=  F , remove_rows = F) {
       #If single value then
+      if(nrow(new_data)==1){
+        node <- colnames(new_data)
+        node_var <- sapply(
+          node,
+          function(node_name) {
+            self$npsem[[node_name]]$variables
+          }
+        )
+        nrow <- nrow(self$data)
+        new_data <- new_data[rep(1,nrow)]
+        setnames(new_data, node, node_var)
+        new_task <- self$clone()
+        new_column_names <- new_task$add_columns(new_data, uuid)
+        new_task$initialize(
+          self$internal_data, self$npsem,
+          nodes = self$nodes,
+          column_names = new_column_names,
+          folds = self$folds,
+          row_index = self$row_index
+        )
+        return(new_task)
+
+      }
       if(!through_data){
 
-        if(!("t" %in% colnames(new_data))){
-
-          #If not in id/t format. Then convert to id/t format and handle node names
-          node <-  setdiff(colnames(new_data), c("id", "t"))
-          dat <- self$get_tmle_node(node, include_time = T, include_id = T)
-          node <-  setdiff(colnames(new_data), c("id", "t"))
-          node_vars <- sapply(
-            node,
-            function(node_name) {
-              self$npsem[[node_name]]$variables
-            }
-          )
-
-          set(dat, , unlist(node_vars, use.names = F), new_data[,node,with=F])
-
-          #setnames(dat, node, node_vars)
-          new_data <- dat
+        if(!("t" %in% colnames(new_data)) | !("id" %in% colnames(new_data))){
+          stop("t and id column not found")
         }
 
 
         data <- data.table::copy(self$get_data())
         node <-  setdiff(colnames(new_data), c("id", "t"))
+        if(remove_rows){
+          id_t_ex <- fsetdiff(data[t %in% unique(new_data$t), c("id", "t"), with = F], new_data[, c("id", "t"), with = F])
+          data <- data[!.(id_t_ex$id, id_t_ex$t), .(node)]
+        } else {
+          id_t_ex <- fsetdiff(data[t %in% unique(new_data$t), c("id", "t"), with = F], new_data[, c("id", "t"), with = F])
+          data <- data[.(id_t_ex$id, id_t_ex$t), .(node) := NA]
+        }
         has_row <- which(unlist(data[.(new_data$id, new_data$t), !is.na(node[[1]]), with = F], use.names = F))
         append_row_data <- new_data[-has_row]
         alter_row_data <- new_data[has_row]
@@ -417,7 +420,7 @@ ltmle3_Task <- R6Class(
         }
 
 
-      }
+
 
       # for current_factor, generate counterfactual values
       node_names <- names(new_data)
@@ -432,19 +435,16 @@ ltmle3_Task <- R6Class(
       node_times <- sapply(
         node_names,
         function(node_name) {
-          self$npsem[[node_name]]$time
+          time <- self$npsem[[node_name]]$time
+          if(!is.null(time) & time == "pooled") time <- sort(self$npsem[[node_name]]$times_to_pool)
         }
       )
-      is_pooled <- "pooled" %in% unlist(node_times)
 
       node_index <- lapply(
         node_times,
         function(time) {
-          if(is_pooled) {
-
-            return(1:nrow(self$data))
-          }
-          which(self$data$t==time)
+          if(is.null(time)) return(1:nrow(self$data))
+          sort(which(self$data$t %in% time))
         }
       )
 

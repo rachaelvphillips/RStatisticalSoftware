@@ -110,10 +110,20 @@ LF_fit_pooled <- R6Class(
 
       # unscale preds (to handle bounded continuous)
       preds_unscaled <- tmle_task$unscale(preds, self$name)
-      preds <- shape_predictions(tmle_task, preds)
+      preds <- data.table(preds_unscaled)
+      preds$id <- learner_task$data$id
+      preds$t <- learner_task$data$t
+      setnames(preds, c(learner_task$nodes$outcome, "id", "t"))
+      if(to_wide){
+        preds <- reshape(preds, idvar = "id", timevar = "t", direction = "wide")
+        setnames(preds, c("id", self$name))
+      }
+      if(drop_id & "id" %in% colnames(preds)) preds$id <- NULL
+      if(drop_time & "t" %in% colnames(preds)) preds$t <- NULL
+      if(drop & ncol(preds) == 1) preds <- unlist(preds, use.names = F)
       return(preds)
     },
-    get_density = function(tmle_task, fold_number, check_at_risk = T, to_wide = T) {
+    get_density = function(tmle_task, fold_number, check_at_risk = T, to_wide = T, drop_id = F, drop_time = F, drop = T) {
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
 
       learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
@@ -124,9 +134,7 @@ LF_fit_pooled <- R6Class(
 
       outcome_type <- self$learner$training_task$outcome_type
       Y <- learner_task$Y
-      if(any(is.na(Y))){
 
-      }
 
       observed <- outcome_type$format(learner_task$Y)
       data <-  learner_task$get_data()
@@ -140,16 +148,15 @@ LF_fit_pooled <- R6Class(
         index_mat <- cbind(seq_along(observed), observed)
         likelihood <- unpacked[index_mat]
       } else if (outcome_type$type == "continuous") {
-        likelihood <- unlist(preds)
+        likelihood <- preds
       } else {
         stop(sprintf("unsupported outcome_type: %s", outcome_type$type))
       }
 
-      if(check_at_risk & "at_risk" %in% colnames(data)) {
+      if(check_at_risk & "at_risk" %in% colnames(data) ) {
         # By setting check_at_risk = F then one can obtain the counterfactual predictions
         # conditioned on everyone being at risk.
-
-        names_last_val <-"last_val"
+        names_last_val <- paste0("last_val", learner_task$nodes$outcome)
         # TODO Support multivariate outcome
         assertthat::assert_that(all(names_last_val %in% colnames(data)), msg = "If at_risk is a column then last_val must be as well.")
         not_at_risk <- which(data$at_risk == 0)
@@ -166,21 +173,13 @@ LF_fit_pooled <- R6Class(
 
       setnames(likelihood, c(learner_task$nodes$outcome, "id", "t"))
       if(to_wide){
-
         likelihood <- reshape(likelihood, idvar = "id", timevar = "t", direction = "wide")
         setnames(likelihood, c("id", self$name))
-
       }
+      if(drop_id & "id" %in% colnames(likelihood)) likelihood$id <- NULL
+      if(drop_time & "t" %in% colnames(likelihood)) likelihood$t <- NULL
+      if(drop & ncol(likelihood) == 1) likelihood <- unlist(likelihood, use.names = F)
 
-      # if(length(unique(likelihood$t))==1){
-      #   likelihood$t <- NULL
-      # }
-      # else if(to_mat){
-      #   likelihood <- reshape(likelihood, idvar = "id", timevar = "t", direction = "wide")
-      # }
-      #make sure ordered by id and t
-      #likelihood <- likelihood[order(likelihood$id), ]
-      #likelihood <- likelihood[order(likelihood$t), ]
 
       return(likelihood)
     },
