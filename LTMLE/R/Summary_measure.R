@@ -153,7 +153,7 @@ make_summary_measure_baseline <- function(column_names){
   name = paste( column_names, "baseline", sep = "_")
 
   summary_function <- function(data,...){
-    return(data[1,])
+    return(first(data))
   }
 
   return(Summary_measure$new(column_names, summary_function, name))

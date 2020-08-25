@@ -37,7 +37,7 @@ ltmle3_Node <- R6Class(
     at_risk_map <- self$at_risk_map
     missing_not_at_risk <- private$.ltmle_params$missing_row_implies_not_at_risk
     if(missing_not_at_risk){
-      keep_id <- unique(data[data == time, id])
+      keep_id <- unique(data[data$t == time, id])
       data <- data[data$id %in% keep_id,]
     }
     if(is.null(at_risk_map)) risk_set <- unique(data$id)

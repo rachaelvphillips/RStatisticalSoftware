@@ -32,7 +32,7 @@ D <- D +
   node("Delta", distr = "rconst", const = as.numeric(T<=C)  ) +
   node("Ttilde", distr = "rconst", const = round(min(T,C,10) +1  ))
 setD <- set.DAG(D)
-dat <- sim(setD, n = 1e4)
+dat <- sim(setD, n = 1e3)
 # only grab ID, W's, A, T.tilde, Delta
 Lname <- grep("W", colnames(dat), value = TRUE)
 Aname <- grep("A", colnames(dat), value = TRUE)
@@ -100,11 +100,28 @@ data[, slice_tail(.SD), by = id]
 
 ```
 
+```{r}
+key(rbind(task$data, task$data))
+
+```
 
 ```{r}
-data
-task = ltmle3_Task$new(data, npsem)
-task$get_tmle_node("A", include_time = T)
+dat <- data[,]
+dat
+dats <- dat[1, c("id", "t", "processN")]
+dats$processN =1
+dats$id = 0
+dat
+dat[.(1,0), processN := 100]
+
+```
+
+
+```{r}
+task = ltmle3_Task$new(data, npsem )
+key(task$data)
+task$get_tmle_node("processN", include_time = T, expand = T, force_time_value = 5)
+task$get_regression_task("processN" , expand = T)$data
 #task$get_regression_task("processN", expand_to_full = T)$get_data()
 ```
 
