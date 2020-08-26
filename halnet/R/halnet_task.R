@@ -3,7 +3,7 @@
 #' @import  data.table
 #' @import  R6
 #' @export
-HALnet_Task <- R6Class("HALnet_Task", private = list(
+halnet_Task <- R6Class("HALnet_Task", private = list(
 
   ##########
   #Variables
