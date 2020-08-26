@@ -13,7 +13,6 @@ ltmle3_Node <- R6Class(
       if(time == "pooled" & is.null(times_to_pool)){
         stop("You specified that this node represents a pooled over time likelihood factor but did not supply the times_to_pool argument.")
       }
-      # Handle counting process at risk summary functions
       if (!is.null(at_risk_map)){
         if(!is.character(at_risk_map)){
           at_risk_map$set_name(paste(paste(variables, collapse = "_"), "at_risk", sep = "_") )
@@ -31,14 +30,15 @@ ltmle3_Node <- R6Class(
       cat(sprintf("\tSummary Measures: %s\n", paste(unlist(sapply(self$summary_functions, function(f){f$name})), collapse = ", ")))
 
     },
-  risk_set = function(data, time){
+  risk_set = function(data, time, subset_time = F){
+    if(subset_time) data <- data[t <= time]
     #Assumes data == data[t <= time,] and time is single number
     #Computes, for this node, the id's of those in data at risk of changing their value at this time
     at_risk_map <- self$at_risk_map
     missing_not_at_risk <- private$.ltmle_params$missing_row_implies_not_at_risk
     if(missing_not_at_risk){
-      keep_id <- unique(data[data$t == time, id])
-      data <- data[data$id %in% keep_id,]
+      keep_id <- unique(data[t == time, id])
+      data <- data[id %in% keep_id,]
     }
     if(is.null(at_risk_map)) risk_set <- unique(data$id)
     if(is.character(self$at_risk_map)) {
@@ -48,14 +48,13 @@ ltmle3_Node <- R6Class(
         risk_set <- data[t == time & data[,at_risk_map,with = F, drop = T]==1, "id", with = F, drop = T][[1]]
       } else{
         #Otherwise find the last value of risk indicator
-        data <- data[!duplicated(data$id, fromLast = T), c("id", at_risk_map), with = F]
-        #data <- data[, slice_tail(.SD), by = id, .SDcols = at_risk_map]
+        data <- data[, last(.SD), by = id, .SDcols = at_risk_map]
         risk_set <- data$id[data[[at_risk_map]] ==1]
       }
     } else{
-      risk_set <-data[which(at_risk_map$summarize(data,time)[,at_risk_map$name, with = F, drop = T]==1), c("id"), with = F, drop = T][[1]]
-
-    }
+      risk_set <-at_risk_map$summarize(data,time)# [,at_risk_map$name, with = F, drop = T]
+      risk_set <- risk_set$id[risk_set[[at_risk_map$name]]==1]
+      }
     return(unlist(risk_set, use.names = F))
 
   }

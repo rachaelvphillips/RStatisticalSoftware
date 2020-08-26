@@ -101,9 +101,9 @@ LF_fit_pooled <- R6Class(
       setnames(preds_stacked, self$name)
       return(preds_stacked)
     },
-    get_mean = function(tmle_task, fold_number) {
+    get_mean = function(tmle_task, fold_number, expand = T) {
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
-      learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
+      learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE, expand = T)
       learner <- self$learner
 
       preds <- learner$predict_fold(learner_task, fold_number)
@@ -123,10 +123,10 @@ LF_fit_pooled <- R6Class(
       if(drop & ncol(preds) == 1) preds <- unlist(preds, use.names = F)
       return(preds)
     },
-    get_density = function(tmle_task, fold_number, check_at_risk = T, to_wide = T, drop_id = F, drop_time = F, drop = T) {
+    get_density = function(tmle_task, fold_number, check_at_risk = T, to_wide = T, drop_id = F, drop_time = F, drop = T, expand = T) {
       # TODO: prediction is made on all data, so is_time_variant is set to TRUE
 
-      learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE)
+      learner_task <- tmle_task$get_regression_task(self$name, is_time_variant = TRUE, expand = expand)
 
       learner <- self$learner
 
@@ -183,11 +183,11 @@ LF_fit_pooled <- R6Class(
 
       return(likelihood)
     },
-    get_likelihood = function(tmle_task, fold_number = "full") {
+    get_likelihood = function(tmle_task, fold_number = "full", expand = T) {
       if (self$type == "mean") {
-        values <- self$get_mean(tmle_task, fold_number)
+        values <- self$get_mean(tmle_task, fold_number, expand = expand)
       } else {
-        values <- self$get_density(tmle_task, fold_number)
+        values <- self$get_density(tmle_task, fold_number, expand = expand)
       }
       if (!is.null(self$bound)) {
         values <- bound(values, self$bound)

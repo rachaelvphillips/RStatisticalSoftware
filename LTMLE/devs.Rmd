@@ -60,71 +60,21 @@ npsem = list(define_lnode("W", c("W"), time =0),
      define_lnode("A", c("A"), c("W"), time =0, summary_functions = make_summary_measure_baseline(c("W"))),
      
      define_lnode("processA", c("processA"),  c("A","W"), time = "pooled",times_to_pool = seq(1,max(data$t)), summary_functions = make_summary_measure_baseline(c("A", "W")),
-                  at_risk_map = make_summary_measure_last_value("at_risk", strict_past  = T)),
+                  at_risk_map = make_summary_measure_last_value("at_risk", strict_past  = T), missing_row_implies_not_at_risk = F),
      
 define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool = seq(1,max(data$t)), summary_functions = make_summary_measure_baseline(c("A", "W")),
-                  at_risk_map = make_summary_measure_last_value("at_risk", strict_past = T)))
+                  at_risk_map = make_summary_measure_last_value("at_risk", strict_past = T), missing_row_implies_not_at_risk = F))
 # Delta is the counting process which is 1 at death
 ```
 
-```{r}
-test<-data
-test
-setkey(test, "id", "t")
-key(test)
-(test[1:100, c("t", "id", "A"), with = F])
 
-```
-
-```{r}
-t = proc.time()
-for(i in 1:1000){
- l= test[, last(.SD), by = id]
-}
-proc.time() - t
-
-setkey(test, "t", "id")
-t = proc.time()
-for(i in 1:1000){
- v= test[!duplicated(test$id, fromLast = T, nmax = 10000),]
- setkey(v, "id", "t")
-}
-l
-v
-proc.time() - t
-```
-
-```{r}
-library(dplyr)
-data[, slice_tail(.SD), by = id]
-
-```
-
-```{r}
-key(rbind(task$data, task$data))
-
-```
-
-```{r}
-dat <- data[,]
-setkey(dat, "id", "t")
-dat
-dats <- dat[1, c("id", "t", "processN")]
-dats$processN =1
-dats$id = 0
-dat
-f=dat[1]
-f[rep(1,100)]
-```
 
 
 
 ```{r}
 task = ltmle3_Task$new(data, npsem )
-key(task$data)
-task$get_tmle_node("processN", include_time = T, expand = T, force_time_value = 5)
-task$get_regression_task("processN" , expand = T)$data
 
+task$get_regression_task("processN", expand = F)$data
 ```
 
 

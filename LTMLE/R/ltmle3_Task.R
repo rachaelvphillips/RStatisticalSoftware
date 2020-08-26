@@ -128,6 +128,7 @@ ltmle3_Task <- R6Class(
 
         if(compute_risk_set & !private$.force_at_risk){
           risk_set <- tmle_node$risk_set(data, time)
+
         }
         data <- data[, c("id", "t", node_var), with = F]
 
@@ -140,7 +141,7 @@ ltmle3_Task <- R6Class(
             } else {
               data$at_risk <- as.numeric(data$id %in% risk_set)
             }
-            set(data, , paste0("last_val_",node_var) , self$data[t <= time - 1, last(.SD), by = id, .SDcols = c(node_var)], use.names = F)
+            set(data, , paste0("last_val_",node_var) , self$data[t <= (time - 1), last(.SD), by = id, .SDcols = c(node_var)][,c(node_var),with = F])
           }
 
         } else {

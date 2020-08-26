@@ -107,24 +107,35 @@ Likelihood_pooled <- R6Class(
         stop("factor_list and task$npsem must have matching names")
       }
     },
-    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, drop_time = F, to_wide = F) {
+    get_likelihood = function(tmle_task, node, fold_number = "full", drop_id = F, drop_time = F, to_wide = F, expand = expand) {
+      # The nonexpanded likelihood is simply for fast montecarlo simulation when you don't need the degenerate probabilities
+      # As a result, these likelihoods will not be cached.
       likelihood_factor <- self$factor_list[[node]]
       # first check for cached values for this task
 
       likelihood_values <- self$cache$get_values(likelihood_factor, tmle_task, fold_number, node ="")
+      if(!expand & !is.null(likelihood_values)) {
+        #Only store the full likelihood
+        #Regression task should be cached so this is cheap
+        keep <- tmle_task$get_regression_task(target_node, expand = T)$data$at_risk == 1
+        likelihood_values <- likelihood_values[keep,]
+      }
+
       # note the above contains all values from the pooled task, not just this node.
 
       if (is.null(likelihood_values)) {
         # if not, generate new ones
 
-        likelihood_values <- likelihood_factor$get_likelihood(tmle_task, fold_number)
+        likelihood_values <- likelihood_factor$get_likelihood(tmle_task, fold_number, expand = expand)
 
         #nodes <- setdiff(names(likelihood_values), c("id", "t"))
         #names_of <- colnames(likelihood_values)
         #keep_cols <- intersect(c("t", "id", grep(node,names_of , value = T)), names_of)
         # Cache all likelihood values for all nodes in likelihood_values.
         #for(node in nodes) {
-        self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values, node = "")
+        if(expand){
+          self$cache$set_values(likelihood_factor, tmle_task, 0, fold_number, likelihood_values, node = "")
+        }
         #}
       }
       #Subset to only likelihood values of this node
@@ -146,14 +157,14 @@ Likelihood_pooled <- R6Class(
       if(drop_time & "t" %in% colnames(likelihood_values)) likelihood_values$t <- NULL
       return(likelihood_values)
     },
-    get_likelihoods = function(tmle_task, nodes = NULL, fold_number = "full", drop_id = F, drop_time = F, to_wide = F) {
+    get_likelihoods = function(tmle_task, nodes = NULL, fold_number = "full", drop_id = F, drop_time = F, to_wide = F, expand = T) {
       if (is.null(nodes)) {
         nodes <- self$nodes
       }
 
       if (length(nodes) > 1) {
         all_likelihoods <- lapply(nodes, function(node) {
-          self$get_likelihood(tmle_task, node, fold_number, to_wide = to_wide)
+          self$get_likelihood(tmle_task, node, fold_number, to_wide = to_wide, expand =  expand)
         })
         contains_t <- all(unlist(lapply(all_likelihoods, function(lik){
           "t" %in% colnames(lik)
@@ -186,7 +197,6 @@ Likelihood_pooled <- R6Class(
       }
     },
     get_possible_counterfactuals = function(nodes = NULL) {
-
       # get factors for nodes
       factor_list <- self$factor_list
       if (!is.null(nodes)) {

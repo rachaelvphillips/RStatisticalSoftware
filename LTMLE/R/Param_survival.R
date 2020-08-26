@@ -196,7 +196,8 @@ Param_survival <- R6Class(
         }
 
 
-        private$.D_cache[[tmle_task$uuid]] <- list(processN = D1 )
+
+        private$.D_cache[[tmle_task$uuid]] <- list(processN = D1)
 
 
 
