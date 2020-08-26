@@ -18,7 +18,7 @@
 #'
 
 
-halnet <- R6Class("HALnet", private = list(
+halnet <- R6Class("halnet", private = list(
   .params = NULL,
   .learners_spec = NULL,
 
