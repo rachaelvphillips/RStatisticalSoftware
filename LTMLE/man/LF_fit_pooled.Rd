@@ -121,7 +121,7 @@ Other Likelihood objects:
 \if{latex}{\out{\hypertarget{method-get_mean}{}}}
 \subsection{Method \code{get_mean()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_mean(tmle_task, fold_number)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_mean(tmle_task, fold_number, expand = T)}\if{html}{\out{</div>}}
 }
 
 }
@@ -137,7 +137,8 @@ Other Likelihood objects:
   to_wide = T,
   drop_id = F,
   drop_time = F,
-  drop = T
+  drop = T,
+  expand = T
 )}\if{html}{\out{</div>}}
 }
 
@@ -147,7 +148,7 @@ Other Likelihood objects:
 \if{latex}{\out{\hypertarget{method-get_likelihood}{}}}
 \subsection{Method \code{get_likelihood()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_likelihood(tmle_task, fold_number = "full")}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{LF_fit_pooled$get_likelihood(tmle_task, fold_number = "full", expand = T)}\if{html}{\out{</div>}}
 }
 
 }

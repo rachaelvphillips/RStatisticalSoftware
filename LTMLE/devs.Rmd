@@ -68,7 +68,14 @@ define_lnode("processN", c("processN"), c("A","W"),time = "pooled",times_to_pool
 ```
 
 
+```{r}
+dat <- copy(data[999:2000])
+dat[t <= 2, .val := last(.SD), by = id, .SDcols = "processN"]
+              setnafill(data, type = "locf")
 
+dat
+#last_vals <- self$data[t <= (time - 1), last(.SD), by = id, .SDcols = c(node_var)][,c(node_var),with = F]
+```
 
 
 ```{r}

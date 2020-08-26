@@ -86,7 +86,8 @@ All output behavior is identical to the standard Likelihood object.
   fold_number = "full",
   drop_id = F,
   drop_time = F,
-  to_wide = F
+  to_wide = F,
+  expand = expand
 )}\if{html}{\out{</div>}}
 }
 
@@ -102,7 +103,8 @@ All output behavior is identical to the standard Likelihood object.
   fold_number = "full",
   drop_id = F,
   drop_time = F,
-  to_wide = F
+  to_wide = F,
+  expand = T
 )}\if{html}{\out{</div>}}
 }
 
