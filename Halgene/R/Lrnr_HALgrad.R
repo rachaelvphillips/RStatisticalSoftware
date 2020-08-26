@@ -11,16 +11,21 @@ Lrnr_HALgrad <- R6Class(
   ),
   private = list(
     .properties = c(
-      "continuous", "binomial", "categorical", "weights"
+      "continuous"
     ),
 
     .train = function(task) {
       verbose <- getOption("sl3.verbose")
       params <- self$params
       MSE = private$MSE
-      X = rowMeans(task$X)
+      X = as.matrix(task$X)
+      y = as.vector(task$Y)
+      if(ncol(X) > 1) {
+        beta <- coefficients(nnls::nnls(X, y))
+        X = X %*% beta
+      }
+
       x=X
-      y = task$Y
       offset = params$offset
 
       relRiskStop = params$relRiskStop
