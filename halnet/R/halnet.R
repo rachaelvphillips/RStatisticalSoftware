@@ -243,7 +243,7 @@ halnet <- R6Class("halnet", private = list(
       lambda_max=1
     }
 
-    private$.learners_spec$lambda_path = round(exp(seq(log(lambda_max)+3, log(lambda_max*eps),
+    private$.learners_spec$lambda_path = round(exp(seq(log(lambda_max)+0.5, log(lambda_max*eps),
                                                    length.out = K)), digits = 10)
 
   }
