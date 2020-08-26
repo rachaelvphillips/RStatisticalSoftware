@@ -279,10 +279,9 @@ active = list(
   }
 ),
 public = list(
-  initialize =function(methylTask = NULL, screeners_to_include = c("screen.corP", "screen.biglasso"),   baseline_learner_choice = c("glmnet"), include_meta_learner = T, which_meta_learner = "HAL",
+  initialize =function(methylTask = NULL, screeners_to_include = c("screen.corP", "screen.biglasso"),  include_meta_learner = T, which_meta_learner = "HAL",
                        screen.pval.fdr_cutoff = c(0.1), screen.biglasso_alpha = c(0.5), screen.max_selected = 300000, screen.pca_dim = 1000,
-                       include_groups=T, group_PCA_dim = NULL,
-                     baseline_glmnet_lambda_choice = c("lambda.min"), alpha = c(1),
+                       include_groups=T, group_PCA_dim = NULL, alpha = c(1),
                      enforce_meta_monotone = T, eps = 1e-5, K = 200,
                      nworkers = 1){
 
