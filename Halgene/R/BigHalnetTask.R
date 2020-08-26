@@ -54,7 +54,7 @@ HALnet_Task <- R6Class("HALnet_Task", private = list(
 
     hal_fit = fit_hal(X=as.matrix(x), Y=as.vector(Y), cv_select = T, family =ifelse(self$params$outcome_type == "continuous", "gaussian", "binomial" ),yolo=F, return_lasso = T, max_degree=2)
     lambda_max = max(hal_fit$glmnet_lasso$lambda)
-    private.initial_fit <- list(biglasso = lrnr_trained, hal = hal_fit)
+    private$.initial_fit <- list(biglasso = lrnr_trained, hal = hal_fit)
     private$.lambda_max = lambda_max
 
   },
