@@ -487,7 +487,9 @@ print(interactions_index)
       }
       return(T)
     }
-    dot_argument_combos = dot_argument_combos[sapply(dot_argument_combos, keep_dot_arg )]
+    if(length(dot_argument_combos) >0){
+      dot_argument_combos = dot_argument_combos[sapply(dot_argument_combos, keep_dot_arg )]
+
     # add the . and .^max_degree basis functions
     basis_listrest = unlist(
       lapply(
@@ -500,6 +502,9 @@ print(interactions_index)
       ),
       recursive = F
     )
+    } else{
+      basis_listrest <-c()
+    }
     Y = as.vector(Y)
 
     # Prepare formula_hal9001 object to return
