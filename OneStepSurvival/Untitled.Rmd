@@ -1,0 +1,62 @@
+---
+title: "SurvivalSimulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+remotes::install_github("osofr/simcausal")
+library(simcausal)
+```
+
+# Sample survival data (W, A, Delta, Ttilde) from scratch
+
+```{r}
+
+
+```
+
+```{r}
+
+
+
+n = 50
+Wsamp = runif(n, 1, 25)
+remp <- function(n, emp_sample){
+  sample(emp_sample, n, replace = T)
+}
+
+# Should be the function P(A = 1 |W).
+#For simplicty, we will just assume P(A=1 | W) = logit(W)
+prob_map <- function(w) {plogis(w%%1)}
+prob_map <- Vectorize(prob_map)
+rTrtment <- function(n, value, prob){
+  rbinom(n, size = 1, prob= prob(value))
+}
+
+
+
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "remp", emp_sample = Wsamp) + 
+  node("A", distr = "rTrtment", value = W, prob =  prob_map) +
+  node("T", distr = "rweibull", shape = W + 5*A + W*A, scale = W + 5*A - 0.2*A*W) +
+    node("C", distr = "rweibull", shape = W + 5*A + W*A, scale = W + 5*A - 0.205*A*W)+
+  node("Tdiscrete", distr = "rconst", const = ceiling(T)) +
+    node("Cdiscrete", distr = "rconst", const = ceiling(C)) +
+  node("Ttilde", distr = "rconst", const = min(Tdiscrete, Cdiscrete)) +
+  node("Delta", distr = "rconst", const = as.numeric(Ttilde  == Tdiscrete) )
+
+
+setD <- set.DAG(D)
+dat <- sim(setD, n = 100)
+# only grab ID, W's, A, T.tilde, Delta
+dat
+
+
+```

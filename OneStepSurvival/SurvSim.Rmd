@@ -1,0 +1,272 @@
+---
+title: "SurvivalSimulation"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+#remotes::install_github("osofr/simcausal")
+library(simcausal)
+
+```
+
+
+The package sincausal allows one to simulate from user defined structural equation models. The main idea is to define a set of nodes which are causally ordered, each with their own distribution. Their distribution might depend on the values of past nodes. Therefore, the data must be simulated sequentially, following the causal ordering.
+
+For an introduction to the package, see the github:
+https://github.com/osofr/simcausal
+
+# Sample survival data (W, A, Delta, Ttilde) from scratch
+
+```{r}
+#Lets draw data from a parametric distribution using the package simcausal (github)
+# We will assume that this is the real data from our study
+
+
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min =1, max = 25) +
+  node("A", distr = "rbinom", size = 1, prob = 0.2 + W/50 ) +
+  node("T", distr = "rexp", rate = 0.05*(1 - 0.5*A + 0.3*W) )+
+  node("C", distr = "rexp",  rate = 0.03*(1 - 0.4*A + 0.2*W)) +
+  node("Delta", distr = "rconst", const = as.numeric(T<=C)  ) +
+  node("Ttilde", distr = "rconst", const = round(min(T,C,10) +1  ))
+setD <- set.DAG(D)
+# Lets draw 200 samples
+dat <- sim(setD, n = 200)
+head(dat)
+```
+
+```{r}
+#Lets assume we are outcome blind.
+# Thus, we are only given the outcome blind data (W, A)
+baseline_data <- dat[, c("W", "A")]
+#We can learn P(A |W) from the given data. For simplicty, lets use logistic regression
+fit <- glm("A ~ W", family = binomial(), data = baseline_data)
+#Lets store P(A=1|W) as a function of w
+PA1_W <- function(w){
+  as.vector(predict(fit, newdata = list(W = w), type = "response"))
+}
+PA1_W(0.5)
+
+```
+
+# Simulate survival data from a known (empirical distribution) of W and estimated conditional density of binary A and parametric forms for censoring/survival
+
+```{r}
+
+# Our goal is to sample (W, A, Delta, Ttilde) survival data structure where W and A are sampled from distributions estimated from the data.
+# Lets estimate P(W) with the empirical distribution so that sampling from it is trivial
+#Next, we assume that A is binary so that once we have drawn W = w, we can draw A using rbinom(1, size = 1, prob = P(A=1|W = w) ). 
+
+
+n = 50
+Wsamp = baseline_data$W
+#This function samples from an empirical sample
+remp <- function(n){
+  emp_sample <- Wsamp
+  sample(emp_sample, n, replace = T)
+}
+
+# Should be the function P(A = 1 |W).
+prob_map <- PA1_W
+#Make sure this map is vectorized if needed
+prob_map <- Vectorize(prob_map)
+#This function samples from A conditional on some value (i.e. W in this case) using our estimated conditional distribution of A
+rTrtment <- function(n, value, prob){
+  rbinom(n, size = 1, prob= prob(value))
+}
+
+
+#Now, we would like to draw survival data. Specifically, we want to draw a time of death T and time of censoring C which would then imply (Ttilde, Delta).
+#For this, we need to specify the conditional distributions P(T <= t| A, W) and 
+# P(C <= t| A, W). 
+# We can parametrically model these conditional distributions (as shown below) or we can estimate these distributions from data. In the case where we are outcome blind, we might still have access to real world survival data from a different study. We can use the estimated conditional distributions from this other data in our simulation. 
+
+
+#First, let us use a parametric form for these conditional distributions of survival and censoring. We will assume they are drawn from a Weibull distribution
+#where the shape and scale parameters depend on A and W
+D <- DAG.empty()
+D <- D +
+  # This node represents a sample of W's from our empirical distribution
+  node("W", distr = "remp") + 
+    # This node represents a sample of A's from our conditional distribution of A given the previously drawn W 
+  node("A", distr = "rTrtment", value = W, prob =  prob_map) +
+   # This node represents a drawn survival time from a parametric form of the conditional survival distribution evaluated at the previously drawn W and A
+  node("T", distr = "rweibull", shape = W + 5*A + W*A, scale = W + 5*A - 0.2*A*W) +
+  # Same as above but for censoring
+    node("C", distr = "rweibull", shape = W + 5*A + W*A, scale = W + 5*A - 0.205*A*W)+
+  # For simplicity, lets make the times discrete by rounding up
+  node("Tdiscrete", distr = "rconst", const = ceiling(T)) +
+    node("Cdiscrete", distr = "rconst", const = ceiling(C)) +
+  #Now we extract Ttilde and Delta
+  node("Ttilde", distr = "rconst", const = min(Tdiscrete, Cdiscrete)) +
+  node("Delta", distr = "rconst", const = as.numeric(Ttilde  == Tdiscrete) )
+
+
+setD <- set.DAG(D)
+#Now we simulate the data by drawing n = 200 samples
+dat <- sim(setD, n = 200)
+# only grab ID, W's, A, T.tilde, Delta
+head(dat)
+#Now we can extract our simulated observed data
+observed_data <- dat[, c("W", "A", "Ttilde", "Delta")]
+head(observed_data)
+```
+
+
+# Simulate data from an estimated survival distribution
+
+Now, lets assume we have an estimated conditional survival function. 
+
+```{r}
+#Lets assume our estimated survival is exactly the pweibull distribution we previously used for simulation for simplicty.
+est_surv <- function(t, A, W){
+  #This could be any estimated survival function (e.g. survival from cox fit)
+  1 - pweibull(t, shape = W + 5*A + W*A, scale = W + 5*A - 0.2*A*W)
+}
+# We need the CDF for sampling
+est_CDF <- function(t, A ,W){
+  return(1 - est_surv(t, A, W))
+}
+library(stats)
+#This function takes a (absolutely) continuous CDF and returns the inverse
+#Note if our survival data is discrete time then we will need to drawn in a different way using the hazard function representation.
+# Function to numerically compute inverse:
+est_cdf_inverse <- function(p, A ,W){
+  f_zero <- function(t){
+    est_CDF(t, A, W) - p
+  }
+  grid_endpoints <- c(0, 30)
+  root <- stats::uniroot(f_zero, interval = grid_endpoints)$root
+  return(root)
+} 
+#We need this to be vectorized
+est_cdf_inverse <- Vectorize(est_cdf_inverse)
+# True inverse using qweibull
+true_inverse <- function(p , A , W){
+  qweibull(p, shape = W + 5*A + W*A, scale = W + 5*A - 0.2*A*W)
+}
+#They are the same
+true_inverse(0.5, 1, 10)
+est_cdf_inverse(0.5, 1, 10)
+```
+
+
+````{r}
+
+#Inverse transform (CDF) sampling
+n_samples <- 100
+A = 1
+W = 10
+#draws n samples from condiitonal dist given A and W
+do_sample <- function(n, A, W){
+  #Draw uniform random variables and feed into inverse CDF
+  est_cdf_inverse(runif(n), A = A, W= W)
+}
+
+#simulated data summary stat
+samples <- do_sample(n_samples, A , W)
+mean(samples)
+sd(samples)
+
+# simulate from rweibull
+samples <- rweibull(n_samples, shape = W + 5*A + W*A, scale = W + 5*A - 0.2*A*W)
+
+mean(samples)
+sd(samples)
+
+#As expected, the two samples have similar means and variances
+#As they are sampling from the same distribution.
+```
+
+
+```{r}
+#Now, lets use our "do_sample" function to simulate the W A T C data.
+# We will use the parametric form of the censoring for simplicity. Though the previous work can be applied to C equally well.
+# The only changes are in the "T" node
+D <- DAG.empty()
+D <- D +
+  # This node represents a sample of W's from our empirical distribution
+  node("W", distr = "remp") + 
+    # This node represents a sample of A's from our conditional distribution of A given the previously drawn W 
+  node("A", distr = "rTrtment", value = W, prob =  prob_map) +
+   # This node represents a drawn survival time from a parametric form of the conditional survival distribution evaluated at the previously drawn W and A
+  node("T", distr = "do_sample", A = A, W = W) +
+  # Same as above but for censoring
+    node("C", distr = "rweibull", shape = W + 5*A + W*A, scale = W + 5*A - max(0.205*A*W, 0))+
+  # For simplicity, lets make the times discrete by rounding up
+  node("Tdiscrete", distr = "rconst", const = ceiling(T)) +
+    node("Cdiscrete", distr = "rconst", const = ceiling(C)) +
+  #Now we extract Ttilde and Delta
+  node("Ttilde", distr = "rconst", const = min(Tdiscrete, Cdiscrete)) +
+  node("Delta", distr = "rconst", const = as.numeric(Ttilde  == Tdiscrete) )
+
+
+setD <- set.DAG(D)
+#Now we simulate the data by drawing n = 200 samples
+dat <- sim(setD, n = 200)
+head(dat)
+#Now we can extract our simulated observed data
+observed_data <- dat[, c("W", "A", "Ttilde", "Delta")]
+head(observed_data)
+
+# We now have our survival data using a custom conditional survvial fit.
+
+```
+
+
+
+# Simulation of survival times via hazard estimates for censoring and survival
+
+```{r}
+time_points = 1:10
+hazard_f <- function(t, A, W){
+  #some hazard of t, A and W
+  plogis(-2 - 0.2*A + W/100)
+}
+hazard_f <- Vectorize(hazard_f)
+
+hazard_g <- function(t, A, W){
+  #some hazard of t, A and W
+  plogis(-6)
+}
+hazard_g <- Vectorize(hazard_f)
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min =1, max = 25) +
+  node("A", distr = "rbinom", size = 1, prob = 0.2 + W/50 ) +
+  node("dNt", t = time_points,  distr = "rbern",  p = hazard_f(t, A, W) , EFU  = T)+  node("dAt", t = time_points,  distr = "rbern",  p = hazard_g(t, A, W) , EFU  = T)
+
+# Lets draw 200 samples
+setD <- set.DAG(D, vecfun = c("hazard_f", "hazard_g"))
+dat <- sim(setD, n = 200)
+head(dat)
+dNt_data <- dat[, grep( "dNt", colnames(dat))]
+survival_times <- apply(dNt_data,1, function(row){
+  result = time_points[!is.na(row) & row ==1]
+  if(length(result)==0){
+    return(NA)
+  }
+  return(result)
+})
+
+dAt_data <- dat[, grep( "dAt", colnames(dat))]
+censor_times <- apply(dAt_data,1, function(row){
+  result = time_points[!is.na(row) & row ==1]
+  if(length(result)==0){
+    return(max(time_points))
+  }
+  return(result)
+})
+
+#NA means censoring happened first
+head(data.frame(cbind(survival_times, censor_times)))
+```
