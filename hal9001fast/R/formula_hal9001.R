@@ -584,7 +584,7 @@ fit <- function(x){
 
 }
 #' @export
-fit.formula_hal9001fast = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
+fit.formula_hal9001 = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
   fit_hal(formula = formula, family = family, yolo=F, ...)
 }
 
