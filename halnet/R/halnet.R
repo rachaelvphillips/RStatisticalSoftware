@@ -102,11 +102,11 @@ halnet <- R6Class("halnet", private = list(
     }
 
     if("screen.biglasso" %in% screeners_to_include){
-      print("hi")
+
       for(alpha in c(self$params$screen.biglasso_alpha)){
-        print("by")
+
         screeners = c(screeners, "screen.biglasso" =make_learner(BigLrnr_screener_biglasso, alpha = alpha, dfmax = self$params$screen.max_selected))
-        print(screeners)
+
       }
 
 
@@ -191,7 +191,7 @@ halnet <- R6Class("halnet", private = list(
 
     for(lrnr in baselearners){
       tmp = list()
-      print(group_subsetters)
+
       if(length(group_subsetters)==0){
         tmp = lrnr
       }
@@ -316,7 +316,7 @@ public = list(
       delayed_lrnr= self$learners_spec$sl3_delayed_learner
       sched <- Scheduler$new(delayed_lrnr, FutureJob, nworkers = nworkers, verbose = verbose)
       cv_fit <- sched$compute()
-      print("no")
+
       private$.learners_spec$sl3_superlearner = cv_fit
     }
     else{
