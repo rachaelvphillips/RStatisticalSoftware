@@ -86,8 +86,8 @@ LF_emp <- R6Class(
       #weights <- tmle_task$get_regression_task(self$name)$weights
       probs <- data.table(probs )
       setnames(probs, self$name)
-      probs$id = observedfull$id
-      probs$t = observedfull$t
+      probs$id <- observedfull$id
+      probs$t <- observedfull$t
 
      # probs$t = NULL
       return(probs)

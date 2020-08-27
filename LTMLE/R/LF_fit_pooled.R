@@ -140,7 +140,6 @@ LF_fit_pooled <- R6Class(
       data <-  learner_task$get_data()
 
 
-
       if (outcome_type$type == "binomial") {
         likelihood <- ifelse(observed == 1, preds, 1 - preds)
       } else if (outcome_type$type == "categorical") {
@@ -156,7 +155,7 @@ LF_fit_pooled <- R6Class(
       if(check_at_risk & "at_risk" %in% colnames(data) ) {
         # By setting check_at_risk = F then one can obtain the counterfactual predictions
         # conditioned on everyone being at risk.
-        names_last_val <- paste0("last_val", learner_task$nodes$outcome)
+        names_last_val <- paste0("last_val_", learner_task$nodes$outcome)
         # TODO Support multivariate outcome
         assertthat::assert_that(all(names_last_val %in% colnames(data)), msg = "If at_risk is a column then last_val must be as well.")
         not_at_risk <- which(data$at_risk == 0)

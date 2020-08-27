@@ -1,4 +1,7 @@
 
+
+#' @importFrom R6 R6Class
+#' @import sl3
 Lrnr_hal9001fast <- R6::R6Class(
   classname = "Lrnr_hal9001fast", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,

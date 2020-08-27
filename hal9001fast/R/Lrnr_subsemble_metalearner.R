@@ -1,4 +1,5 @@
-
+#' @importFrom R6 R6Class
+#' @import sl3
 #' @export
 Lrnr_subsemble_hal_metalearner <- R6::R6Class(
   classname = "Lrnr_subsemble_hal_metalearner", inherit = Lrnr_subsemble_metalearner,

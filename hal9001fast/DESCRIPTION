@@ -42,7 +42,8 @@ Imports:
   methods,
   assertthat,
   origami (>= 1.0.3),
-  glmnet
+  glmnet,
+  R6
 Suggests:
   testthat,
   knitr,

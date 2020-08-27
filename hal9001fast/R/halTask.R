@@ -13,7 +13,8 @@ make_learner_subsemble_hal <- function(lrnr, task, k = 5, num_preds){
   return(list(subsemble_lrnr = final_lrnr, cv_task = new_task))
 }
 
-
+#' @importFrom R6 R6Class
+#' @import sl3
 #' @export
 sl3_hal_Task <- R6::R6Class(
   classname = "sl3_hal_Task",
@@ -36,8 +37,10 @@ sl3_hal_Task <- R6::R6Class(
   )
 )
 #' Custom subsemble meta learner for hal
+#' @importFrom R6 R6Class
+#' @import sl3
 #' @export
-Lrnr_hal9001_subsemble_collapser <- R6Class(
+Lrnr_hal9001_subsemble_collapser <- R6::R6Class(
   classname = "Lrnr_hal9001_collapser", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
