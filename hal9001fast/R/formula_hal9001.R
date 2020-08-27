@@ -571,23 +571,24 @@ print.formula_hal9001 <- function(formula, expand = F){
 
   return(invisible(NULL))
 }
-
+#' @export
 model.matrix.formula_hal9001 <- function(formula, new_X = NULL){
   if(!is.null(new_X)){
     return(make_design_matrix(as.matrix(new_X), formula$basis_list))
   }
   make_design_matrix(as.matrix(formula$X), formula$basis_list)
 }
-
+#' @export
 fit <- function(x){
   UseMethod("fit",x)
 
 }
+#' @export
 fit.formula_hal9001fast = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
   fit_hal(formula = formula, family = family, yolo=F, ...)
 }
 
-
+#' @export
 importance <- function(fit, covariate, X = NULL, intervene_on = NULL){
 
   if(!is.null(intervene_on)){
@@ -626,7 +627,7 @@ importance <- function(fit, covariate, X = NULL, intervene_on = NULL){
 }
 
 
-
+#' @export
 summary.hal9001fast <- function(fit, lambda_index = NULL, vim = F, plot_vim = F){
   formula =  fit$formula
   preds = predict(fit, new_data = formula$X)
