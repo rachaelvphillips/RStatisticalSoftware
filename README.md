@@ -20,7 +20,7 @@ objects. The machine learning and cross validation can be done without ever load
 (and possibly screening with a BigMatrix supported screener). The Big.Matrix compatible sl3_Tasks and Big.Matrix compatible learners are completely general 
 and can be used for any purpose, not just this package.
 
-LTMLE:
+(OLD, see tmle3 fork for updated version) LTMLE:
 Building upon tlverse/tmle3, I am building a general implementation of likelihood-based LTMLE. This package will support very general longitudinal data structures
 (e.g. continuous-time, time dependent covariates, censoring, and counting process/monitoring processes).
 
