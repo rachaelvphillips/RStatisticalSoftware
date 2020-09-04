@@ -13,21 +13,22 @@ devtools::document()
 
 
 ```{r}
-n = 10
-X = cbind(rbinom(n,1,0.5))
+n = 10000
+X = cbind(rnorm(n), rnorm(n), rnorm(n),  rnorm(n),  rnorm(n),  rnorm(n))
+colnames(X) = 1:ncol(X)
 
-colnames(X) = c("x")
-Y = X[,1]^2 
+Y = rowSums(X)^2 
 data =cbind(Y,X)
 colnames(data) = c("y", colnames(X))
 ```
 
 
 ```{r}
-form = formula_hal("y ~  h(x)", smoothness_orders = , data, bins = NULL)
-
+t = proc.time()
+form = formula_hal("y ~  .^2", smoothness_orders = 1, data, bins = 100, screen_cor_pval = 0.1)
 form
-
+#fit <- fit_hal(form)
+proc.time() - t
 
 ```
 

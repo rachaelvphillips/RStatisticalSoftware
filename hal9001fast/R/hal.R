@@ -128,7 +128,6 @@
 fit_halfast <- function(X = NULL,
                     Y = NULL,
                     X_unpenalized = NULL,
-                    formula = NULL,
                     max_degree = 3,
                     max_edge_degree = 3,
                     smoothness_orders = NULL,
@@ -138,7 +137,7 @@ fit_halfast <- function(X = NULL,
                     n_folds = 10,
                     foldid = NULL,
                     use_min = TRUE,
-                    reduce_basis = ifelse(!is.null(X), 1/sqrt(ncol(X))/2, NULL),
+                    reduce_basis = ifelse(!is.null(X), 1/sqrt(nrow(X))/2, NULL),
                     screen_basis_main_terms = F,
                     screen_basis_interactions = F,
                     family = c("gaussian", "binomial", "cox"),
@@ -149,8 +148,6 @@ fit_halfast <- function(X = NULL,
                     id = NULL,
                     offset = NULL,
                     cv_select = TRUE,
-                    upper.limits = ifelse(!is.null(Y), max(Y)-min(Y), Inf),
-                    lower.limits = ifelse(!is.null(Y), min(Y)-max(Y), -Inf),
                     screen_cor_pval = NULL,
                     max_num_two_way = ifelse(!is.null(X) & nrow(X) <=1000, 100000, 50000),
                     max_total_basis =  ifelse(!is.null(X) & nrow(X) <=1000, 500000, 350000),
@@ -189,27 +186,6 @@ fit_halfast <- function(X = NULL,
     )
   )
 
-  if(!is.null(formula)){
-
-    if(class(formula)=="formula_hal9001"){
-
-      if(is.null(X)){
-        X = formula$X
-      }
-      if(is.null(Y)){
-        Y = formula$Y
-      }
-      basis_list = formula$basis_list
-      upper.limits = formula$upper.limits
-      lower.limits = formula$lower.limits
-      smoothness_orders = formula$smoothness_orders
-
-    }
-
-  } else{
-    formula = list(formula = paste0("Y ~ .^", max_degree), X = X, Y = Y, smoothness_orders = smoothness_orders)
-
-  }
 
   # cast X to matrix -- and don't start the timer until after
   if (!is.matrix(X)) {
@@ -242,11 +218,11 @@ fit_halfast <- function(X = NULL,
   time_start <- proc.time()
 
   # make design matrix for HAL
-  old_basis_list = NULL
+
   if (is.null(basis_list)) {
     if(!is.null(num_bins)){
       num_bins = suppressWarnings(round(num_bins) + rep(0,max_degree))
-      X_quant = quantizer(X, num_bins[1])
+      X_quant = quantizer(X, max(num_bins))
     } else{
       X_quant = X
     }
@@ -407,8 +383,6 @@ fit_halfast <- function(X = NULL,
         family = family,
         lambda = lambda,
         penalty.factor = penalty_factor,
-        upper.limits = upper.limits,
-        lower.limits = lower.limits,
         standardize=standardize,
         ...
       )
@@ -423,8 +397,6 @@ fit_halfast <- function(X = NULL,
         lambda = lambda,
         foldid = foldid,
         penalty.factor = penalty_factor,
-        upper.limits = upper.limits,
-        lower.limits = lower.limits,
         standardize=standardize,
         ...
       )

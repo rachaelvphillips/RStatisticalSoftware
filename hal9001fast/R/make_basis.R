@@ -11,21 +11,7 @@
 #'
 #' @return A \code{list} containing the basis functions generated from a set of
 #'  input columns.
-basis_list_cols_order <- function(cols, x, order_map, include_zero_order, include_lower_order) {
 
-
-  basis_list <- basis_list_cols(cols, x, order_map, include_zero_order, include_lower_order)
-  # Generate edge basis (including all lower order basis functions)
-  # Do not enforce that knot points are observed, as this is unlikely for edge points.
-  # Edge basis functions are important so just generate all of them from min of each column.
-  x_edge <- matrix(apply(x,2,min), nrow = 1)
-  basis_list_edge <- basis_list_cols(cols, x_edge, order_map, F, T)
-  basis_list <- union(basis_list, basis_list_edge)
-
-
-  # output
-  return(basis_list)
-}
 
 basis_list_cols <- function(cols, x, order_map, include_zero_order, include_lower_order = F) {
   # first, subset only to columns of interest

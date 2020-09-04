@@ -8,7 +8,6 @@ fit_halfast(
   X = NULL,
   Y = NULL,
   X_unpenalized = NULL,
-  formula = NULL,
   max_degree = 3,
   max_edge_degree = 3,
   smoothness_orders = NULL,
@@ -18,7 +17,7 @@ fit_halfast(
   n_folds = 10,
   foldid = NULL,
   use_min = TRUE,
-  reduce_basis = ifelse(!is.null(X), 1/sqrt(ncol(X))/2, NULL),
+  reduce_basis = ifelse(!is.null(X), 1/sqrt(nrow(X))/2, NULL),
   screen_basis_main_terms = F,
   screen_basis_interactions = F,
   family = c("gaussian", "binomial", "cox"),
@@ -29,8 +28,6 @@ fit_halfast(
   id = NULL,
   offset = NULL,
   cv_select = TRUE,
-  upper.limits = ifelse(!is.null(Y), max(Y) - min(Y), Inf),
-  lower.limits = ifelse(!is.null(Y), min(Y) - max(Y), -Inf),
   screen_cor_pval = NULL,
   max_num_two_way = ifelse(!is.null(X) & nrow(X) <= 1000, 1e+05, 50000),
   max_total_basis = ifelse(!is.null(X) & nrow(X) <= 1000, 5e+05, 350000),
@@ -48,12 +45,6 @@ fit_halfast(
 \item{X_unpenalized}{An input \code{matrix} with the same format as X, that
 directly get appended into the design matrix (no basis expansion). No L-1
 penalization is performed on these covariates.}
-
-\item{formula}{A formula_hal9001 object as returned by \code{formula_hal9001}
-specifying a model structure for hal9001.
-\code{formula_hal9001} allows one to specify which main terms and interactions are included,
-whether certain variables/interactions should be monotonely increasing or decreasing,
-and the smoothness order for each variable.}
 
 \item{max_degree}{The highest order of interaction terms for which the basis
 functions ought to be generated. The default (\code{NULL}) corresponds to
@@ -155,6 +146,12 @@ consult its documentation for a full list of options.}
 \item{yolo}{A \code{logical} indicating whether to print one of a curated
 selection of quotes from the HAL9000 computer, from the critically
 acclaimed epic science-fiction film "2001: A Space Odyssey" (1968).}
+
+\item{formula}{A formula_hal9001 object as returned by \code{formula_hal9001}
+specifying a model structure for hal9001.
+\code{formula_hal9001} allows one to specify which main terms and interactions are included,
+whether certain variables/interactions should be monotonely increasing or decreasing,
+and the smoothness order for each variable.}
 }
 \value{
 Object of class \code{hal9001}, containing a list of basis

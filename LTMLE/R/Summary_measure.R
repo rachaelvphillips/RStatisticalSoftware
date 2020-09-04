@@ -20,21 +20,12 @@ Summary_measure <- R6Class(
   portable = TRUE,
   class = TRUE,
   public = list(
-    initialize = function(column_names, summary_function, name = "Summary", strict_past = F, args_to_pass = NULL){
+    initialize = function(column_names, summary_function, name = "Summary", strict_past = F, args_to_pass = NULL, group_by_id = T){
         # Summary function must return data.table with nrow = 1 ...
        # for self$summarize to work correctly.
-        summary_function_wrap <- function(data, time,  ...){
-          if(all(is.na(data))) {
-            return(data)
-          }
-          result <- summary_function(data, time, ...)
-          if(!is.data.table(result)){
-            result <- data.table(matrix(result, nrow =1))
-          }
-          return(result)
-        }
+
         params <- sl3::args_to_list()
-        params$summary_function <- summary_function_wrap
+        params$summary_function <- summary_function
         private$.params <- params
     },
     set_name = function(name){
@@ -61,9 +52,13 @@ Summary_measure <- R6Class(
       # Needed since pass by promise would break next line apparently
 
 
+      if(self$params$group_by_id){
+        reduced_data <- data[,func(.SD, time, self$params$args_to_pass), by = id,
+                             .SDcols = self$params$column_names]
+      } else {
+        reduced_data <- func(data, time self$params$args_to_pass)
+      }
 
-      reduced_data <- data[,func(.SD, time, self$params$args_to_pass), by = id,
-                           .SDcols = self$params$column_names]
 
     # This code isn't needed unless func does not return a data.table, which can't happen.
      #  num_sample <- length(unique(reduced_data$id))

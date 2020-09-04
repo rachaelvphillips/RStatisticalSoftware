@@ -85,6 +85,7 @@ formula_hal <-
            generate_lower_degrees = F,
            exclusive_dot = F,
            custom_group = NULL, remove = NULL,...) {
+    other_args <- list(...)
     if(any(sapply(names(custom_group), function(name){nchar(name)!=1}))){
       stop("Custom group names must be single characters of length one.")
     }
@@ -529,11 +530,9 @@ print(interactions_index)
     form_obj$Y = (Y)
     form_obj$bins = bins
     form_obj$include_zero_order = include_zero_order
+    form_obj$other_args = other_args
     class(form_obj) <- "formula_hal9001"
-    fit.formula_hal9001 <- function(formula){
-      print("here")
 
-    }
     form_obj
     return(form_obj)
   }
@@ -571,6 +570,24 @@ print.formula_hal9001 <- function(formula, expand = F){
 
   return(invisible(NULL))
 }
+
+basis_list_cols_order <- function(cols, x, order_map, include_zero_order, include_lower_order) {
+
+
+  basis_list <- basis_list_cols(cols, x, order_map, include_zero_order, include_lower_order)
+  # Generate edge basis (including all lower order basis functions)
+  # Do not enforce that knot points are observed, as this is unlikely for edge points.
+  # Edge basis functions are important so just generate all of them from min of each column.
+  x_edge <- matrix(apply(x,2,min), nrow = 1)
+  basis_list_edge <- basis_list_cols(cols, x_edge, order_map, F, T)
+  basis_list <- union(basis_list, basis_list_edge)
+
+
+  # output
+  return(basis_list)
+}
+
+
 #' @export
 model.matrix.formula_hal9001 <- function(formula, new_X = NULL){
   if(!is.null(new_X)){
@@ -579,13 +596,21 @@ model.matrix.formula_hal9001 <- function(formula, new_X = NULL){
   make_design_matrix(as.matrix(formula$X), formula$basis_list)
 }
 #' @export
-fit <- function(x){
-  UseMethod("fit",x)
+fit_hal <- function(x){
+  UseMethod("fit_hal",x)
 
 }
 #' @export
-fit.formula_hal9001 = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
-  fit_hal(formula = formula, family = family, yolo=F, ...)
+fit_hal.formula_hal9001 = function(formula, family = ifelse(all(formula$Y %in% c(0,1)), "binomial", "gaussian"), ...){
+  other_args <- formula$other_args
+
+  do.call(function(...) {fit_halfast(X = formula$X, Y = formula$Y,
+              lower.limits = formula$lower.limits,
+              upper.limits = formula$upper.limits,
+              smoothness_orders = formula$smoothness_orders,
+              num_bins = formula$bins,
+              basis_list = formula$basis_list,
+              yolo=F, ...)}, other_args)
 }
 
 #' @export
