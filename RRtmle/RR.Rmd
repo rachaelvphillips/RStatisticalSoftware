@@ -1,0 +1,98 @@
+---
+title: "rel"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r}
+
+devtools::document()
+```
+
+```{r}
+library(simcausal)
+library(data.table)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -0.5, max = 0.5) +
+   node("W", distr = "rconst", const = round(W1,1)) +
+   node("U1", distr = "rnorm", mean = 0, sd = 0.5) +
+   node("U", distr = "rconst", const = round(U1,1)) +
+  node("A", distr = "rbinom", size = 1, prob = plogis((U ) ) )+
+  node("g", distr = "rconst", const = plogis((U )) )+
+  node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  (U + W)^2 - .4*A + 10*A*W ) )+
+  node("R1", distr = "rconst", const = plogis(.2 +  (U + W)^2 - .4 + 10*W ) )+
+    node("R0", distr = "rconst", const =  plogis(.2 + (U + W)^2  ) )+
+      node("RR", distr = "rconst", const = (R1/R0) ) +
+  node("LRR", distr = "rconst", const = log(RR) ) 
+
+setD <- set.DAG(D, vecfun = c("bound", "round"))
+data <- sim(setD, n = 350)
+data <- setDT(data)
+data$id <- data$ID
+data$ID <- NULL
+data$t <- 0
+data$id <- as.factor(data$id)
+table(data$R)
+table(data$A)
+table(data$R[data$A==1])
+table(data$R[data$A==0])
+setkey(data, id ,t)
+
+library(tmle3)
+library(sl3)
+library(uuid)
+npsem <- list(define_node("W", "W", time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("U"), time = 0), 
+              define_node("U", "U"),
+              define_node("R", "R", c("W", "A", "U"), time = 0), define_node("RR", "R", c("W", "U"), time = 0))
+task <- tmle3_Task$new(data, npsem, long_format = F)
+data
+```
+
+```{r}
+factor_list <- list(LF_emp$new("W"), 
+                    LF_fit$new("A", make_learner(Lrnr_glm)),
+                     LF_fit$new("R", make_learner(Lrnr_hal9001, max_degree = 2), type = "mean")
+)
+lik <- Likelihood$new(factor_list)
+lik <- lik$train(task)
+tlik <- Targeted_Likelihood$new(lik)
+```
+
+
+
+```{r}
+tlik <- Targeted_Likelihood$new(lik)
+param <- Param_RR$new(tlik, IPW_as_initial= T, smoothness = 0, num_fits = 5)
+
+```
+
+
+
+`
+
+
+
+```{r}
+library(future.apply)
+
+plan(multiprocess, workers = 5)
+tlik$updater$set_estimates(task)
+X = tlik$updater$current_estimates
+X <- X[[1]]
+as.data.table(X)
+as.data.table(tlik$get_likelihood(task, "R"))
+colMeans(X$IC)
+mean((X$psi - data$RR)^2)
+tlik$updater$update_step(tlik, task)
+```
+
+
+```{r}
+
+cbind(X$psi, data$RR)
+```
