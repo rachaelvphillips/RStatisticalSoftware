@@ -18,20 +18,24 @@ library(simcausal)
 library(data.table)
 D <- DAG.empty()
 D <- D +
-  node("W1", distr = "runif", min = -0.5, max = 0.5) +
-   node("W", distr = "rconst", const = round(W1,1)) +
-   node("U1", distr = "rnorm", mean = 0, sd = 0.5) +
+  node("W1", distr = "runif", min = -1, max = 1) +
+   node("W", distr = "rconst", const = round(W1/3,1)) +
+  node("Z1", distr = "runif", min = -0.3, max = 0.3) +
+   node("Z", distr = "rconst", const = round(Z1/5,1) +W  ) +
+   node("U1", distr = "rnorm", mean = 0, sd = 0.2) +
    node("U", distr = "rconst", const = round(U1,1)) +
-  node("A", distr = "rbinom", size = 1, prob = plogis((U ) ) )+
-  node("g", distr = "rconst", const = plogis((U )) )+
-  node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  (U + W)^2 - .4*A + 10*A*W ) )+
-  node("R1", distr = "rconst", const = plogis(.2 +  (U + W)^2 - .4 + 10*W ) )+
-    node("R0", distr = "rconst", const =  plogis(.2 + (U + W)^2  ) )+
+  node("A", distr = "rbinom", size = 1, prob = plogis((0) ) )+
+  node("g", distr = "rconst", const = plogis((0 )) )+
+  node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  (U + W - Z/2)^2 - Z*A - .4*A + 5*A*W ) )+
+    node("gR", distr = "rconst",  const = plogis(.2 +  (U + W- Z/2)^2 - Z*A +.4*A + 5*A*W ) )+
+
+  node("R1", distr = "rconst", const = plogis(.2 +  (U + W - Z/2)^2 - Z - .4 + 5*W ) )+
+    node("R0", distr = "rconst", const =  plogis(.2 + (U + W - Z/2)^2  ) )+
       node("RR", distr = "rconst", const = (R1/R0) ) +
   node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 350)
+data <- sim(setD, n = 500)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -46,53 +50,88 @@ setkey(data, id ,t)
 library(tmle3)
 library(sl3)
 library(uuid)
-npsem <- list(define_node("W", "W", time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("U"), time = 0), 
-              define_node("U", "U"),
-              define_node("R", "R", c("W", "A", "U"), time = 0), define_node("RR", "R", c("W", "U"), time = 0))
+npsem <- list(define_node("W", c("W", "U", "Z"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0), define_node("Z", "Z",  variable_type = variable_type("continuous")),
+             
+              define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")))
 task <- tmle3_Task$new(data, npsem, long_format = F)
 data
 ```
 
 ```{r}
 factor_list <- list(LF_emp$new("W"), 
-                    LF_fit$new("A", make_learner(Lrnr_glm)),
-                     LF_fit$new("R", make_learner(Lrnr_hal9001, max_degree = 2), type = "mean")
+                    LF_fit$new("A", make_learner(Lrnr_mean)),
+                     LF_fit$new("R", make_learner(Lrnr_ranger), type = "mean")
 )
 lik <- Likelihood$new(factor_list)
 lik <- lik$train(task)
 tlik <- Targeted_Likelihood$new(lik)
 ```
 
-
+```{r}
+task$get_regression_task("RR")$X
+```
 
 ```{r}
 tlik <- Targeted_Likelihood$new(lik)
-param <- Param_RR$new(tlik, IPW_as_initial= T, smoothness = 0, num_fits = 5)
-
+lrr <- LRR_risk$new(tlik, max_degree = 2, IPW_as_initial = T, type = "grad")
 ```
 
+```{r}
+lrr$initialize_best(task)
 
+```
+```{r}
 
-`
+lrr$update_likelihood(task, iter = 1)
+lrr$IPW_risk(task)
+lrr$efficient_risk(task)
+lrr$plugin_risk(task)
+```
+
+```{r}
+
+```
+```{r}
+param <- Param_RR$new(tlik, IPW_as_initial= F, smoothness = 0, num_fits = 1, type = "grad")
+risk <- param$risk_function
+
+risk$train_IPW(task)
+```
+
+```{r}
+risk$efficient_risk(task)
+
+beta = risk$gradient_descent_update(task, search_eps = T)
+risk$efficient_risk(task)
+```
+
+````{r}
+v = as.data.table(param$risk_function$predict_derived(task))
+
+mean((v[[1]] - data$RR)^2)
+
+v = as.data.table(param$risk_function$predict(task, type = "RR"))
+
+mean((v[[1]] - data$RR)^2)
+```
 
 
 
 ```{r}
 library(future.apply)
-
-plan(multiprocess, workers = 5)
 tlik$updater$set_estimates(task)
 X = tlik$updater$current_estimates
 X <- X[[1]]
 as.data.table(X)
-as.data.table(tlik$get_likelihood(task, "R"))
+mean((tlik$get_likelihood(task, "R") - data$gR)^2 )
 colMeans(X$IC)
 mean((X$psi - data$RR)^2)
 tlik$updater$update_step(tlik, task)
+param$risk_function$efficient_risk(task)
 ```
 
 
 ```{r}
 
-cbind(X$psi, data$RR)
+as.data.table(cbind(X$psi, data$RR))
 ```

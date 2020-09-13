@@ -8,7 +8,7 @@ Param_RR <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, outcome_node = "R", ...) {
+    initialize = function(observed_likelihood, outcome_node = "R", risk_function = NULL, ...) {
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
       cf_task <- observed_likelihood$training_task
       # cf_data where everyone is the maximum level of of the node so that they are above threshhold in every group
@@ -20,7 +20,11 @@ Param_RR <- R6Class(
       observed_likelihood$get_likelihood(cf_task1, "R")
       observed_likelihood$get_likelihood(cf_task0, "R")
 
-      private$.risk_function <- LRR_risk$new(observed_likelihood, ...)
+      if(is.null(risk_function)) {
+        private$.risk_function <- LRR_risk$new(observed_likelihood, ...)
+      } else {
+        private$.risk_function <- risk_function
+      }
       # get initial LRR
       #risk <- self$risk_function
       #risk$train(tmle_task, fold_number)
@@ -36,13 +40,13 @@ Param_RR <- R6Class(
       if(refit) {
         risk$train(tmle_task, fold_number)
       }
-      LRR <- risk$predict(tmle_task)
+      LRR <- risk$predict(tmle_task, type = "LRR")
       A <- tmle_task$get_tmle_node("A")
       g <- self$observed_likelihood$get_likelihood(tmle_task, "A")
       g <- bound(g, c(0.005, 1))
       H1 <- A/g * LRR
       H2 <- (1/g) * log(1 + exp(LRR))
-      HA <- cbind(H1, H2)
+      HA <- rowSums(cbind(H1, H2))
 
       return(list(R = HA))
     },
@@ -55,8 +59,8 @@ Param_RR <- R6Class(
       R <- tmle_task$get_tmle_node("R")
       #Assumes estimates is called before clever covariates every time
       HA <- (self$clever_covariates(tmle_task, fold_number, refit = T)$R)
-      H <- rowSums(HA)
-      IC <- H*(R - ER)
+      # H <- rowSums(HA)
+      # IC <- H*(R - ER)
       risk <- self$risk_function
       psi <- risk$predict(tmle_task, type = "RR")
       # Returns the value of the RR function and the IC equation that needed to be solved.
