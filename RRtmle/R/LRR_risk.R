@@ -28,7 +28,7 @@ LRR_risk <- R6Class(
        return(list(x_basis = x_basis, basis_list = basis_list))
 
     },
-    IPW_risk = function(tmle_task, fold_number = "full") {
+    IPW_risk = function(tmle_task, fold_number = "full", fit = NULL) {
       task <- tmle_task$get_regression_task("RR")
       R <- tmle_task$get_tmle_node("R", format = T)$R
       A <- tmle_task$get_tmle_node("A", format = T)$A
@@ -36,12 +36,8 @@ LRR_risk <- R6Class(
       keep <- R==1
       weights <- (R/g)
       Y <- A
-      basis_list <- private$.basis_list
-      beta <- as.vector(private$.beta)
-      lst <- self$design_matrix(tmle_task, basis_list = basis_list)
-      x_basis <- lst$x_basis
+      f <- self$predict(tmle_task, type = "LRR", fit = fit)
 
-      f <- as.vector(x_basis %*% beta[-1]) + beta[1]
       loss <- R * (-A*f + log(1 + exp(f)))/ g
       return(mean(loss))
     },
@@ -57,7 +53,7 @@ LRR_risk <- R6Class(
       loss <- ER1 * -1 * LRR + (ER1 + ER0) * log(1 + exp(LRR))
       return(mean(loss))
     },
-    efficient_risk = function(tmle_task, fold_number = "full", cache = F) {
+    efficient_risk = function(tmle_task, fold_number = "full", cache = F, fit = NULL) {
       #basis_list <- private$.basis_list
       #beta <- as.vector(private$.beta)
       #lst <- self$design_matrix(tmle_task, basis_list = basis_list)
@@ -71,10 +67,9 @@ LRR_risk <- R6Class(
       ER1 <- lik$get_likelihood(cf_task1, "R", fold_number)
       ER0 <- lik$get_likelihood(cf_task0, "R", fold_number)
       ER <- lik$get_likelihood(tmle_task, "R", fold_number)
-      LRR <- self$predict(tmle_task, type = "LRR")
+      LRR <- self$predict(tmle_task, type = "LRR", fit = fit)
       C1 <- A/g * (R - ER) + ER1
       C2 <- C1 + (1-A)/g * (R - ER) + ER0
-      Z <- -C1 + C2 * (1-plogis(LRR))
       risk  <- function(beta) {
         #f <- as.vector(x_basis %*% beta[-1]) + beta[1]
         f <- LRR
@@ -189,8 +184,7 @@ LRR_risk <- R6Class(
         updater$update_step(self$likelihood, tmle_task, fold_number)
       }
     },
-    # Uses HAL to obtain an estimate of the LRR.
-    # Either to obtain an initial fit or obtain an improved fit.
+    # Initializes RR hal fit at optimal values
     initialize_best = function(tmle_task, fold_number = "full") {
       type  <- self$params$type
       self$type <- "none"
@@ -202,7 +196,6 @@ LRR_risk <- R6Class(
       private$.useIPW <- F
       self$type <- "plugin"
       self$updater$set_estimates(tmle_task, fold_number)
-      self$updater$update_step(self$likelihood, tmle_task, fold_number)
       self$type <- type
       fit2 <- list(beta = private$.beta, basis_list = private$.basis_list)
       risk2 <- self$efficient_risk(tmle_task, fold_number)
@@ -212,6 +205,8 @@ LRR_risk <- R6Class(
       }
 
     },
+    # Uses HAL to obtain an estimate of the LRR.
+    # Either to obtain an initial fit or obtain an improved fit.
     train = function(tmle_task, fold_number = "full", type = NULL) {
       if(is.null(type)) {
         type <- self$params$type
@@ -271,6 +266,8 @@ LRR_risk <- R6Class(
       keep <- which(beta[-1]!=0)
       private$.basis_list <- basis_list[keep]
       private$.beta <- beta[c(1, keep+1)]
+      private$.IPWfit <- list(basis_list = private$.basis_list, beta = private$.beta)
+
       return(invisible(list(basis_list = private$.basis_list, beta = private$.beta)))
     },
     # Estimates the LRR using the plug-in risk function with nuisance parameter E[R|A,W]
@@ -321,6 +318,7 @@ LRR_risk <- R6Class(
       keep <- which(beta[-1]!=0)
       private$.basis_list <- basis_list[keep]
       private$.beta <- beta[c(1, keep+1)]
+      private$.pluginFit <- list(basis_list = private$.basis_list, beta = private$.beta)
       return(invisible(list(basis_list = private$.basis_list, beta = private$.beta)))
 
     },
@@ -334,11 +332,17 @@ LRR_risk <- R6Class(
       return(ER1 / ER0)
     },
     # This outputs a prediction of the RR based on however HAL was fit.
-    predict = function(tmle_task, type = c("LRR", "RR")) {
-      type <- match.arg(type)
+    predict = function(tmle_task, type = c("LRR", "RR"), fit_object = NULL) {
 
-      basis_list <- private$.basis_list
-      beta <- private$.beta
+      type <- match.arg(type)
+      if(!is.null(fit_object)) {
+        basis_list <- fit_object$basis_list
+        beta <- fit_object$beta
+      } else {
+        basis_list <- private$.basis_list
+        beta <- private$.beta
+      }
+
       lst <- self$design_matrix(tmle_task, basis_list = basis_list)
       x_basis <- lst$x_basis
       predictions <-  as.vector(beta[1] + x_basis %*% beta[-1])
@@ -346,7 +350,18 @@ LRR_risk <- R6Class(
         predictions <- exp(predictions)
       }
       return(predictions)
+    },
+    get_fit = function(type = c("cur", "IPW", "plugin")) {
+      type <- match.arg(type)
+      if(type == "cur") {
+        return(self$fit_object)
+      } else if (type == "IPW") {
+        return(private$.IPWfit)
+      } else {
+        return(private$.pluginFit)
+      }
     }
+
 
   ),
   private = list(
@@ -356,7 +371,9 @@ LRR_risk <- R6Class(
     .useIPW = NULL,
     .eps = NULL,
     .risk_history = c(),
-    .tmle_param = NULL
+    .tmle_param = NULL,
+    .IPWfit = NULL,
+    .pluginFit = NULL
   ),
   active = list(
     params = function(){

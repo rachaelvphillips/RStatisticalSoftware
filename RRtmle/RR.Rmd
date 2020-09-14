@@ -35,7 +35,7 @@ D <- D +
   node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 500)
+data <- sim(setD, n = 15000)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -60,7 +60,7 @@ data
 ```{r}
 factor_list <- list(LF_emp$new("W"), 
                     LF_fit$new("A", make_learner(Lrnr_mean)),
-                     LF_fit$new("R", make_learner(Lrnr_ranger), type = "mean")
+                     LF_fit$new("R", make_learner(Lrnr_glm), type = "mean")
 )
 lik <- Likelihood$new(factor_list)
 lik <- lik$train(task)
@@ -82,15 +82,38 @@ lrr$initialize_best(task)
 ```
 ```{r}
 
-lrr$update_likelihood(task, iter = 1)
-lrr$IPW_risk(task)
+lrr$update_likelihood(task, iter = 3)
+v = lrr$predict(task, "RR")
+mean((v - data$RR)^2)
 lrr$efficient_risk(task)
-lrr$plugin_risk(task)
+lrr$IPW_risk(task)
 ```
 
 ```{r}
 
+fit <- lrr$get_fit("IPW")
+v = lrr$predict(task, "RR", fit)
+mean((v - data$RR)^2)
+lrr$efficient_risk(task, fit = fit)
+lrr$IPW_risk(task, fit = fit)
+mean(-1 *data$R1 *log(v) + (data$R1 + data$R0) * (log(1 + exp(log(v)))))
+fit <- lrr$get_fit("plugin")
+print(" ")
+v = lrr$predict_derived(task)
+v = lrr$predict(task, "RR", fit)
+mean((v - data$RR)^2)
+lrr$efficient_risk(task, fit = fit)
+lrr$IPW_risk(task, fit = fit)
+mean(-1 *data$R1 *log(v) + (data$R1 + data$R0) * (log(1 + exp(log(v)))))
+print(" ")
+v = lrr$predict(task, "RR")
+mean((v - data$RR)^2)
+lrr$efficient_risk(task)
+lrr$IPW_risk(task)
+mean(-1 *data$R1 *log(v) + (data$R1 + data$R0) * (log(1 + exp(log(v)))))
+print(" ")
 ```
+
 ```{r}
 param <- Param_RR$new(tlik, IPW_as_initial= F, smoothness = 0, num_fits = 1, type = "grad")
 risk <- param$risk_function
