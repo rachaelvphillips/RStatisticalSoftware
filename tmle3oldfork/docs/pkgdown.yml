@@ -1,9 +1,0 @@
-pandoc: 2.2.1
-pkgdown: 1.4.1
-pkgdown_sha: ~
-articles:
-  framework: framework.html
-urls:
-  reference: http://tlverse.org/tmle3/reference
-  article: http://tlverse.org/tmle3/articles
-
