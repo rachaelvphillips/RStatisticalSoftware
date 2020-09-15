@@ -35,7 +35,7 @@ D <- D +
   node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 15000)
+data <- sim(setD, n = 1000)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -155,6 +155,35 @@ param$risk_function$efficient_risk(task)
 
 
 ```{r}
+likelihood <- lik
+rev <- make_revere(task, likelihood, "gen")
+```
 
-as.data.table(cbind(X$psi, data$RR))
+
+```{r}
+tsk =rev$revere_fold_task("full")
+lrnr = Lrnr_LRR_hal9001$new(max_degree = 1, method = "plugin",grad_desc = T)
+lrnr_tr =lrnr$train(tsk)
+```
+
+
+```{r}
+
+sl <- make_super_learner(list(lrnr), task, likelihood )
+trained <- sl$train(tsk)
+trained
+```
+
+```{r}
+trained$fit_object$learner_fits$CV_Stack$cv_risk(loss)
+
+
+```
+
+```{r}
+
+data.table(exp(lrnr$predict(tsk)), data$RR)
+mean((exp(lrnr$predict(tsk))- data$RR)^2)
+loss <- make_eff_loss(task, likelihood )
+mean(loss(lrnr$predict(tsk), NULL))
 ```

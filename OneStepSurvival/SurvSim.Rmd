@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 
-#remotes::install_github("osofr/simcausal")
+remotes::install_github("osofr/simcausal")
 library(simcausal)
 
 ```
@@ -249,6 +249,7 @@ D <- D +
 setD <- set.DAG(D, vecfun = c("hazard_f", "hazard_g"))
 dat <- sim(setD, n = 200)
 head(dat)
+
 dNt_data <- dat[, grep( "dNt", colnames(dat))]
 survival_times <- apply(dNt_data,1, function(row){
   result = time_points[!is.na(row) & row ==1]
@@ -269,4 +270,200 @@ censor_times <- apply(dAt_data,1, function(row){
 
 #NA means censoring happened first
 head(data.frame(cbind(survival_times, censor_times)))
+```
+
+# Estimating hazards
+
+```{r}
+
+library(sl3)
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min =1, max = 25) +
+  node("A", distr = "rbinom", size = 1, prob = 0.2 + W/50 ) +
+  node("T", distr = "rexp", rate = 0.05*(1 - 0.5*A + 0.3*W) )+
+  node("C", distr = "rexp",  rate = 0.03*(1 - 0.4*A + 0.2*W)) +
+  node("Delta", distr = "rconst", const = as.numeric(T<=C)  ) +
+  node("Ttilde", distr = "rconst", const = round(min(T,C,10) +1  ))
+setD <- set.DAG(D)
+# Lets draw 200 samples
+dat <- sim(setD, n = 200)
+head(dat)
+
+
+```
+
+
+
+
+```{r}
+data <- dat[,c("ID", "W", "A", "Delta", "Ttilde")]
+head(data)
+time_range <- range(data$Ttilde)
+times <- seq.int(min(time_range), max(time_range))
+list_of_data <- lapply(times, function(t) {
+  #copy data
+  data <- data
+  data$t <- t
+  # Outcome is 1 if and only if person dies at time t
+  data$dN <- as.numeric(data$Ttilde == t & data$Delta == 1)
+  data$dC <- as.numeric(data$Ttilde == t & data$Delta == 0)
+  return(data)
+})
+
+
+data_pooled <- do.call(rbind, list_of_data)
+head(data_pooled)
+
+# Estimate survival hazard
+covariates <- c("W", "A", "t")
+outcome <-  "dN"
+# Create sl3 regression task. The task essentially keeps track of the information needed for regression.
+# E.g. data, covariate names, outcome names, time and ids for cross validation.
+task_survival <- sl3_Task$new(data_pooled, covariates = covariates, outcome = outcome, outcome_type = "binomial", time = "t", id = "ID")
+
+covariates <- c("W", "A", "t")
+outcome <-  "dC"
+task_censoring <- sl3_Task$new(data_pooled, covariates = covariates, outcome = outcome, outcome_type = "binomial", time = "t", id = "ID")
+head(task_survival$data)
+```
+
+```{r}
+# For estimation, we only keep rows corresponding to times where the person is still alive/not censored
+keep_surv <-  data_pooled$t <= data_pooled$Ttilde
+data_pooled_training_surv <- data_pooled[keep_surv,]
+covariates <- c("W", "A", "t")
+outcome <-  "dN"
+task_survival_training <- sl3_Task$new(data_pooled_training_surv, covariates = covariates, outcome = outcome, outcome_type = "binomial", time = "t", id = "ID")
+# or cleaner
+task_survival_training <- task_survival[keep_surv]
+head(task_survival_training$data)
+tail(task_survival_training$data)
+dim(task_survival_training$data)
+
+
+
+# For estimation, we only keep rows corresponding to times where the person is still alive/not censored.
+# We usually assume that we observe whether someone is alive before they get censored Therefore, if someone has died at time t, they are no longer at risk of being censored at time t. As a result, we also remove all rows where people have died. Thus, the risk sets of censoring and survival are a bit different
+### This done so we have a time ordering in the likelihood. Only needed for discrete time.
+keep_censoring <-  data_pooled$t <= data_pooled$Ttilde & (data_pooled$dN != 1)
+task_censoring_training <- task_censoring[keep_censoring]
+head(task_censoring_training$data)
+tail(task_censoring_training$data)
+dim(task_censoring_training$data)
+```
+
+```{r}
+# We now have 4 tasks, 2 for estimation and 2 for prediction.
+# Removing rows is needed so that the estimation is correct.
+# However we want the hazard predictions at all time points for all people, so dont remove rows.
+task_survival
+task_survival_training
+task_censoring
+task_censoring_training
+```
+
+
+```{r}
+#survival training
+# Now, we need a binomial learner.
+lrnr_glm <- make_learner(Lrnr_glm, family = binomial())
+# train using training task
+lrnr_glm_trained <- lrnr_glm$train(task_survival_training)
+# predict using full task
+hazard_survival_preds <- lrnr_glm_trained$predict(task_survival)
+long_preds <- (data.frame(id = task_survival$id, t = task_survival$time, preds = hazard_survival_preds))
+print(head(long_preds))
+wide_preds <- reshape(long_preds, timevar = "t", idvar = "id", direction = "wide")
+colnames(wide_preds) <- c("id", times)
+head(wide_preds)
+
+# It looks like the hazard probability increases with time.
+survival_preds <- data.frame(cbind(wide_preds[,1], t(apply(1 -wide_preds[,-1],1, cumprod))))
+colnames(survival_preds) <- c("id", times)
+head(survival_preds)
+```
+
+```{r}
+#censoring training
+# Now, we need a binomial learner.
+lrnr_glm <- make_learner(Lrnr_glm)
+# train using training task
+lrnr_glm_trained <- lrnr_glm$train(task_censoring_training)
+# predict using full task
+hazard_censoring_preds <- lrnr_glm_trained$predict(task_censoring)
+long_preds <- (data.frame(id = task_censoring$id, t = task_censoring$time, preds = hazard_censoring_preds))
+print(head(long_preds))
+wide_preds <- reshape(long_preds, timevar = "t", idvar = "id", direction = "wide")
+colnames(wide_preds) <- c("id", times)
+head(wide_preds)
+
+# It looks like the hazard probability increases with time.
+censoring_survival_preds <- data.frame(cbind(wide_preds[,1], t(apply(1 -wide_preds[,-1],1, cumprod))))
+colnames(censoring_survival_preds) <- c("id", times)
+head(censoring_survival_preds)
+```
+
+
+```{r}
+#survival
+#Lets use xgboost now with depth 3
+lrnr_xgboost <- make_learner(Lrnr_xgboost, max.depth = 3)
+lrnr_xgboost_trained <- lrnr_xgboost$train(task_survival_training)
+hazard_survival_preds <- lrnr_xgboost_trained$predict(task_survival)
+long_preds <- (data.frame(id = task_survival$id, t = task_survival$time, preds = hazard_survival_preds))
+print(head(long_preds))
+wide_preds <- reshape(long_preds, timevar = "t", idvar = "id", direction = "wide")
+colnames(wide_preds) <- c("id", times)
+head(wide_preds)
+survival_preds <- data.frame(cbind(wide_preds[,1], t(apply(1 -wide_preds[,-1],1, cumprod))))
+colnames(survival_preds) <- c("id", times)
+head(survival_preds)
+```
+
+```{r}
+
+# And hal9001 (highly adaptive lasso)
+
+
+lrnr_hal9001<- make_learner(Lrnr_hal9001, max_degree = 2)
+lrnr_hal9001_trained <- lrnr_hal9001$train(task_survival_training)
+hazard_survival_preds <- lrnr_hal9001_trained$predict(task_survival)
+long_preds <- (data.frame(id = task_survival$id, t = task_survival$time, preds = hazard_survival_preds))
+print(head(long_preds))
+wide_preds <- reshape(long_preds, timevar = "t", idvar = "id", direction = "wide")
+colnames(wide_preds) <- c("id", times)
+head(wide_preds)
+survival_preds <- data.frame(cbind(wide_preds[,1], t(apply(1 -wide_preds[,-1],1, cumprod))))
+colnames(survival_preds) <- c("id", times)
+head(survival_preds)
+```
+
+
+```{r}
+# We can also do the estimation without sl3
+covariates <- c("W", "A", "t")
+outcome <-  "dN"
+id <- data_pooled$ID
+
+data_pooled_glm <- data_pooled[, c(covariates, outcome)]
+data_pooled_training_surv_glm <- data_pooled_training_surv[, c(covariates, outcome)]
+head(data_pooled)
+head(data_pooled_training_surv)
+
+# need to add intercpt manually
+x_train = cbind(rep(1, nrow(data_pooled_training_surv_glm)), data_pooled_training_surv_glm[, covariates])
+colnames(x_train) <- c("intercept", covariates)
+y_train = data_pooled_training_surv_glm[, outcome]
+fit <- glm.fit(x_train, y_train, family = binomial())
+x_pred = cbind(rep(1, nrow(data_pooled_glm)), data_pooled_glm[, covariates])
+coefs <- fit$coefficients
+coefs
+preds <- data.frame(t = data_pooled_glm$t, id =id, preds = plogis(as.matrix(x_pred) %*% coefs ))
+wide_preds <- reshape(preds, idvar = "id", timevar = "t", direction = "wide")
+head(wide_preds)
+survival_preds <- data.frame(cbind(wide_preds[,1], t(apply(1 -wide_preds[,-1],1, cumprod))))
+colnames(survival_preds) <- c("id", times)
+head(survival_preds)
 ```

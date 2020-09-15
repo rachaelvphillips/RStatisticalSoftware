@@ -12,7 +12,11 @@ LazyData: true
 RoxygenNote: 7.1.1
 Depends: R,
         R6, 
-        tmle3
+        tmle3,
+        sl3,
+        origami,
+        delayed,
+        data.table
 Imports:
     sl3,
     delayed,

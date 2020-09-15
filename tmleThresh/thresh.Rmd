@@ -55,37 +55,51 @@ dat
 
 
 ```{r}
-spec <- tmle3_Spec_Threshold$new()
+spec <- tmle3_Spec_Threshold$new(threshold_values  = quantile(dat$S, c(0.05, 0.1, 0.2, 0.4, 0.6)))
 dat
-```
-
-```{r}
-task <- spec$make_tmle_task(dat, list("W" = "W", "A" = "S", "Y" = "Y"))
-task$get_regression_task("A")$data
-task$get_regression_task("Y")$data
-lik <- spec$make_initial_likelihood(task, list("A" = make_learner(Lrnr_glm, family = binomial()), "Y" = make_learner(Lrnr_glm, family = binomial())))
-updater <- spec$make_updater()
-tlik <- spec$make_targeted_likelihood(lik, updater)
-spec$make_params(task, tlik)
-```
-
-```{r}
-tlik$updater$update_step(tlik, task)
-param <- tlik$updater$tmle_params[[1]]
-est <- (param$estimates(task))
-colMeans(est$IC)
-est$psi
+lrnr_bin <- make_learner(Lrnr_glm_fast)
+fit <- tmle3(spec, dat, list(W = "W", A = "S", Y = "Y"), list(A = lrnr_bin, Y = lrnr_bin))
 ```
 
 
 ```{r}
-task$get_regression_task("Y")$weights
-
-
+task <- fit$tmle_task
+colMeans(fit$tmle_params[[1]]$estimates(task)$IC)
+apply(fit$tmle_params[[1]]$estimates(task)$IC, 2, var)
 ```
 
 
 
+
+
+
+
+
+
+```{r}
+quantile(dat$S, c(0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9))
+cutoff = -3
+
+
+summary_from_estimates(task, list(est), simultaneous_ci = F , param_types = "threshold")
+
+np_estimate <- function(task, cutoff) {
+  A <- task$get_tmle_node("A")
+  Y <- task$get_tmle_node("Y")
+  sum(Y * (A >= cutoff)) / sum(A >= cutoff)
+}
+np_estimate(task, -3)
+```
+
+
+
+
+
+
+```{r}
+
+adjusted_sim(1000)
+```
 
 
 
