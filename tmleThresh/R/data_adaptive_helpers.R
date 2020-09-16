@@ -10,6 +10,7 @@ learner_marker_task_generator <- function(learned_marker_node = "A", learned_mar
       column_names <- task$add_columns(new_data)
 
       new_task <- task$next_in_chain(outcome = learned_marker_node, column_names = column_names)
+      data <- new_task$data
 
       return(new_task)
     }
@@ -42,3 +43,4 @@ learner_marker_task_generator <- function(learned_marker_node = "A", learned_mar
     return(outA)
   }
 }
+

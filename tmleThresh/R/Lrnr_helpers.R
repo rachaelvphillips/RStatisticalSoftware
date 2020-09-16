@@ -1,3 +1,7 @@
+# Some helper
+
+
+
 #' Derived Likelihood Factor Estimated from Data + Other Likelihood values, using sl3.
 #'
 #' Uses an \code{sl3} learner to estimate a likelihood factor from data.
@@ -39,7 +43,7 @@ LF_fit_derived <- R6::R6Class(
   class = TRUE,
   inherit = LF_base,
   public = list(
-    initialize = function(name, learner, base_likelihood, task_generator, cast_to_long = T, byrow = T, ..., type = "density") {
+    initialize = function(name, learner, base_likelihood, task_generator, cast_to_long = T, byrow = F, ..., type = "density") {
       super$initialize(name, ..., type = type)
       private$.learner <- learner
       private$.base_likelihood <- base_likelihood
@@ -68,13 +72,15 @@ LF_fit_derived <- R6::R6Class(
     get_mean = function(tmle_task, fold_number, ...) {
       derived_task <- self$task_generator(tmle_task, self$base_likelihood)
       learner <- self$learner
+      preds <- sl3::unpack_predictions(learner$predict_fold(derived_task, fold_number))
       if(self$cast_to_long) {
-        preds <- as.data.table(as.vector(learner$predict_fold(derived_task, fold_number)))
-      } else {
-        preds <- as.data.table(learner$predict_fold(derived_task, fold_number))
-
+        if(self$byrow) {
+          preds <- as.vector(t(preds))
+        } else {
+          preds <- as.vector(preds)
+        }
       }
-
+      preds <- as.data.table(preds)
       setnames(preds, self$name)
 
       return(preds)
@@ -84,7 +90,7 @@ LF_fit_derived <- R6::R6Class(
       learner <- self$learner
       if(self$cast_to_long) {
         preds <- learner$predict_fold(derived_task, fold_number)
-
+        preds <- sl3::unpack_predictions(preds)
         if(self$byrow) {
           preds <- as.vector(t(preds))
         } else {
@@ -127,3 +133,138 @@ LF_fit_derived <- R6::R6Class(
     .byrow = NULL
   )
 )
+
+
+
+Lrnr_wrapper <- R6Class(
+  classname = "Lrnr_wrapper",
+  inherit = Lrnr_base, portable = TRUE,
+  class = TRUE,
+  public = list(
+    initialize = function(ncol, ...) {
+
+      params <- list(ncol = ncol, ...)
+      super$initialize(params = params, ...)
+    }
+  ),
+
+  active = list(
+    name = function() {
+
+      name <- "Wrapper"
+      return(name)
+    }
+  ),
+  private = list(
+
+    .train = function(task) {
+      fit_object = list()
+      return(fit_object)
+    },
+
+    .predict = function(task) {
+      ncol <- self$params$ncol
+      X <- ((task$X))
+
+      out <- (apply(X, 2, function(v) {
+        v <- matrix(v, ncol = ncol)
+        predictions <- pack_predictions(v)
+      }))
+
+      return(out)
+    },
+    .required_packages = NULL
+  )
+)
+
+Lrnr_chainer <- R6Class(
+  classname = "Lrnr_chainer",
+  inherit = Lrnr_base, portable = TRUE,
+  class = TRUE,
+  public = list(
+    initialize = function(cutoffs = cutoffs, strata_variable = strata_variable, ...) {
+
+      params <- list(strata_variable = strata_variable, cutoffs = cutoffs,...)
+      super$initialize(params = params, ...)
+    }
+  ),
+
+  active = list(
+    name = function() {
+
+      name <- "Wrapper"
+      return(name)
+    }
+  ),
+  private = list(
+
+    .train = function(task) {
+      fit_object = list()
+      return(fit_object)
+    },
+
+    .chain = function(task) {
+      args <- self$params
+      cutoffs <- args$cutoffs
+
+      strata_variable <- args$strata_variable
+
+      if(inherits(task, "delayed")) {
+        task <- task$compute()
+      }
+      if(inherits(task, "sl3_revere_Task")) {
+        new_generator <- function(task, fold_number) {
+          task <- task$revere_fold_task(fold_number)
+          data <- task$data
+          cutoffs <- args$cutoffs
+          data_list <- list()
+
+          for(cutoff in cutoffs) {
+            Xcopy <- copy(data)
+            Xcopy$bin <- cutoff
+            Xcopy$Ind <- as.numeric(Xcopy[[strata_variable]] >= cutoff)
+            Xcopy[[strata_variable]] <- NULL
+            data_list[[as.character(cutoff)]] <- Xcopy
+          }
+          data <- rbindlist(data_list)
+
+          nodes <- task$nodes
+
+          nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
+          task <- sl3_Task$new(data, nodes = nodes)
+
+          return(task)
+        }
+        task <- sl3_revere_Task$new(new_generator, task)
+
+
+      } else {
+        args <- self$params
+        strata_variable <- args$strata_variable
+
+        data <- task$data
+        cutoffs <- args$cutoffs
+        data_list <- list()
+
+        for(cutoff in cutoffs) {
+          Xcopy <- copy(data)
+          Xcopy$bin <- cutoff
+          Xcopy$Ind <- as.numeric(Xcopy[[strata_variable]] >= cutoff)
+          Xcopy[[strata_variable]] <- NULL
+          data_list[[as.character(cutoff)]] <- Xcopy
+        }
+        data <- rbindlist(data_list)
+
+        nodes <- task$nodes
+
+        nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
+        task <- sl3_Task$new(data, nodes = nodes)
+
+      }
+
+      return(task)
+    },
+    .required_packages = NULL
+  )
+)
+

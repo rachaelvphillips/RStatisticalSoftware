@@ -15,6 +15,7 @@ devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
 
 
 ```{r}
+devtools::install_github("tlverse/sl3", ref = "devel")
 library(tmle3)
 library(sl3)
 library(hal9001fast)

@@ -44,8 +44,10 @@ dat
 ```
 
 
-```{r}
+```{r, include = F}
 library(data.table)
+library(origami)
+library(delayed)
 cutoffs <-  quantile(dat$S, c(0.05, 0.1, 0.2, 0.4, 0.6))
 
 npsem <- list(define_node("W", "W", c()),
@@ -55,7 +57,7 @@ npsem <- list(define_node("W", "W", c()),
 dat
 task <- tmle3_Task$new(as.data.table(dat), npsem)
 lrnr_bin <- make_learner(Lrnr_glm_fast)
-cv_lrnr <- make_learner(Pipeline, Lrnr_cv$new(make_learner(Lrnr_glm)))
+cv_lrnr <- make_learner(Pipeline, Lrnr_cv$new(make_learner(Lrnr_glm), full_fit = T))
 
 factor_list <- list(W = LF_emp$new("W"), A_learned = LF_fit$new("A_learned", cv_lrnr, type = "mean"))
 likelihood <- Likelihood$new(factor_list)
@@ -65,29 +67,35 @@ generator_R <- learner_marker_task_generator(learned_marker_node = "A_learned", 
 
 generator_A <- learner_marker_task_generator(learned_marker_node = "A_learned", node = "A")
 
-lf_R <- LF_fit_derived$new("Y", Lrnr_cv$new(Lrnr_thresh$new(lrnr_bin, 
+  
+```
+
+```{r, include = F}
+lf_A <- LF_derived$new("A", Lrnr_CDF$new(lrnr_bin,
+                                   10,  cutoffs, cv = F), likelihood, generator_A, type = "mean")
+lf_R <- LF_derived$new("Y", Lrnr_thresh$new(Lrnr_cv$new(make_learner(Pipeline, lrnr_bin, make_learner(Lrnr_wrapper, 5))), 
                                     strata_variable = "A",
-                                    cutoffs = cutoffs)), likelihood, generator_R)
-lf_A <- LF_fit_derived$new("A", Lrnr_cv$new(Lrnr_CDF$new(lrnr_bin, 
-                                   10,  cutoffs)), likelihood, generator_A)
-task$get_regression_task("Y")$data
-likelihood$add_factors(list(R = lf_R, lf_A))
+                                    cutoffs = cutoffs), likelihood, generator_R, type = "mean")
+
+lf_R <- LF_derived$new("Y", Lrnr_thresh$new(make_learner(Stack, lrnr_bin, lrnr_bin),
+                                    strata_variable = "A", cv = T,
+                                    cutoffs = cutoffs), likelihood, generator_R, type = "mean")
+Lrnr_chainer
+likelihood$add_factors(list(lf_A, lf_R))
 ```
 
 ```{r}
-rev <- generator_A(task, likelihood)
-rev$revere_fold_task("validation")$data
-data.table(likelihood$get_likelihood(task, "A_learned", fold_number = "validation"))
-as.data.table(likelihood$get_likelihood(task, "A", fold_number = "validation"))
+#as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "validation"), nrow = 1500))
+#as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "validation"), nrow = 1500))
+
+as.data.table(matrix(likelihood$get_likelihood(task, "Y", fold_number = "validation"), nrow = 1500))
+
+as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "validation"), nrow = 1500))
 ```
 
 ```{r}
-task$get_regression_task("Y")$data
+as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = 1), nrow = 1500))
 
-generator <- learner_marker_task_generator()
-lf_derived <- LF_derived$new("R", Lrnr_thresh$new(make_learner(Lrnr_glm), 
-                                    strata_variable = "A",
-                                    cutoffs = cutoffs), )
 ```
 
 
