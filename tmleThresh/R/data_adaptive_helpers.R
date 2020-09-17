@@ -1,8 +1,11 @@
 
 # Generated data-adaptive covariate "A"
-learner_marker_task_generator <- function(learned_marker_node = "A", learned_marker_var = "A", node = "Y") {
+learner_marker_task_generator <- function(learned_marker_node = "A", learned_marker_var = "A", node = "Y", data_adaptive = T) {
   outA <- function(tmle_task, likelihood) {
     generator <- function(task, fold_number) {
+      if(!data_adaptive) {
+        return(task)
+      }
       preds <- likelihood$get_likelihood(tmle_task,  learned_marker_node, fold_number)
       new_data <- as.data.table(preds)
       setnames(new_data, learned_marker_node)
@@ -20,7 +23,9 @@ learner_marker_task_generator <- function(learned_marker_node = "A", learned_mar
 
   outR <- function(tmle_task, likelihood) {
     generator <- function(task, fold_number) {
-
+      if(!data_adaptive) {
+        return(task)
+      }
       preds <- likelihood$get_likelihood(tmle_task,  learned_marker_node, fold_number)
       new_data <- as.data.table(preds)
 

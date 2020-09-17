@@ -19,7 +19,7 @@ make_generator <- function(likelihood, type = "IPW") {
     cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
-    weights <- R/g * task$weights
+    weights <- R/g
     covariates <- colnames(X)
     outcome <- "Y"
     outcome_type <- "binomial"
@@ -39,7 +39,7 @@ make_generator <- function(likelihood, type = "IPW") {
     cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
-    weights <- (ER1 + ER0) * task$weights
+    weights <- (ER1 + ER0)
     Y <- ER1/weights
     covariates <- colnames(X)
     outcome <- "Y"
@@ -61,7 +61,7 @@ make_generator <- function(likelihood, type = "IPW") {
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
     weightsIPW <- R/g * task$weights
-    weightsplugin <- (ER1 + ER0) * task$weights
+    weightsplugin <- (ER1 + ER0)
     YIPW <- A
     Yplugin <- ER1/weightsplugin
     covariates <- colnames(X)
