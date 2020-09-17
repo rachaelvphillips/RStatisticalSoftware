@@ -13,7 +13,7 @@ Lrnr_LRR_hal9001 <- R6Class(
     }
   ),
   private = list(
-    .properties = c("binomial"),
+    .properties = c( "RRtmle"),
 
     .train = function(task) {
       method <- self$params$method

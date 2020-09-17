@@ -1,6 +1,6 @@
 
 #' @export
-threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10) {
+threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10, cv = T) {
   # covariates
   W_factor <- define_lf(LF_emp, "W")
 
@@ -15,10 +15,10 @@ threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10) {
   }
 
 
-  A_factor <- define_lf(LF_fit, "A", learner = Lrnr_CDF$new(learner_list[["A"]], bins, cutoffs), type = "mean", bound = A_bound)
+  A_factor <- define_lf(LF_derived, "A", learner = Lrnr_CDF$new(learner_list[["A"]], bins, cutoffs, cv = cv),likelihood, generator_R,  type = "mean", bound = A_bound)
 
   # outcome
-  Y_factor <- LF_fit$new("Y", Lrnr_thresh$new(learner_list[["Y"]], tmle_task$npsem[["A"]]$variables, cutoffs =cutoffs ), type = "mean")
+  Y_factor <- LF_derived$new("Y", Lrnr_thresh$new(learner_list[["Y"]], tmle_task$npsem[["A"]]$variables, cutoffs =cutoffs, cv = cv ),likelihood, generator_R, type = "mean")
 
 
   # construct and train likelihood
@@ -29,7 +29,7 @@ threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10) {
     if (is.null(learner_list[["delta_Y"]])) {
       stop("Y is subject to censoring, but no learner was specified for censoring mechanism delta_Y")
     }
-
+    #TODO
     delta_Y_factor <- define_lf(LF_fit, "delta_Y", learner = learner_list[["delta_Y"]], type = "mean", bound = c(0.025, 1))
     factor_list <- c(factor_list, delta_Y_factor)
   }

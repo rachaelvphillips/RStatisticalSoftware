@@ -167,14 +167,15 @@ lrnr_tr =lrnr$train(tsk)
 ```
 
 
-```{r}
+```{r, include = F}
 
-sl <- make_super_learner(list(lrnr), task, likelihood )
+sl <- make_super_learner(list(lrnr,  Lrnr_LRR_subst$new()), task, likelihood )
 trained <- sl$train(tsk)
 trained
 ```
 
 ```{r}
+loss <- make_eff_loss(task, likelihood )
 trained$fit_object$learner_fits$CV_Stack$cv_risk(loss)
 
 
@@ -182,8 +183,8 @@ trained$fit_object$learner_fits$CV_Stack$cv_risk(loss)
 
 ```{r}
 
-data.table(exp(lrnr$predict(tsk)), data$RR)
-mean((exp(lrnr$predict(tsk))- data$RR)^2)
+data.table(exp(trained$predict(tsk)), data$RR)
+mean((exp(trained$predict(tsk))- data$RR)^2)
 loss <- make_eff_loss(task, likelihood )
-mean(loss(lrnr$predict(tsk), NULL))
+mean(loss(trained$predict(tsk), NULL))
 ```

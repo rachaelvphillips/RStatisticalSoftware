@@ -2,16 +2,14 @@ Lrnr_LRR_subst <- R6Class(
   classname = "Lrnr_LRR_subst", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
-    initialize = function(max_degree = 3,
-                          smoothness_degree = 0,
-                          iter = 200,
+    initialize = function(
                           ...) {
       params <- args_to_list()
       super$initialize(params = params, ...)
     }
   ),
   private = list(
-    .properties = c("binomial"),
+    .properties = c( "RRtmle"),
 
     .train = function(task) {
       fit_object <- list()
