@@ -101,6 +101,7 @@ make_eff_loss <- function(tmle_task, likelihood) {
     C2 <- C1 + (1-A)/g * (R - ER) + ER0
     loss <- C1*-1*LRR + C2 * log(1 + exp(LRR))
 
+
     return(loss)
   }
 

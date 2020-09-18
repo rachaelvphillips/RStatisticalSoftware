@@ -141,9 +141,9 @@ Lrnr_wrapper <- R6Class(
   inherit = Lrnr_base, portable = TRUE,
   class = TRUE,
   public = list(
-    initialize = function(ncol, ...) {
+    initialize = function(ncol, pack = T, ...) {
 
-      params <- list(ncol = ncol, ...)
+      params <- list(ncol = ncol, pack = pack, ...)
       super$initialize(params = params, ...)
     }
   ),
@@ -167,9 +167,15 @@ Lrnr_wrapper <- R6Class(
       X <- ((task$X))
 
       out <- (apply(X, 2, function(v) {
-        v <- matrix(v, ncol = ncol)
-        predictions <- pack_predictions(v)
+        if(self$params$pack){
+          v <- matrix(v, ncol = ncol)
+          predictions <- pack_predictions(v)
+        } else {
+          predictions <- v
+        }
+        return((predictions))
       }))
+
 
       return(out)
     },

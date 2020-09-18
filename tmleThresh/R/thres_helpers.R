@@ -59,7 +59,8 @@ Lrnr_thresh <- R6::R6Class(
                           ...) {
       params <- args_to_list()
 
-      lrnr <- make_learner(Pipeline, make_learner(Lrnr_chainer, cutoffs, strata_variable), lrnr_bin, make_learner(Lrnr_wrapper, length(cutoffs)))
+
+      lrnr <- make_learner(Pipeline, make_learner(Lrnr_chainer, cutoffs, strata_variable), lrnr, make_learner(Lrnr_wrapper, length(cutoffs), pack =cv))
       if(cv) {
         lrnr <- Lrnr_sl$new(lrnr, make_learner(Lrnr_solnp, metalearner_linear_multivariate, loss_squared_error_multivariate))
       }
@@ -176,7 +177,7 @@ Lrnr_thresh <- R6::R6Class(
     .predict = function(task = NULL) {
       args <- self$params
       cutoffs <- args$cutoffs
-      print("here")
+
       strata_variable <- args$strata_variable
       #task <- private$.process_task(task, F)
       if(!("cv" %in% lrnr$properties)) {
@@ -185,8 +186,7 @@ Lrnr_thresh <- R6::R6Class(
       } else {
         predictions <- self$fit_object$lrnr$predict_fold(task, "full")
       }
-      print("here")
-      print(self$fit_object$lrnr)
+
 
       predictions <- sl3::unpack_predictions(predictions)
       predictions <- as.vector(predictions)
@@ -203,7 +203,9 @@ Lrnr_CDF <- R6::R6Class(
                           ...) {
 
       params <- args_to_list()
-
+      if(!("weights" %in% lrnr$properties)){
+        warning("weights is not in learner properties. Note weights must be used for this learner to work.")
+      }
       super$initialize(params = params, ...)
     },
     predict_fold = function(task, fold_number = "full") {
@@ -238,7 +240,7 @@ Lrnr_CDF <- R6::R6Class(
       private$cutoffs <- cutoffs
       return(lrnr)
     },
-    .process_task = function(task, cutoffs = NULL, training = T) {
+    .process_task = function(task, cutoffs = NULL, training = F) {
 
       args <- self$params
       num_bins <- args$num_bins
@@ -251,7 +253,14 @@ Lrnr_CDF <- R6::R6Class(
         data <- task1$data
         Y <- task1$Y
         if(is.null(cutoffs)) {
-          cutoffs <- as.vector(quantile(Y, seq(0, 1, length.out = num_bins)))
+          #cutoffs <- as.vector(quantile(Y, seq(0, 1, length.out = num_bins)))
+          min_Y <- min(Y)
+          max_Y <- max(Y)
+          threshs <- c(min_Y, self$params$threshs, max_Y)
+          cutoffs <-  unique(quantile(threshs,seq(0, 1, length.out = num_bins),  type = 1))
+          cutoffs <- unique(cutoffs)
+          print(cutoffs)
+
         }
 
         folds <- task1$folds
@@ -272,20 +281,27 @@ Lrnr_CDF <- R6::R6Class(
           data <- task$data
           Y <- task$Y
 
-          Y <- (cutoffs[findInterval(Y, cutoffs, left.open = self$params$type != "left-continuous", all.inside
-                                     = T)])
+          Y <- findInterval(Y, cutoffs, left.open = self$params$type != "left-continuous", all.inside
+                                     = T)
           #nested revere task
-
+          if(length(unique(Y))!= length(cutoffs) - 1) {
+            stop("oops")
+          }
 
           data_list <- list()
 
+          index = 1
           for(cutoff in (cutoffs[-1])) {
             Xcopy <- copy(data)
-            Xcopy$bin <- cutoff
-            Xcopy$in_bin <- as.numeric(Y==cutoff)
+            Xcopy$bin <- index
+
+            Xcopy$in_bin <- as.numeric(Y == index)# as.numeric(dplyr::near(Y,cutoff))
             Xcopy$Y <- Y
             data_list[[as.character(cutoff)]] <- Xcopy
+            index <- index + 1
           }
+
+
           data <- rbindlist(data_list)
           cluster_ids <- rep(orig_ids, length(cutoffs[-1]))
           new_folds <- id_folds_to_folds(folds, cluster_ids)
@@ -293,9 +309,10 @@ Lrnr_CDF <- R6::R6Class(
             keep <- data$bin <= data$Y
 
             weights <- as.numeric(data$bin <= data$Y) * task$weights
-            data$weights <- weights
+            data$weights <-weights
+            print("shshs")
             #data <- data[keep]
-
+            #data <- data[keep]
           } else {
 
 
@@ -313,26 +330,36 @@ Lrnr_CDF <- R6::R6Class(
         }
         pooled_task <- sl3_revere_Task$new(new_generator, task)
       } else {
+
         data <- task$data
         Y <- task$Y
-        cutoffs <- as.vector(quantile(Y, seq(0, 1, length.out = num_bins)))
-
-        Y <- (cutoffs[findInterval(Y, cutoffs, left.open = self$params$type != "left-continuous", all.inside
-                                   = T)])
+        if(is.null(cutoffs)) {
+          min_Y <- min(Y)
+          max_Y <- max(Y)
+          threshs <- self$params$threshs
+          cutoffs <- c(min_Y, unique(quantile(threshs,seq(0, 1, length.out = num_bins),  type = 1)))
+          cutoffs <- unique(cutoffs)
+        }
+        Y <- findInterval(Y, cutoffs, left.open = self$params$type != "left-continuous", all.inside
+                                   = T)
         #nested revere task
-
 
         data_list <- list()
 
+        index = 1
         for(cutoff in (cutoffs[-1])) {
           Xcopy <- copy(data)
           Xcopy$bin <- cutoff
-          Xcopy$in_bin <- as.numeric(Y==cutoff)
+
+          Xcopy$in_bin <- as.numeric(Y == index)# as.numeric(dplyr::near(Y,cutoff))
           Xcopy$Y <- Y
           data_list[[as.character(cutoff)]] <- Xcopy
+          index <- index + 1
         }
         data <- rbindlist(data_list)
-        data <- data[data$bin <= data$Y]
+        if(training) {
+          data <- data[data$bin <= data$Y]
+        }
         nodes <- task$nodes
         nodes$covariates <- union(task$nodes$covariates, c("bin"))
         nodes$outcome <- "in_bin"
@@ -361,37 +388,43 @@ Lrnr_CDF <- R6::R6Class(
       pooled_task <- out$task
 
       # This additional revere thing shouldnt be needed but iti s
-      predictions <- matrix(lrnr$predict_fold(pooled_task$revere_fold_task(fold_number), fold_number), nrow = task$revere_fold_task("validation")$nrow)
+      if(!self$params$cv) {
+        pooled_task <- pooled_task$revere_fold_task("full")
+      }
+      predictions <- matrix(lrnr$predict_fold(pooled_task, fold_number), nrow = task$revere_fold_task("validation")$nrow)
       predictions <- cbind(rep(0, task$revere_fold_task("validation")$nrow), 1 - t(apply(1-predictions, 1, cumprod)))
-
       #Interpolate to get values at desired cutoffs
-      predictions <- rbindlist(lapply(1:nrow(predictions), function(i){
 
-        approx(orig_cutoffs, as.vector(predictions[i,]), xout = as.vector(threshs), rule = 2, yright = 1, yleft = 0 )
+      predictions <- do.call(rbind, lapply(1:nrow(predictions), function(i){
+
+        approx(orig_cutoffs, as.vector(predictions[i,]), xout = as.vector(threshs), rule = 2, yright = 1, yleft = 0 )[[2]]
       }))
 
-      predictions <- as.vector(predictions[,2][[1]])
+      predictions <- as.vector(predictions)
 
-      predictions <- (matrix(predictions, ncol = length(threshs), byrow = T))
+      predictions <- (matrix(predictions, ncol = length(threshs), byrow = F))
+      print(head(predictions))
       return(as.vector(predictions))
       #predictions <- sl3::pack_predictions(predictions)
+
       predictions <- sl3::pack_predictions(predictions)
+
     },
     .predict = function(task = NULL) {
 
       args <- self$params
       cutoffs <- private$cutoffs
-
       orig_cutoffs <- cutoffs
       #cutoffs <- c(-Inf,cutoffs)
       threshs <- args$threshs
       lrnr <- self$fit_object$lrnr
 
-      pooled_task <- private$.process_task(task, cutoffs)$task
+      pooled_task <- private$.process_task(task, cutoffs, training = F)$task
 
       predictions <- matrix(lrnr$predict_fold(pooled_task, "validation"), nrow = task$nrow)
 
       predictions <- cbind(rep(0, task$nrow), 1 - t(apply(1-predictions, 1, cumprod)))
+
 
       #Interpolate to get values at desired cutoffs
       predictions <- rbindlist(lapply(1:nrow(predictions), function(i){

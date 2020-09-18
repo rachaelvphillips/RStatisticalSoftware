@@ -67,7 +67,7 @@ generator_A <- learner_marker_task_generator(learned_marker_node = "A_learned", 
   
 ```
 
-```{r, include = F}
+```{r, include = T}
 lf_A <- LF_derived$new("A", Lrnr_CDF$new(lrnr_bin,
                                    10,  cutoffs, cv = F), likelihood, generator_A, type = "mean")
 lf_R <- LF_derived$new("Y", Lrnr_thresh$new(Lrnr_cv$new(make_learner(Pipeline, lrnr_bin, make_learner(Lrnr_wrapper, 5))), 
@@ -77,6 +77,12 @@ lf_R <- LF_derived$new("Y", Lrnr_thresh$new(Lrnr_cv$new(make_learner(Pipeline, l
 lf_R <- LF_derived$new("Y", Lrnr_thresh$new(make_learner(Stack, lrnr_bin, lrnr_bin),
                                     strata_variable = "A", cv = T,
                                     cutoffs = cutoffs), likelihood, generator_R, type = "mean")
+
+
+lf_R <- LF_derived$new("Y", Lrnr_thresh$new( make_learner(Lrnr_glm, family = binomial()),
+                                            strata_variable = "A", cv = F,
+                                            cutoffs = cutoffs), likelihood, generator_R, type = "mean")
+
 Lrnr_chainer
 likelihood$add_factors(list(lf_A, lf_R))
 ```
@@ -84,10 +90,10 @@ likelihood$add_factors(list(lf_A, lf_R))
 ```{r}
 #as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "validation"), nrow = 1500))
 #as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "validation"), nrow = 1500))
+likelihood$get_likelihood(task, "Y", fold_number = "full")
+as.data.table(matrix((likelihood$get_likelihood(task, "Y", fold_number = "full")), nrow = 1500))
 
-as.data.table(matrix(likelihood$get_likelihood(task, "Y", fold_number = "validation"), nrow = 1500))
-
-as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "validation"), nrow = 1500))
+as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = "full"), nrow = 1500))
 ```
 
 ```{r}
@@ -96,3 +102,8 @@ as.data.table(matrix(likelihood$get_likelihood(task, "A", fold_number = 1), nrow
 ```
 
 
+
+```{R}
+x <- c(1,2,3,4,5,6,7,8,9)
+near(x,1)
+```

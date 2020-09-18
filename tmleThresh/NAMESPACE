@@ -3,6 +3,7 @@
 export(LF_fit_derived)
 export(Lrnr_CDF)
 export(Lrnr_cv)
+export(Lrnr_hal9001_fixed)
 export(Lrnr_thresh)
 export(Param_thresh)
 export(threshold_likelihood)

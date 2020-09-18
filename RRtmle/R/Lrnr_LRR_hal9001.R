@@ -4,7 +4,7 @@ Lrnr_LRR_hal9001 <- R6Class(
   public = list(
     initialize = function(max_degree = 3,
                           smoothness_degree = 0,
-                          iter = 250,
+                          iter = 100,
                           method = NULL,
                           grad_desc = F,
                           ...) {
@@ -103,9 +103,11 @@ Lrnr_LRR_hal9001 <- R6Class(
       C1 <- A/g * (R - ER) + ER1
       C2 <- C1 + (1-A)/g * (R - ER) + ER0
       Z <- -C1 + C2 * exp(LRR) / (1 + exp(LRR))
+      Z <- Z * task$weights
       risk  <- function(beta) {
         f <- as.vector(x_basis %*% beta[-1]) + beta[1]
         loss = C1*-1*f + C2 * log(1 + exp(f))
+        loss <- loss * task$weights
         return(mean(loss))
       }
 

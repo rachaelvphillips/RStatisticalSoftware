@@ -35,7 +35,7 @@ D <- D +
   node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 1000)
+data <- sim(setD, n = 8000)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -68,109 +68,16 @@ tlik <- Targeted_Likelihood$new(lik)
 ```
 
 ```{r}
-task$get_regression_task("RR")$X
-```
-
-```{r}
-tlik <- Targeted_Likelihood$new(lik)
-lrr <- LRR_risk$new(tlik, max_degree = 2, IPW_as_initial = T, type = "grad")
-```
-
-```{r}
-lrr$initialize_best(task)
-
-```
-```{r}
-
-lrr$update_likelihood(task, iter = 3)
-v = lrr$predict(task, "RR")
-mean((v - data$RR)^2)
-lrr$efficient_risk(task)
-lrr$IPW_risk(task)
-```
-
-```{r}
-
-fit <- lrr$get_fit("IPW")
-v = lrr$predict(task, "RR", fit)
-mean((v - data$RR)^2)
-lrr$efficient_risk(task, fit = fit)
-lrr$IPW_risk(task, fit = fit)
-mean(-1 *data$R1 *log(v) + (data$R1 + data$R0) * (log(1 + exp(log(v)))))
-fit <- lrr$get_fit("plugin")
-print(" ")
-v = lrr$predict_derived(task)
-v = lrr$predict(task, "RR", fit)
-mean((v - data$RR)^2)
-lrr$efficient_risk(task, fit = fit)
-lrr$IPW_risk(task, fit = fit)
-mean(-1 *data$R1 *log(v) + (data$R1 + data$R0) * (log(1 + exp(log(v)))))
-print(" ")
-v = lrr$predict(task, "RR")
-mean((v - data$RR)^2)
-lrr$efficient_risk(task)
-lrr$IPW_risk(task)
-mean(-1 *data$R1 *log(v) + (data$R1 + data$R0) * (log(1 + exp(log(v)))))
-print(" ")
-```
-
-```{r}
-param <- Param_RR$new(tlik, IPW_as_initial= F, smoothness = 0, num_fits = 1, type = "grad")
-risk <- param$risk_function
-
-risk$train_IPW(task)
-```
-
-```{r}
-risk$efficient_risk(task)
-
-beta = risk$gradient_descent_update(task, search_eps = T)
-risk$efficient_risk(task)
-```
-
-````{r}
-v = as.data.table(param$risk_function$predict_derived(task))
-
-mean((v[[1]] - data$RR)^2)
-
-v = as.data.table(param$risk_function$predict(task, type = "RR"))
-
-mean((v[[1]] - data$RR)^2)
-```
-
-
-
-```{r}
-library(future.apply)
-tlik$updater$set_estimates(task)
-X = tlik$updater$current_estimates
-X <- X[[1]]
-as.data.table(X)
-mean((tlik$get_likelihood(task, "R") - data$gR)^2 )
-colMeans(X$IC)
-mean((X$psi - data$RR)^2)
-tlik$updater$update_step(tlik, task)
-param$risk_function$efficient_risk(task)
-```
-
-
-```{r}
 likelihood <- lik
 rev <- make_revere(task, likelihood, "gen")
 ```
 
 
-```{r}
-tsk =rev$revere_fold_task("full")
-lrnr = Lrnr_LRR_hal9001$new(max_degree = 1, method = "plugin",grad_desc = T)
-lrnr_tr =lrnr$train(tsk)
-```
-
-
 ```{r, include = F}
 
+lrnr = Lrnr_LRR_hal9001$new(max_degree = 1, method = "IPW",grad_desc = T)
 sl <- make_super_learner(list(lrnr,  Lrnr_LRR_subst$new()), task, likelihood )
-trained <- sl$train(tsk)
+trained <- sl$train(rev)
 trained
 ```
 
@@ -183,8 +90,7 @@ trained$fit_object$learner_fits$CV_Stack$cv_risk(loss)
 
 ```{r}
 
-data.table(exp(trained$predict(tsk)), data$RR)
-mean((exp(trained$predict(tsk))- data$RR)^2)
-loss <- make_eff_loss(task, likelihood )
-mean(loss(trained$predict(tsk), NULL))
+data.table(exp(trained$predict(rev)), data$RR)
+mean((exp(trained$predict(rev))- data$RR)^2)
+
 ```
