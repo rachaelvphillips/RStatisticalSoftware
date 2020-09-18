@@ -1,10 +1,13 @@
+
+
+#' @export
 Lrnr_LRR_hal9001 <- R6Class(
   classname = "Lrnr_LRR_hal9001", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
     initialize = function(max_degree = 3,
                           smoothness_degree = 0,
-                          iter = 100,
+                          iter = 200,
                           method = NULL,
                           grad_desc = F,
                           ...) {
@@ -23,14 +26,18 @@ Lrnr_LRR_hal9001 <- R6Class(
       if(!is.null(method)) {
         weights <- task$get_data(,c("weightsIPW", "weightsplugin"))
         if(method == "IPW") {
+
+          family <- "binomial"
           weights <- weights[, weightsIPW]
           Y <- Y[, YIPW]
         }
         else if(method == "plugin") {
+          family <- binomial()
           weights <- weights[, weightsplugin]
           Y <- Y[, Yplugin]
         }
       } else {
+        family <- binomial()
         weights <- task$get_data(,"weights")
       }
       weights <- weights * task$weights
@@ -40,9 +47,11 @@ Lrnr_LRR_hal9001 <- R6Class(
       x_basis <- hal9001fast::make_design_matrix(as.matrix(X), basis_list)
 
 
-      fit <- glmnet::cv.glmnet(x_basis, Y, family = binomial(), weights = weights, standardize = F, nlambda = 125)
+      fit <- glmnet::cv.glmnet(x_basis, Y, family = family, weights = weights, standardize = F, nlambda = 125)
       fit_object <- list(basis_list = basis_list, beta = as.vector(coef(fit)))
+
       keep <- which(fit_object$beta[-1]!=0)
+
       basis_list <- basis_list[keep]
       beta <- fit_object$beta[c(1, keep+1)]
       fit_object$basis_list <- basis_list
@@ -54,8 +63,12 @@ Lrnr_LRR_hal9001 <- R6Class(
         return(fit_object)
       }
       search_eps = T
-      for(i in 1:self$params$iter) {
 
+
+      for(i in 1:self$params$iter) {
+        if(length(keep)==1) {
+          break
+        }
         out <- private$.gradient_descent_update(task, x_basis, search_eps)
         search_eps = F
 
@@ -65,6 +78,7 @@ Lrnr_LRR_hal9001 <- R6Class(
       }
       fit_object$beta <- private$.beta
 
+
       return(fit_object)
     },
     .predict = function(task = NULL) {
@@ -73,7 +87,13 @@ Lrnr_LRR_hal9001 <- R6Class(
       beta <- fit_obj$beta
       X <- task$X
       x_basis <- hal9001fast::make_design_matrix(as.matrix(X), basis_list)
-      predictions <- x_basis %*% beta[-1] + beta[1]
+
+      if(length(beta) == 1){
+        predictions <- beta[1]
+
+      } else {
+        predictions <- x_basis %*% beta[-1] + beta[1]
+      }
       return(predictions)
     },
     .gradient_descent_update = function(task, x_basis, search_eps = F) {
@@ -155,7 +175,7 @@ Lrnr_LRR_hal9001 <- R6Class(
         eps <- search_set[which.min(risks)]
         private$.eps <- eps
         new_risk <- min(risks)
-        print(new_risk)
+
         if(new_risk > cur_risk) {
           warning("fit not improved in gradient update")
           eps <- 0

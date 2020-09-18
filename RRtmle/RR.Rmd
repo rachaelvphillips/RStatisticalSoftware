@@ -27,15 +27,15 @@ D <- D +
   node("A", distr = "rbinom", size = 1, prob = plogis((0) ) )+
   node("g", distr = "rconst", const = plogis((0 )) )+
   node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  (U + W - Z/2)^2 - Z*A - .4*A + 5*A*W ) )+
-    node("gR", distr = "rconst",  const = plogis(.2 +  (U + W- Z/2)^2 - Z*A +.4*A + 5*A*W ) )+
+    node("gR", distr = "rconst",  const = plogis(.2 +  (U + W- Z/2) - Z*A +.4*A + 5*A*W ) )+
 
-  node("R1", distr = "rconst", const = plogis(.2 +  (U + W - Z/2)^2 - Z - .4 + 5*W ) )+
-    node("R0", distr = "rconst", const =  plogis(.2 + (U + W - Z/2)^2  ) )+
+  node("R1", distr = "rconst", const = plogis(.2 +  (U + W - Z/2) - Z - .4 + 5*W ) )+
+    node("R0", distr = "rconst", const =  plogis(.2 + (U + W - Z/2)  ) )+
       node("RR", distr = "rconst", const = (R1/R0) ) +
   node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 8000)
+data <- sim(setD, n = 700)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -75,10 +75,12 @@ rev <- make_revere(task, likelihood, "gen")
 
 ```{r, include = F}
 
-lrnr = Lrnr_LRR_hal9001$new(max_degree = 1, method = "IPW",grad_desc = T)
-sl <- make_super_learner(list(lrnr,  Lrnr_LRR_subst$new()), task, likelihood )
+lrnr_xgboost = Lrnr_LRR_xgboost$new(method = "IPW", max_depth = 3)
+lrnr_hal9001a = Lrnr_LRR_hal9001$new(method = "IPW", smoothness = 0, max_degree = 1, grad_desc =F, iter = 100)
+lrnr_hal9001b = Lrnr_LRR_hal9001$new(method = "IPW", smoothness = 1, max_degree = 1, grad_desc =F, iter = 100)
+
+sl <- make_super_learner(list(lrnr_xgboost, lrnr_hal9001a, lrnr_hal9001b, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW")), task, likelihood )
 trained <- sl$train(rev)
-trained
 ```
 
 ```{r}
