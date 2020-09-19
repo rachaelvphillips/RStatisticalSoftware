@@ -26,16 +26,15 @@ D <- D +
    node("U", distr = "rconst", const = round(U1,1)) +
   node("A", distr = "rbinom", size = 1, prob = plogis((0) ) )+
   node("g", distr = "rconst", const = plogis((0 )) )+
-  node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  (U + W - Z/2)^2 - Z*A - .4*A + 5*A*W ) )+
-    node("gR", distr = "rconst",  const = plogis(.2 +  (U + W- Z/2) - Z*A +.4*A + 5*A*W ) )+
-
+  node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  8*U*W - 8*Z*U + 8*U* W+ (U + W - Z/2) - Z*A - .4*A + 5*A*W ) )+
+    node("gR", distr = "rconst",  const =plogis(.2 +  8*U*W - 8*Z*U + 8*U* W+ (U + W - Z/2) - Z*A - .4*A + 5*A*W ) )+
   node("R1", distr = "rconst", const = plogis(.2 +  (U + W - Z/2) - Z - .4 + 5*W ) )+
     node("R0", distr = "rconst", const =  plogis(.2 + (U + W - Z/2)  ) )+
       node("RR", distr = "rconst", const = (R1/R0) ) +
   node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 700)
+data <- sim(setD, n = 2000)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -52,7 +51,8 @@ library(sl3)
 library(uuid)
 npsem <- list(define_node("W", c("W", "U", "Z"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0), define_node("Z", "Z",  variable_type = variable_type("continuous")),
              
-              define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")))
+              define_node("Rinit", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")),
+              define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")))
 task <- tmle3_Task$new(data, npsem, long_format = F)
 data
 ```
@@ -70,29 +70,110 @@ tlik <- Targeted_Likelihood$new(lik)
 ```{r}
 likelihood <- lik
 rev <- make_revere(task, likelihood, "gen")
+
 ```
 
 
 ```{r, include = F}
 
 lrnr_xgboost = Lrnr_LRR_xgboost$new(method = "IPW", max_depth = 3)
-lrnr_hal9001a = Lrnr_LRR_hal9001$new(method = "IPW", smoothness = 0, max_degree = 1, grad_desc =F, iter = 100)
-lrnr_hal9001b = Lrnr_LRR_hal9001$new(method = "IPW", smoothness = 1, max_degree = 1, grad_desc =F, iter = 100)
+lrnr_hal9001a = Lrnr_LRR_hal9001$new(method = "IPW", smoothness = 0, max_degree = 2, grad_desc =F, iter = 100)
 
-sl <- make_super_learner(list(lrnr_xgboost, lrnr_hal9001a, lrnr_hal9001b, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW")), task, likelihood )
+
+sl <- make_super_learner(list(lrnr_xgboost, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW")), task, likelihood )
 trained <- sl$train(rev)
 ```
-
 ```{r}
 loss <- make_eff_loss(task, likelihood )
 trained$fit_object$learner_fits$CV_Stack$cv_risk(loss)
 
 
-```
-
-```{r}
 
 data.table(exp(trained$predict(rev)), data$RR)
 mean((exp(trained$predict(rev))- data$RR)^2)
 
 ```
+
+
+
+```{r}
+genuniv <- make_generator(likelihood, "univ")
+tsk <- genuniv(task, "full")
+tsk$get_data()
+tsk$revere_fold_task("full")$get_data()
+```
+
+
+
+```{r, include = F}
+library(future)
+library(delayed)
+plan(multisession, workers = 1)
+lrnr_sieve <- make_learner(Lrnr_glmnet_relaxed, relax_lambda = "best")
+lrnr_glm <- make_learner(Lrnr_glm)
+learners <- list(Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 25, max_degree = 1),
+                 Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 100, max_degree = 2),
+                 Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 100, max_degree = 1),
+                 Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 50, max_degree = 1),
+                  Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 10, max_degree = 1),
+                  Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 10, max_degree = 2)
+)
+
+learners <- learners[5]
+stack <- do.call(function(...) {
+  make_learner(Stack, ...)
+}, learners)
+
+tsk <- tsk$revere_fold_task("full")
+lrnr_sl <- make_learner(Lrnr_sl, learners, meta_learner = Lrnr_cv_selector$new())
+lrnr_sl <- make_learner(Lrnr_cv, learners[[1]], full_fit = T)
+
+lrnr_sl1 <- delayed_learner_train(learners[[1]],tsk$revere_fold_task("full"))$compute()
+lrnr_sl <-  lrnr_sl$train(tsk)
+```
+
+```{r}
+f <- trained$predict(rev)
+ER <- lik$get_likelihood(task, "R")
+pred = lrnr_sl1$predict(tsk)
+pred1 = lrnr_sl$predict(tsk)
+pred3 = lrnr_sl$fit_object$full_fit$predict(tsk)
+data.table(pred, pred1, pred3,ER)
+
+data.table(f)
+ER <- lik$get_likelihood(task, "R")
+g <- lik$get_likelihood(task, "A")
+A <- tsk$get_data(,"A")[[1]]
+R <- task$get_data(,"R")[[1]]
+mean(A/g * (R - ER) * f)
+mean((1-A)/g * (R - ER) * f)
+mean((1/g) * (R - ER) * log(1+ exp(f)))
+mean(1/g * (R - ER) * f)
+mean((R - ER) )
+ER <- pred
+g <- lik$get_likelihood(task, "A")
+A <- tsk$get_data(,"A")[[1]]
+R <- task$get_data(,"R")[[1]]
+mean(A/g * (R - ER) * f)
+mean((1-A)/g * (R - ER) * f)
+mean((1/g) * (R - ER) * log(1+ exp(f)))
+mean(1/g * (R - ER) * f)
+mean((R - ER) )
+```
+
+
+
+
+
+```{r}
+
+lrnr <- Lrnr_universal_hal9001$new(max_degree = 3)
+
+lrnr <- lrnr$train(tsk)
+
+```
+
+
+
+
+

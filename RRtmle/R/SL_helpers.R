@@ -7,6 +7,23 @@ make_revere <- function(task, likelihood, type = "gen") {
 
 make_generator <- function(likelihood, type = "IPW") {
 
+  gen_task_univ <- function(tmle_task, fold_number) {
+    task <- tmle_task$get_regression_task("RR")
+    X <- task$X
+    g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
+    A <- tmle_task$get_tmle_node("A", format = T)$A
+    Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
+    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
+    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
+    ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
+
+    data <- cbind(data.table(Y = task$Y, A = A, Q = Q, g = 1/g, ER1 = ER1, ER0 = ER0, weights = task$weights), X)
+    covariates <- colnames(X)
+    outcome  <- "Y"
+    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome,  weights = "weights")
+    return(new_task)
+  }
 
   gen_task_IPW <- function(tmle_task, fold_number) {
     task <- tmle_task$get_regression_task("RR")
@@ -77,26 +94,36 @@ make_generator <- function(likelihood, type = "IPW") {
     return(gen_task_IPW)
   } else if (type == "plugin") {
     return(gen_task_plugin)
-  } else {
+  } else if(type == "univ"){
+    return(gen_task_univ)
+    }
+  else {
     return(gen_task_general)
   }
 
 }
 
 make_eff_loss <- function(tmle_task, likelihood) {
-
+  tmle_task <- tmle_task
+  likelihood <- likelihood
 
   efficient_loss = function(preds, Y) {
+
     LRR <- preds
+    print(likelihood)
+    print(tmle_task)
     R <- tmle_task$get_tmle_node("R", format = T)$R
     A <- tmle_task$get_tmle_node("A", format = T)$A
+    print("here")
     g <- likelihood$get_likelihood(tmle_task, "A", "validation")
     lik <- likelihood
-    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    print("here")
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=1))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=0))
     ER1 <- lik$get_likelihood(cf_task1, "R", "validation")
     ER0 <- lik$get_likelihood(cf_task0, "R", "validation")
     ER <- lik$get_likelihood(tmle_task, "R", "validation")
+    print("here")
     C1 <- A/g * (R - ER) + ER1
     C2 <- C1 + (1-A)/g * (R - ER) + ER0
     loss <- C1*-1*LRR + C2 * log(1 + exp(LRR))

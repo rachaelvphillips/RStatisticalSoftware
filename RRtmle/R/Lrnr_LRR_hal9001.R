@@ -64,19 +64,20 @@ Lrnr_LRR_hal9001 <- R6Class(
       }
       search_eps = T
 
-
+      recent_out = list()
       for(i in 1:self$params$iter) {
         if(length(keep)==1) {
           break
         }
-        out <- private$.gradient_descent_update(task, x_basis, search_eps)
+        out <- private$.gradient_descent_update(task, x_basis, search_eps, recent_out)
         search_eps = F
 
         if(out == "converged") {
           break
         }
+        recent_out = out
       }
-      fit_object$beta <- private$.beta
+      fit_object$beta <- recent_out$beta
 
 
       return(fit_object)
@@ -96,8 +97,8 @@ Lrnr_LRR_hal9001 <- R6Class(
       }
       return(predictions)
     },
-    .gradient_descent_update = function(task, x_basis, search_eps = F) {
-      eps <- private$.eps
+    .gradient_descent_update = function(task, x_basis, search_eps = F, prev_run = list()) {
+      eps <- prev_run$eps
 
       if(!is.null(eps)) {
 
@@ -110,7 +111,7 @@ Lrnr_LRR_hal9001 <- R6Class(
 
 
 
-      beta <- private$.beta
+      beta <- prev_run$beta
 
       g <- task$get_data(,"g")[[1]]
       ER <- task$get_data(,"Q")[[1]]
@@ -140,11 +141,11 @@ Lrnr_LRR_hal9001 <- R6Class(
 
       if(norm < 1e-5) {
 
-        return("converged")
+        return( "converged")
       }
       D_star <- D_star / norm
       cur_risk <- risk(beta)
-      eps <- private$.eps
+
 
       eps_max <- 1/max(abs(D_star))
 
@@ -182,8 +183,7 @@ Lrnr_LRR_hal9001 <- R6Class(
         }
         new_beta <- (1+eps*D_star) * beta
       }
-      private$.beta <- new_beta
-      return("Not converged")
+      return(list(beta = new_beta, eps = eps))
 
     },
     .eps = NULL,
