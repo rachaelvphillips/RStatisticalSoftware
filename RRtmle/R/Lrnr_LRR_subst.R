@@ -17,8 +17,8 @@ Lrnr_LRR_subst <- R6Class(
     },
     .predict = function(task = NULL) {
       fit_obj <- self$fit_object
-      ER1 <- task$get_data(,"ER1")
-      ER0 <- task$get_data(,"ER0")
+      ER1 <- bound(task$get_data(,"ER1"), c(0.001))
+      ER0 <- bound(task$get_data(,"ER0"), c(0.001))
 
       return(log(ER1/ER0))
     }

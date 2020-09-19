@@ -24,12 +24,12 @@ Lrnr_universal <- R6Class(
       Y <- task$Y
 
       if(self$params$through_weights) {
-        covariates <- c(task$nodes$covariates, "Q")
+        covariates <- setdiff(c(task$nodes$covariates, "Q"), "A")
         weights <- task$weights / g
         column_names <- task$add_columns(data.table(weights = weights))
         next_task <- task$next_in_chain(covariates = covariates, column_names = column_names, weights = "weights")
       } else {
-        covariates <- c(task$nodes$covariates, "Q", "g")
+        covariates <- setdiff(c(task$nodes$covariates, "Q", "g"), "A")
         next_task <- task$next_in_chain(covariates = covariates)
       }
       X <- next_task$X
@@ -64,7 +64,7 @@ Lrnr_universal <- R6Class(
       }
 
       private$.basis_list <- basis_list
-      print(length(basis_list))
+
       X <- next_task$X
 
 
@@ -104,7 +104,7 @@ Lrnr_universal <- R6Class(
           #next_task <- next_task$add_interactions(inter)
         }
       }
-      print((next_task$X))
+
 
       private$.inters <- inters
       private$.var_names <- var_names
@@ -112,11 +112,11 @@ Lrnr_universal <- R6Class(
       task1 <- next_task[A==1]
 
       lrnr <- sieve_learner
-      print("kd")
+
 
 
       bundle <- bundle_delayed(list(inters = inters, var_names = var_names, basis_list = basis_list, fits = bundle_delayed(list("R0" = delayed_learner_train(lrnr, task0), "R1" = delayed_learner_train(lrnr, task1)))))
-      print("k")
+
       return(bundle)
 
 
@@ -126,12 +126,16 @@ Lrnr_universal <- R6Class(
       max_degree <- self$params$max_degree
       g <- task$get_data(, "g")[[1]]
       if(self$params$through_weights) {
-        covariates <- c(task$nodes$covariates, "Q")
+        covariates <- setdiff(c(task$nodes$covariates, "Q"), "A")
+        num_orig <- length(covariates)
+
         weights <- task$weights / g
         column_names <- task$add_columns(data.table(weights = weights))
         next_task <- task$next_in_chain(covariates = covariates, column_names = column_names, weights = "weights")
       } else {
-        covariates <- c(task$nodes$covariates, "Q", "g")
+        covariates <- setdiff(c(task$nodes$covariates, "Q", "g"), "A")
+        num_orig <- length(covariates)
+
         next_task <- task$next_in_chain(covariates = covariates)
       }
 
@@ -160,7 +164,6 @@ Lrnr_universal <- R6Class(
           #inters[[as.character(degree)]] <- inter
           vars <- colnames(X)
 
-          num_orig <- length(c(task$nodes$covariates, "Q", "g"))
 
           Xchange <- (matrix(as.vector(as.matrix(X)), ncol = num_orig))
           k <- num_basis

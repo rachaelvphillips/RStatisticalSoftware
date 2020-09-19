@@ -31,7 +31,6 @@ Lrnr_universal_hal9001 <- R6Class(
       coefs <- as.matrix(coef(glmnet_fit, s = lambdas))[-1,]
       x_basis <- x_basis[,basis_to_check]
       new_lambda = NULL
-
       for(i in seq_along(lambdas)) {
 
         residual <- as.vector(Y - preds[,i])
@@ -42,17 +41,23 @@ Lrnr_universal_hal9001 <- R6Class(
           print(data.table(scores = scores))
           if(self$params$thresh == "sample_size") {
             passed <- scores <= sd(residual)/n
+          } else if(is.numeric(self$params$thresh)) {
+
+            passed <- scores <= sd(residual)/(n^(self$params$thresh))
           } else {
             passed <- scores <= sd(residual)/sqrt(n)/log(n)/2
           }
           if(sum(!passed) == 0) {
+            print(sum(coefs[,i]!=0))
             new_lambda = lambdas[i]
             break
           }
         }
       }
-      print(best_lambda)
-      print(new_lambda)
+      if(is.null(new_lambda)) {
+        new_lambda <- min(lambdas)
+      }
+
       fit_object = list(basis_list = basis_list, fit = glmnet_fit, lambda = new_lambda)
       return(fit_object)
     },
