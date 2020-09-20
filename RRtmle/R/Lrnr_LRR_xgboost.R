@@ -38,7 +38,7 @@ Lrnr_LRR_xgboost <- R6Class(
       weights <- weights * task$weights
       params <- list(verbose = 0, nrounds = self$params$nrounds, nthread = self$params$nthread, label = Y, data = as.matrix(X), weight = weights, max_depth = self$params$max_depth,
                      eta = self$params$eta, gamma = self$params$gamma, objective = "reg:logistic" )
-      print("here")
+
       fit_object <- do.call(xgboost::xgboost, params)
       return(fit_object)
     },

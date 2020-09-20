@@ -28,7 +28,7 @@ make_generator <- function(likelihood, type = "IPW") {
     data <- cbind(data.table(Y = task$Y, A = A, Q = Q, g = 1/g, ER1 = ER1, ER0 = ER0, weights = task$weights), X)
     covariates <- c(colnames(X), "A")
     outcome  <- "Y"
-    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome,  weights = "weights")
+    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome,  weights = "weights", folds = task$folds)
     return(new_task)
   }
 
@@ -48,7 +48,7 @@ make_generator <- function(likelihood, type = "IPW") {
     outcome <- "Y"
     outcome_type <- "binomial"
     data <- cbind(data.table(Y = A,  weightsold = task$weights, weights = weights, Q = Q, g = g, R = R, A = A, ER1 = ER1, ER0 = ER0), X)
-    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome, outcome_type = outcome_type, weights = "weightsold")
+    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome, outcome_type = outcome_type, weights = "weightsold", folds = task$folds)
     return(new_task)
   }
 
@@ -69,7 +69,7 @@ make_generator <- function(likelihood, type = "IPW") {
     outcome <- "Y"
     outcome_type <- "continuous"
     data <- cbind(data.table(Y = Y, weightsold = task$weights,  weights = weights, Q = Q, g = g, R = R, A = A, ER1 = ER1, ER0 = ER0), X)
-    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome, outcome_type = outcome_type, weights = "weightsold")
+    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome, outcome_type = outcome_type, weights = "weightsold", folds = task$folds)
     return(new_task)
   }
 
@@ -93,7 +93,7 @@ make_generator <- function(likelihood, type = "IPW") {
     weights <- c(tmle_task$nodes$weights)
     data <- cbind(data.table(YIPW = YIPW, Yplugin = Yplugin, weightsplugin = weightsplugin, weightsIPW = weightsIPW, Q = Q, g = g, R = R, A = A, ER1 = ER1, ER0 = ER0), X)
     data <- cbind(task$get_data(,weights), data)
-    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome, weights = weights)
+    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome, weights = weights, folds = task$folds)
     return(new_task)
   }
 

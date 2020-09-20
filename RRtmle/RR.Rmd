@@ -52,6 +52,7 @@ setkey(data, id ,t)
 library(tmle3)
 library(sl3)
 library(uuid)
+library(RRtmle)
 npsem <- list(define_node("W", c("W", "U", "Z", "W2", "W3"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0), define_node("Z", "Z",  variable_type = variable_type("continuous")),
              
               define_node("Rinit", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")),
@@ -64,32 +65,40 @@ data
 library(delayed)
 factor_list <- list(LF_emp$new("W"), 
                     LF_fit$new("A", make_learner(Lrnr_mean)),
-                     LF_fit$new("R", Lrnr_cv$new(make_learner(Lrnr_glm, max_depth = 2), full_fit = T), type = "mean")
+                     LF_fit$new("R", Lrnr_cv$new(make_learner(Lrnr_mean, max_depth = 2), full_fit = T), type = "mean")
 )
 lik <- Likelihood$new(factor_list)
 lik <- lik$train(task)
 lrnr_sieve <- make_learner(Lrnr_glmnet_relaxed, relax_lambda = "best")
 
-lrnr_derived <-  Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 2, max_degree = 1)
+lrnr_derived <-  Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 4, max_degree = 1)
 
 lrnr_derived <- make_learner(Lrnr_sl, lrnr_derived, metalearner = Lrnr_cv_selector$new())
 lik_copy <- lik$clone()
 smoothR <- LF_derived$new("R", lrnr_derived, lik_copy, derived_generator())
-#smoothR <- train_lf(smoothR, task)
-#old <- unlist(lik$get_likelihood(task, "R"))
-#lik$add_factors(smoothR)
-#new = smoothR$get_likelihood(task)[[1]]
+smoothR <- train_lf(smoothR, task)
+old <- unlist(lik$get_likelihood(task, "R"))
+lik$add_factors(smoothR)
+new = smoothR$get_likelihood(task)[[1]]
 ```
 
 ```{r}
 mean(ifelse(data$R==1, log(new), log(1 - new)))
 mean(ifelse(data$R==1, log(old), log(1 - old)))
-
+data.table(new)
+data.table(old)
 mean((data$gR - new)^2)
 mean((data$gR - old)^2)
 ```
 
-
+```{r}
+rev <- make_revere(task, likelihood, "gen")
+rev1 <- make_revere(task, likelihood, "univ")
+rev$folds[[1]]$validation_set
+rev$revere_fold_task(1)$folds[[1]]$validation_set
+rev1$revere_fold_task(1)$folds[[1]]$validation_set
+training$
+```
 
 
 
@@ -104,8 +113,9 @@ lrnr_xgboost2 = Lrnr_LRR_xgboost$new(method = "plugin", max_depth = 2)
 
 
 
-sl <- make_super_learner(list(lrnr_xgboost1,lrnr_xgboost2, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW")), task, likelihood )
-sl_cv <- Lrnr_cv$new(list(lrnr_xgboost1,lrnr_xgboost2, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW")))
+sl <- make_super_learner(list(lrnr_xgboost1,lrnr_xgboost2, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW"), Lrnr_LRR_glm$new(method = "plugin")
+                             ), task, likelihood )
+
 trained <- sl$train(rev)
 trained
 
@@ -126,28 +136,19 @@ truerisk <- function(preds) {
 
 }
 losss <- make_eff_loss(task, likelihood )
-trained$learner_fits$CV_Stack$cv_risk(losss)
+trained$fit_object$full_fit
 
-v=data.table(pred = (trained$predict(rev)))
-other = (trained$learner_fits$CV_Stack$predict(rev))
-other
+
 
 ```
 
 
-```{r}
-cv_stack <- trained$learner_fits$CV_Stack
-other = (cv_stack$predict_fold(rev, "validation"))
-other
-task <- cv_stack$training_task
-task <- task$revere_fold_task("validation")
-other = (cv_stack$predict_fold(task, "validation"))
-other
-```
-
 
 ```{r}
-other
+trained$fit_object$cv_fit$cv_risk(loss)
+trained
+other <- trained$fit_object$cv_fit$predict_fold(rev, "validation")
+other <- trained$fit_object$cv_fit$predict_fold(rev, "validation")
 
 truerisk(v[[1]])
 truerisk(other[[1]])
@@ -162,13 +163,15 @@ mean(loss(other[[2]]))
 mean(loss(other[[3]]))
 mean(loss(other[[4]]))       
      
-cv_risk(trained$learner_fits$CV_Stack, loss)    
+   
 ```
 
 
 ```{r}
-
-
+rev$revere_fold_task("validation")$get_data()
+rev$revere_fold_task(1)$get_data()
+data.table(trained$predict_fold(rev, "validation"))
+data.table(trained$predict_fold(rev$revere_fold_task("validation"), "validation"))
 ```
 
 
@@ -195,7 +198,7 @@ plan(multisession, workers = 1)
 lrnr_sieve <- make_learner(Lrnr_glmnet_relaxed, relax_lambda = "best")
 lrnr_glm <- make_learner(Lrnr_glm)
 learners <- list(Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 25, max_degree = 1),
-                 Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 100, max_degree = 2),
+                 Lrnr_universal$new(lrnr_sieve, through_weights = T, nbasis = 100, max_degree = 2, through_offset = T),
                  Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 100, max_degree = 1),
                  Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 50, max_degree = 1),
                   Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 10, max_degree = 1),
@@ -217,7 +220,7 @@ lrnr_sl <-  learners[[1]]$train(tsk)
 f <- trained$predict(rev)
 ER <- lik$get_likelihood(task, "R")
 
-pred = lrnr$predict(tsk)
+pred = lrnr_sl$predict(tsk)
 ER <- lik$get_likelihood(task, "R")
 g <- lik$get_likelihood(task, "A")
 A <- tsk$get_data(,"A")[[1]]

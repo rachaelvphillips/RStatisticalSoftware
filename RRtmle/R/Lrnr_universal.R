@@ -5,7 +5,7 @@ Lrnr_universal <- R6Class(
   classname = "Lrnr_universal", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
-    initialize = function(sieve_learner = make_learner(Lrnr_glmnet), max_degree = 2, through_weights = F, nbasis = 100,...) {
+    initialize = function(sieve_learner = make_learner(Lrnr_glmnet), max_degree = 2, through_weights = T, through_offset = T, nbasis = 100,...) {
       params <- args_to_list()
       super$initialize(params = params, ...)
     }
@@ -24,13 +24,25 @@ Lrnr_universal <- R6Class(
       Y <- task$Y
 
       if(self$params$through_weights) {
-        covariates <- setdiff(c(task$nodes$covariates, "Q"), "A")
+        if(self$params$through_offset) {
+          covariates <- setdiff(task$nodes$covariates, "A")
+          offset <- "Q"
+        } else {
+          covariates <- setdiff(c(task$nodes$covariates, "Q"), "A")
+          offset <- NULL
+        }
         weights <- task$weights / g
         column_names <- task$add_columns(data.table(weights = weights))
-        next_task <- task$next_in_chain(covariates = covariates, column_names = column_names, weights = "weights")
+        next_task <- task$next_in_chain(covariates = covariates,offset = offset, column_names = column_names, weights = "weights")
       } else {
-        covariates <- setdiff(c(task$nodes$covariates, "Q", "g"), "A")
-        next_task <- task$next_in_chain(covariates = covariates)
+        if(self$params$through_offset) {
+          covariates <- setdiff(c(task$nodes$covariates, "g"), "A")
+          offset <- "Q"
+        } else {
+          covariates <- setdiff(c(task$nodes$covariates, "Q", "g"), "A")
+          offset <- NULL
+        }
+        next_task <- task$next_in_chain(covariates = covariates, offset = offset)
       }
       X <- next_task$X
 
@@ -126,20 +138,29 @@ Lrnr_universal <- R6Class(
       max_degree <- self$params$max_degree
       g <- task$get_data(, "g")[[1]]
       if(self$params$through_weights) {
-        covariates <- setdiff(c(task$nodes$covariates, "Q"), "A")
-        num_orig <- length(covariates)
-
+        if(self$params$through_offset) {
+          covariates <- setdiff(task$nodes$covariates, "A")
+          offset <- "Q"
+        } else {
+          covariates <- setdiff(c(task$nodes$covariates, "Q"), "A")
+          offset <- NULL
+        }
         weights <- task$weights / g
         column_names <- task$add_columns(data.table(weights = weights))
-        next_task <- task$next_in_chain(covariates = covariates, column_names = column_names, weights = "weights")
+        next_task <- task$next_in_chain(covariates = covariates,offset = offset, column_names = column_names, weights = "weights")
       } else {
-        covariates <- setdiff(c(task$nodes$covariates, "Q", "g"), "A")
-        num_orig <- length(covariates)
-
-        next_task <- task$next_in_chain(covariates = covariates)
+        if(self$params$through_offset) {
+          covariates <- setdiff(c(task$nodes$covariates, "g"), "A")
+          offset <- "Q"
+        } else {
+          covariates <- setdiff(c(task$nodes$covariates, "Q", "g"), "A")
+          offset <- NULL
+        }
+        next_task <- task$next_in_chain(covariates = covariates, offset = offset)
       }
-
       X <- next_task$X
+
+
 
       covariates <- c()
       num_basis <- NULL
@@ -154,7 +175,7 @@ Lrnr_universal <- R6Class(
         next_task <- next_task$next_in_chain(covariates = covariates, column_names = column_names)
       }
       X <- next_task$X
-
+      num_orig <-  length(var_names)
 
 
       if(max_degree > 1){
