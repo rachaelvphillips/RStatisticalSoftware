@@ -1,6 +1,53 @@
 
+compute_thresh_estimate = function(likelihood, tmle_task = NULL, type = 1) {
+  if(is.null(tmle_task)){
+    tmle_task <- likelihood$training_task
+  }
+  cf_task <- tmle_task
+  cutoffs <- likelihood$factor_list$Y$learner$cutoffs
+  # cf_data where everyone is the maximum level of of the node so that they are above threshhold in every group
+  if(type == 1) {
+    cf_data <- data.table(rep(10*max(cutoffs), cf_task$nrow))
+  } else if (type ==0) {
+    cf_data <- data.table(rep(min(cutoffs- 10), cf_task$nrow))
+  }
+
+  setnames(cf_data, "A")
+
+  cf_data$id <- cf_task$id
+  cf_data$t <- cf_task$time
+
+  cf_task <- cf_task$generate_counterfactual_task(UUIDgenerate(), cf_data)
+
+  return(colMeans(matrix(likelihood$get_likelihood(cf_task, "Y"), ncol = length(cutoffs))))
+}
+
+make_thresh_npsem <- function(baseline_covariates, marker_covariates, outcome_covariate, censoring_indicator = NULL, data_adaptive = F) {
+  if(!data_adaptive) {
+    npsem <- list(define_node("W", baseline_covariates, c()),
+                  define_node("A", marker_covariates, "W"),
+                  define_node("Y", outcome_covariate, c("W", "A")))
+  } else {
+    npsem <- list(define_node("W", baseline_covariates, c()),
+                  define_node("A_learned", outcome_covariate, c("A")),
+                  define_node("A", marker_covariates, "W"),
+                  define_node("Y", outcome_covariate, c("W", "A")))
+  }
+  if(!is.null(censoring_indicator)) {
+    npsem <- c(npsem, list(define_node("delta_Y", censoring_indicator, c("W", "A"))))
+  }
+  return(npsem)
+
+}
+
+make_thresh_task <- function(data, npsem, ...) {
+  tmle3_Task$new(data, npsem, long_format = F, ...)
+}
+
 #' @export
-threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10, cv = T) {
+make_thresh_likelihood <- function(tmle_task, learner_list,
+                                   cutoffs= function(A) {as.vector(quantile(A, seq(0.05, 0.95, length.out = 10)))},
+                                   bins = 10, cv = T, marker_learner = NULL) {
   # covariates
   W_factor <- define_lf(LF_emp, "W")
 
@@ -13,16 +60,40 @@ threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10, cv
   } else {
     A_bound <- NULL
   }
+  data_adaptive <- !is.null(marker_learner)
+  if(data_adaptive) {
+    learned_marker_node <- "A_learned"
+    short_lik <- Likelihood$new(LF_fit$new("A_learned", marker_learner))
+    short_lik <- short_lik$train(tmle_task)
+    Aval <- short_lik$get_likelihood(tmle_task, "A_learned")
+  } else {
+    learned_marker_node <- "A"
+    short_lik <- NULL
+    Aval <- tmle_task$get_tmle_node("A")
+  }
+
+  if(is.function(cutoffs)) {
+    cutoffs <- cutoffs(Aval)
+  }
 
 
-  A_factor <- define_lf(LF_derived, "A", learner = Lrnr_CDF$new(learner_list[["A"]], bins, cutoffs, cv = cv),likelihood, generator_R,  type = "mean", bound = A_bound)
+  generator_A <- learner_marker_task_generator(learned_marker_node = learned_marker_node, learned_marker_var = "A", marker_node = "A", node = "A", data_adaptive = data_adaptive)
+
+  generator_Y <- learner_marker_task_generator(learned_marker_node = learned_marker_node, learned_marker_var = "A", marker_node = "A", node = "Y", data_adaptive = data_adaptive)
+
+  print(generator_Y(tmle_task, short_lik)$revere_fold_task("full")$data)
+  print(generator_A(tmle_task, short_lik)$revere_fold_task("full")$data)
+  print(data.table(cutoffs))
+  A_factor <- define_lf(LF_derived, "A", learner = Lrnr_CDF$new(learner_list[["A"]], bins, cutoffs, cv = cv),short_lik, generator_A,  type = "mean", bound = A_bound)
 
   # outcome
-  Y_factor <- LF_derived$new("Y", Lrnr_thresh$new(learner_list[["Y"]], tmle_task$npsem[["A"]]$variables, cutoffs =cutoffs, cv = cv ),likelihood, generator_R, type = "mean")
+  Y_factor <- LF_derived$new("Y", Lrnr_thresh$new(learner_list[["Y"]], "A", cutoffs =cutoffs, cv = cv ),short_lik, generator_Y, type = "mean")
 
 
   # construct and train likelihood
   factor_list <- list(W_factor, A_factor, Y_factor)
+
+
 
   # add outcome censoring factor if necessary
   if (!is.null(tmle_task$npsem[["Y"]]$censoring_node)) {
@@ -54,6 +125,11 @@ threshold_likelihood <- function(tmle_task, learner_list, cutoffs, bins = 10, cv
 Lrnr_thresh <- R6::R6Class(
   classname = "Lrnr_thresh", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
+  active = list(
+    cutoffs = function() {
+      self$params$cutoffs
+    }
+  ),
   public = list(
     initialize = function(lrnr = make_learner(Lrnr_glm), strata_variable, cutoffs,cv = T,
                           ...) {

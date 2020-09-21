@@ -1,12 +1,14 @@
 
 # Generated data-adaptive covariate "A"
-learner_marker_task_generator <- function(learned_marker_node = "A", learned_marker_var = "A", node = "Y", data_adaptive = T) {
+learner_marker_task_generator <- function(learned_marker_node = "A", learned_marker_var = "A", marker_node = "A", node = "Y", data_adaptive = T) {
   outA <- function(tmle_task, likelihood) {
     generator <- function(task, fold_number) {
       if(!data_adaptive) {
-        return(task)
+        preds <- tmle_task$get_tmle_node("A")
+      } else {
+        preds <- likelihood$get_likelihood(tmle_task,  learned_marker_node, fold_number)
       }
-      preds <- likelihood$get_likelihood(tmle_task,  learned_marker_node, fold_number)
+
       new_data <- as.data.table(preds)
       setnames(new_data, learned_marker_node)
 
@@ -24,16 +26,17 @@ learner_marker_task_generator <- function(learned_marker_node = "A", learned_mar
   outR <- function(tmle_task, likelihood) {
     generator <- function(task, fold_number) {
       if(!data_adaptive) {
-        return(task)
+        preds <- tmle_task$get_tmle_node("A")
+      } else {
+        preds <- likelihood$get_likelihood(tmle_task,  learned_marker_node, fold_number)
       }
-      preds <- likelihood$get_likelihood(tmle_task,  learned_marker_node, fold_number)
       new_data <- as.data.table(preds)
 
       setnames(new_data, learned_marker_var)
 
       column_names <- task$add_columns(new_data)
       # Removes the covariates corresponding with A
-      covariates <- sort(setdiff(union(task$nodes$covariates, learned_marker_var), tmle_task$npsem[[learned_marker_node]]$variables))
+      covariates <- sort(union(setdiff(task$nodes$covariates, tmle_task$npsem[[marker_node]]$variables), learned_marker_var))
       #Assumes that no extra covariates have been added.
       new_task <- task$next_in_chain(covariates = covariates, column_names = column_names)
 

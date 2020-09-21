@@ -54,7 +54,7 @@ Param_thresh <- R6Class(
       if(type == 1) {
         cf_data <- data.table(rep(10*max(cutoffs), cf_task$nrow))
       } else if (type ==0) {
-        cf_data <- data.table(rep(min(cutoffs)/10, cf_task$nrow))
+        cf_data <- data.table(rep(min(cutoffs) - 10, cf_task$nrow))
       }
 
       setnames(cf_data, thresh_node)

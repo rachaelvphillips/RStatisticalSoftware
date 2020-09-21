@@ -65,13 +65,13 @@ data
 library(delayed)
 factor_list <- list(LF_emp$new("W"), 
                     LF_fit$new("A", make_learner(Lrnr_mean)),
-                     LF_fit$new("R", Lrnr_cv$new(make_learner(Lrnr_mean, max_depth = 2), full_fit = T), type = "mean")
+                     LF_fit$new("R", Lrnr_cv$new(make_learner(Lrnr_glm, max_depth = 2), full_fit = T), type = "mean")
 )
 lik <- Likelihood$new(factor_list)
 lik <- lik$train(task)
 lrnr_sieve <- make_learner(Lrnr_glmnet_relaxed, relax_lambda = "best")
-
 lrnr_derived <-  Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 4, max_degree = 1)
+lrnr_derived <- make_learner(Lrnr_undersmooth, basis_generator = hal_basis(max_degree = 1))
 
 lrnr_derived <- make_learner(Lrnr_sl, lrnr_derived, metalearner = Lrnr_cv_selector$new())
 lik_copy <- lik$clone()
@@ -82,23 +82,6 @@ lik$add_factors(smoothR)
 new = smoothR$get_likelihood(task)[[1]]
 ```
 
-```{r}
-mean(ifelse(data$R==1, log(new), log(1 - new)))
-mean(ifelse(data$R==1, log(old), log(1 - old)))
-data.table(new)
-data.table(old)
-mean((data$gR - new)^2)
-mean((data$gR - old)^2)
-```
-
-```{r}
-rev <- make_revere(task, likelihood, "gen")
-rev1 <- make_revere(task, likelihood, "univ")
-rev$folds[[1]]$validation_set
-rev$revere_fold_task(1)$folds[[1]]$validation_set
-rev1$revere_fold_task(1)$folds[[1]]$validation_set
-training$
-```
 
 
 
@@ -110,10 +93,10 @@ rev <- make_revere(task, likelihood, "gen")
 
 lrnr_xgboost1 = Lrnr_LRR_xgboost$new(method = "IPW", max_depth = 2)
 lrnr_xgboost2 = Lrnr_LRR_xgboost$new(method = "plugin", max_depth = 2)
+lrnr_hal <- Lrnr_LRR_hal9001$new(method = "plugin", max_degree = 1)
 
 
-
-sl <- make_super_learner(list(lrnr_xgboost1,lrnr_xgboost2, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW"), Lrnr_LRR_glm$new(method = "plugin")
+sl <- make_super_learner(list(lrnr_xgboost1,lrnr_xgboost2, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW"), Lrnr_LRR_glm$new(method = "plugin"),lrnr_hal
                              ), task, likelihood )
 
 trained <- sl$train(rev)
@@ -145,19 +128,19 @@ trained$fit_object$full_fit
 
 
 ```{r}
+loss <- losss
 trained$fit_object$cv_fit$cv_risk(loss)
 trained
 other <- trained$fit_object$cv_fit$predict_fold(rev, "validation")
-other <- trained$fit_object$cv_fit$predict_fold(rev, "validation")
+other
 
-truerisk(v[[1]])
 truerisk(other[[1]])
 truerisk(other[[2]])
 truerisk(other[[3]])
 truerisk(other[[4]])
 print("k")
-loss <- losss
-mean(loss(v[[1]]))
+
+
 mean(loss(other[[1]]))
 mean(loss(other[[2]]))
 mean(loss(other[[3]]))

@@ -3,7 +3,7 @@ title: "dataAdapt"
 output: html_document
 ---
 
-```{r}
+```{r, include = F}
 devtools::document()
 
 library(sl3)
@@ -40,12 +40,27 @@ dat
 
 ```
 
+```{r, include = T}
+library(data.table)
+npsem <- make_thresh_npsem(c("W1", "W"), c("S"), "Y", data_adaptive = F)
+task <- make_thresh_task(as.data.table(dat), npsem)
+
+lik <- make_thresh_likelihood(task, list("A" = Lrnr_glm$new(), "Y" = Lrnr_glm$new()))
+```
+
+
+```{r}
+data.table(matrix(lik$get_likelihood(task, "A"), ncol = 10))
+data.table(matrix(lik$get_likelihood(task, "Y"), ncol = 10))
+compute_thresh_estimate(lik, type = 1)
+```
+
 
 ```{r, include = F}
 library(data.table)
 library(origami)
 library(delayed)
-cutoffs <-  quantile(dat$S, c(0.05, 0.1, 0.2, 0.4, 0.6))
+
 
 npsem <- list(define_node("W", "W", c()),
               define_node("A_learned", c("S"), c("A")),

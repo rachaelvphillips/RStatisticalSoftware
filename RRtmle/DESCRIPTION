@@ -15,7 +15,8 @@ Depends: R,
         tmle3,
         sl3,
         origami,
-        data.table
+        data.table,
+        delayed
 Imports:
     sl3,
     delayed,
