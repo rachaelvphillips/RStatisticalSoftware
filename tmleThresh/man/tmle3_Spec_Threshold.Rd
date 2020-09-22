@@ -15,6 +15,7 @@ Defines a TML Estimator (except for the data)
 \subsection{Public methods}{
 \itemize{
 \item \href{#method-new}{\code{tmle3_Spec_Threshold$new()}}
+\item \href{#method-make_tmle_task}{\code{tmle3_Spec_Threshold$make_tmle_task()}}
 \item \href{#method-make_initial_likelihood}{\code{tmle3_Spec_Threshold$make_initial_likelihood()}}
 \item \href{#method-make_params}{\code{tmle3_Spec_Threshold$make_params()}}
 \item \href{#method-clone}{\code{tmle3_Spec_Threshold$clone()}}
@@ -24,7 +25,6 @@ Defines a TML Estimator (except for the data)
 \out{<details open ><summary>Inherited methods</summary>}
 \itemize{
 \item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="tmle3_Spec" data-id="make_targeted_likelihood">}\href{../../tmle3/html/tmle3_Spec.html#method-make_targeted_likelihood}{\code{tmle3::tmle3_Spec$make_targeted_likelihood()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="tmle3_Spec" data-id="make_tmle_task">}\href{../../tmle3/html/tmle3_Spec.html#method-make_tmle_task}{\code{tmle3::tmle3_Spec$make_tmle_task()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="tmle3_Spec" data-id="make_updater">}\href{../../tmle3/html/tmle3_Spec.html#method-make_updater}{\code{tmle3::tmle3_Spec$make_updater()}}\out{</span>}
 }
 \out{</details>}
@@ -35,11 +35,22 @@ Defines a TML Estimator (except for the data)
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$new(
-  threshold_values = NULL,
-  num_thresholds = 10,
+  threshold_function = function(A) {     as.vector(quantile(A, seq(0.05, 0.95,
+    length.out = 10))) },
   cdf_bins = 10,
+  data_adaptive = F,
+  cv = data_adaptive,
   ...
 )}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-make_tmle_task"></a>}}
+\if{latex}{\out{\hypertarget{method-make_tmle_task}{}}}
+\subsection{Method \code{make_tmle_task()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_tmle_task(data, node_list)}\if{html}{\out{</div>}}
 }
 
 }

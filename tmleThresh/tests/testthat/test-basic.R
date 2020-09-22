@@ -67,15 +67,16 @@ likelihood <- likelihood$train(task)
 generator_R <- learner_marker_task_generator(learned_marker_node = "A_learned", node = "Y", data_adaptive = F)
 
 generator_A <- learner_marker_task_generator(learned_marker_node = "A_learned", node = "A", data_adaptive = F)
+head(generator_R(task, likelihood)$revere_fold_task("full")$data)
 
-lf_A <- LF_derived$new("A", Lrnr_CDF$new(make_learner(Lrnr_hal9001_fixed),
+lf_A <- LF_derived$new("A", Lrnr_CDF$new(make_learner(Lrnr_xgboost),
                                          10,  cutoffs, cv = F), likelihood, generator_A, type = "mean")
 lf_R <- LF_derived$new("Y", Lrnr_thresh$new(Lrnr_cv$new(make_learner(Pipeline, lrnr_bin, make_learner(Lrnr_wrapper, 5))),
-                                            strata_variable = "S",
+                                            strata_variable = "A",
                                             cutoffs = cutoffs), likelihood, generator_R, type = "mean")
 
-lf_R <- LF_derived$new("Y", Lrnr_thresh$new( make_learner(Lrnr_hal9001_fixed),
-                                            strata_variable = "S", cv = F,
+lf_R <- LF_derived$new("Y", Lrnr_thresh$new( make_learner(Lrnr_xgboost),
+                                            strata_variable = "A", cv = F,
                                             cutoffs = cutoffs), likelihood, generator_R, type = "mean")
 
 
@@ -85,7 +86,7 @@ likelihood$add_factors(list(lf_A, lf_R))
 cutoffs
 cf_task <- task
 
-cf_data <- data.table(rep(10*max(cutoffs), cf_task$nrow))
+cf_data <- data.table(rep(10 + max(cutoffs), cf_task$nrow))
 
 setnames(cf_data, "A")
 cf_data$id <- cf_task$id
@@ -111,9 +112,9 @@ for(cutoff in cutoffs) {
 # These should all be close
 out <- colMeans(as.matrix(Yout_cf))
 out
-results
+
 np_results
-assertthat::assert_that(max(abs(out - np_results)) < 0.025)
+assertthat::assert_that(max(abs(out - np_results)) < 0.01)
 
 results <- c()
 for(cutoff in cutoffs) {
@@ -121,7 +122,9 @@ for(cutoff in cutoffs) {
   results <- c(results, res)
 }
 results
-colMeans(Aout)
+out <- colMeans(Aout)
+out
+assertthat::assert_that(max(abs(out - results)) < 0.01)
 
 
 length(unlist(Aout))

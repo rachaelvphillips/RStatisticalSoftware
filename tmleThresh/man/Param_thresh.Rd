@@ -75,7 +75,6 @@ Estimates the threshold function E_W E[Y | A >=c, W] for a range of given values
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Param_thresh$new(
   observed_likelihood,
-  cutoffs,
   thresh_node = "A",
   outcome_node = "Y",
   type = 1

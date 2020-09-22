@@ -13,7 +13,7 @@ library(hal9001fast)
 
 
 ```{r}
-
+remotes::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
 #rmultinom(n = 2, c(1,2,3,4,5), rep(1/5,5))
 rmults <- function(n, size, prob) {
   size = size[1]
@@ -40,20 +40,28 @@ dat
 
 ```
 
-```{r, include = T}
-library(data.table)
-npsem <- make_thresh_npsem(c("W1", "W"), c("S"), "Y", data_adaptive = F)
-task <- make_thresh_task(as.data.table(dat), npsem)
 
-lik <- make_thresh_likelihood(task, list("A" = Lrnr_glm$new(), "Y" = Lrnr_glm$new()))
+
+
+
+```{r, include = F}
+tmle_spec <- tmle3_Spec_Threshold$new(data_adaptive = T,
+                                      threshold_function = function(A) {as.vector(quantile(A, seq(0.05, 0.90, length.out = 10)))})
+task <- tmle_spec$make_tmle_task(dat, list("W" = c("W1", "W"), "A" = "S", "Y" = "Y"))
+likelihood <- tmle_spec$make_initial_likelihood(task, list("A" = Lrnr_glm$new(), "A_learned" = Lrnr_glm$new(), "Y" = Lrnr_glm$new()))
+
+updater <- tmle_spec$make_updater()
+tlik <- tmle_spec$make_targeted_likelihood(likelihood, updater)
+
+params <- tmle_spec$make_params(task, tlik)
+(params[[1]]$estimates(task, "validation")$psi)
+updater$update(tlik, task)
+(params[[1]]$estimates(task, "validation")$psi)
 ```
 
 
-```{r}
-data.table(matrix(lik$get_likelihood(task, "A"), ncol = 10))
-data.table(matrix(lik$get_likelihood(task, "Y"), ncol = 10))
-compute_thresh_estimate(lik, type = 1)
-```
+
+
 
 
 ```{r, include = F}

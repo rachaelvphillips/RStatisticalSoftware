@@ -46,30 +46,16 @@ Param_thresh <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, cutoffs, thresh_node = "A", outcome_node = "Y", type = 1) {
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1) {
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
-      cf_task <- observed_likelihood$training_task
-      # cf_data where everyone is the maximum level of of the node so that they are above threshhold in every group
-      cf_task$data
-      if(type == 1) {
-        cf_data <- data.table(rep(10*max(cutoffs), cf_task$nrow))
-      } else if (type ==0) {
-        cf_data <- data.table(rep(min(cutoffs) - 10, cf_task$nrow))
-      }
 
-      setnames(cf_data, thresh_node)
+      compute_thresh_estimate(likelihood = observed_likelihood, fold_number = "full", type = type)
+      compute_thresh_estimate(likelihood = observed_likelihood, fold_number = "validation", type = type)
 
-      cf_data$id <- cf_task$id
-      cf_data$t <- cf_task$time
-
-      cf_task <- cf_task$generate_counterfactual_task(UUIDgenerate(), cf_data)
-      #cache task
-
-
-      observed_likelihood$get_likelihood(cf_task, "Y")
 
       private$.censoring_node <- (observed_likelihood$censoring_nodes[[outcome_node]])
       private$.thresh_node <- thresh_node
+      cutoffs <- likelihood$factor_list$Y$learner$cutoffs
       private$.cutoffs <- cutoffs
       private$.strict_threshold <- F
       private$.cf_task <- cf_task
@@ -87,7 +73,11 @@ Param_thresh <- R6Class(
       cdfS <- as.vector(self$observed_likelihood$get_likelihood(tmle_task, thresh_node, fold_number))
 
       cdfS <- bound(cdfS, c(0.0005, .9995))
-      S <- tmle_task$get_tmle_node(thresh_node)
+      if("A_learned" %in% names(tmle_task$npsem)) {
+        S <- self$observed_likelihood$get_likelihood(tmle_task, "A_learned", fold_number)
+      } else {
+        S <- tmle_task$get_tmle_node(thresh_node)
+      }
 
       if(!is.null(censoring_node)) {
         pCensoring <- self$observed_likelihood$get_likelihood(tmle_task, censoring_node, fold_number)
@@ -119,6 +109,7 @@ Param_thresh <- R6Class(
       if(length(indS)!= length(cdfS)) {
         stop("Uneven lengths in cdfS and indS")
       }
+      print(as.data.table(H))
       return(list(Y = H))
     },
     estimates = function(tmle_task = NULL, fold_number = "full") {
@@ -128,7 +119,7 @@ Param_thresh <- R6Class(
       thresh_node <- private$.thresh_node
       censoring_node <- private$.censoring_node
       cutoffs <- private$.cutoffs
-      cf_task <- private$.cf_task
+
       intervention_nodes <- union(names(self$intervention_list_treatment), names(self$intervention_list_control))
 
       # clever_covariates happen here (for this param) only, but this is repeated computation
@@ -140,14 +131,15 @@ Param_thresh <- R6Class(
       EY <- matrix(self$observed_likelihood$get_likelihood(tmle_task, self$outcome_node, fold_number), nrow = tmle_task$nrow)
 
       #get E[Y|A>=1, W]
-      EY1 <- matrix(self$observed_likelihood$get_likelihood(cf_task, self$outcome_node, fold_number), nrow = tmle_task$nrow)
+      EY1 <- matrix(compute_thresh_estimate(self$observed_likelihood, tmle_task, type = private$.type_est, fold_number = fold_number, return_estimate = F), nrow = tmle_task$nrow)
+      #EY1 <- matrix(self$observed_likelihood$get_likelihood(cf_task, self$outcome_node, fold_number), nrow = tmle_task$nrow)
 
       psi <- colMeans(EY1)
 
 
       IC <- HA * (as.vector(Y) - EY)  + t((t(EY1)  - psi))
-      weights <- tmle_task$get_regression_task(self$outcome_node)$weights
-      result <- list(psi = psi, IC = IC * weights)
+      #weights <- tmle_task$get_regression_task(self$outcome_node)$weights
+      result <- list(psi = psi, IC = IC )
       return(result)
     }
   ),

@@ -1,28 +1,44 @@
 
-compute_thresh_estimate = function(likelihood, tmle_task = NULL, type = 1) {
+compute_thresh_estimate = function(likelihood, tmle_task = NULL, type = 1, fold_number = "full", return_estimate = T) {
   if(is.null(tmle_task)){
     tmle_task <- likelihood$training_task
   }
   cf_task <- tmle_task
   cutoffs <- likelihood$factor_list$Y$learner$cutoffs
-  # cf_data where everyone is the maximum level of of the node so that they are above threshhold in every group
+  print(data.table(cutoffs))
+  data_adaptive <- "A_learned" %in% names(tmle_task$npsem)
+  if(data_adaptive) {
+    marker_vals <- likelihood$get_likelihood(likelihood$training_task, "A_learned", fold_number = fold_number)
+  } else{
+    marker_vals <- likelihood$training_task$get_tmle_node("A")
+  }
   if(type == 1) {
-    cf_data <- data.table(rep(10*max(cutoffs), cf_task$nrow))
-  } else if (type ==0) {
-    cf_data <- data.table(rep(min(cutoffs- 10), cf_task$nrow))
+    max_indiv <- which.max(marker_vals)
+  } else if (type == 0) {
+    max_indiv <- which.min(marker_vals)
   }
 
-  setnames(cf_data, "A")
+  all_marker_vals <- tmle_task$get_tmle_node("A", format = T)
+  max_row <- likelihood$training_task$get_tmle_node("A")[max_indiv]
+  all_marker_vals[] <- max_row
 
-  cf_data$id <- cf_task$id
-  cf_data$t <- cf_task$time
+  column_names <- tmle_task$add_columns(all_marker_vals)
+  cf_task <- tmle_task$next_in_chain(column_names = column_names)
 
-  cf_task <- cf_task$generate_counterfactual_task(UUIDgenerate(), cf_data)
 
-  return(colMeans(matrix(likelihood$get_likelihood(cf_task, "Y"), ncol = length(cutoffs))))
+  #cf_task <- cf_task$generate_counterfactual_task(UUIDgenerate(), cf_data)
+ lik <- likelihood$get_likelihood(cf_task, "Y", fold_number = fold_number)
+ if(!return_estimate){
+   return(lik)
+ }
+  return(colMeans(matrix(lik, ncol = length(cutoffs))))
 }
 
-make_thresh_npsem <- function(baseline_covariates, marker_covariates, outcome_covariate, censoring_indicator = NULL, data_adaptive = F) {
+make_thresh_npsem <- function(node_list, data_adaptive = F) {
+  baseline_covariates <- node_list[["W"]]
+  marker_covariates <- node_list[["A"]]
+  outcome_covariate <- node_list[["Y"]]
+  censoring_indicator <- node_list[["delta_Y"]]
   if(!data_adaptive) {
     npsem <- list(define_node("W", baseline_covariates, c()),
                   define_node("A", marker_covariates, "W"),
@@ -63,7 +79,11 @@ make_thresh_likelihood <- function(tmle_task, learner_list,
   data_adaptive <- !is.null(marker_learner)
   if(data_adaptive) {
     learned_marker_node <- "A_learned"
-    short_lik <- Likelihood$new(LF_fit$new("A_learned", marker_learner))
+    if(cv){
+      short_lik <- Likelihood$new(LF_fit$new("A_learned", Lrnr_sl$new(marker_learner), type = "mean"))
+    } else {
+      short_lik <- Likelihood$new(LF_fit$new("A_learned", marker_learner, type = "mean"))
+    }
     short_lik <- short_lik$train(tmle_task)
     Aval <- short_lik$get_likelihood(tmle_task, "A_learned")
   } else {
@@ -81,9 +101,7 @@ make_thresh_likelihood <- function(tmle_task, learner_list,
 
   generator_Y <- learner_marker_task_generator(learned_marker_node = learned_marker_node, learned_marker_var = "A", marker_node = "A", node = "Y", data_adaptive = data_adaptive)
 
-  print(generator_Y(tmle_task, short_lik)$revere_fold_task("full")$data)
-  print(generator_A(tmle_task, short_lik)$revere_fold_task("full")$data)
-  print(data.table(cutoffs))
+
   A_factor <- define_lf(LF_derived, "A", learner = Lrnr_CDF$new(learner_list[["A"]], bins, cutoffs, cv = cv),short_lik, generator_A,  type = "mean", bound = A_bound)
 
   # outcome
@@ -91,7 +109,7 @@ make_thresh_likelihood <- function(tmle_task, learner_list,
 
 
   # construct and train likelihood
-  factor_list <- list(W_factor, A_factor, Y_factor)
+  factor_list <- c(list(W_factor, A_factor, Y_factor),short_lik$factor_list)
 
 
 
@@ -335,7 +353,7 @@ Lrnr_CDF <- R6::R6Class(
           threshs <- c(min_Y, self$params$threshs, max_Y)
           cutoffs <-  unique(quantile(threshs,seq(0, 1, length.out = num_bins),  type = 1))
           cutoffs <- unique(cutoffs)
-          print(cutoffs)
+
 
         }
 
@@ -361,7 +379,7 @@ Lrnr_CDF <- R6::R6Class(
                                      = T)
           #nested revere task
           if(length(unique(Y))!= length(cutoffs) - 1) {
-            stop("oops")
+            #stop("oops")
           }
 
           data_list <- list()
@@ -386,7 +404,7 @@ Lrnr_CDF <- R6::R6Class(
 
             weights <- as.numeric(data$bin <= data$Y) * task$weights
             data$weights <-weights
-            print("shshs")
+
             #data <- data[keep]
             #data <- data[keep]
           } else {
@@ -479,7 +497,7 @@ Lrnr_CDF <- R6::R6Class(
       predictions <- as.vector(predictions)
 
       predictions <- (matrix(predictions, ncol = length(threshs), byrow = F))
-      print(head(predictions))
+
       return(as.vector(predictions))
       #predictions <- sl3::pack_predictions(predictions)
 

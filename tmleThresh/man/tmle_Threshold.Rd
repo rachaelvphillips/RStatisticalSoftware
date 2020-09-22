@@ -4,7 +4,14 @@
 \alias{tmle_Threshold}
 \title{All Treatment Specific Means}
 \usage{
-tmle_Threshold(threshold_values, num_thresholds, cdf_bins, ...)
+tmle_Threshold(
+  threshold_function = function(A) {     as.vector(quantile(A, seq(0.05, 0.95,
+    length.out = 10))) },
+  cdf_bins = 10,
+  data_adaptive = F,
+  cv = data_adaptive,
+  ...
+)
 }
 \arguments{
 \item{treatment_level}{the level of A that corresponds to treatment}
