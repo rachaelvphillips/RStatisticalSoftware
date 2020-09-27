@@ -6,6 +6,7 @@ rmults <- function(n, size, prob) {
 
 }
 
+
 adjusted_sim <- function(n = 1000){
   library(simcausal)
   D <- DAG.empty()

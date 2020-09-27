@@ -7,7 +7,6 @@ library(delayed)
 library(sl3)
 library(hal9001fast)
 library(tmle3)
-library(tmleThresh)
 rmults <- function(n, size, prob) {
   size = size[1]
   prob = prob[1]
@@ -15,7 +14,7 @@ rmults <- function(n, size, prob) {
 
 }
 
-n = 10000
+n = 15000
 library(simcausal)
 D <- DAG.empty()
 D <- D +
@@ -67,18 +66,17 @@ likelihood <- likelihood$train(task)
 generator_R <- learner_marker_task_generator(learned_marker_node = "A_learned", node = "Y", data_adaptive = F)
 
 generator_A <- learner_marker_task_generator(learned_marker_node = "A_learned", node = "A", data_adaptive = F)
-head(generator_R(task, likelihood)$revere_fold_task("full")$data)
+tmp <- (generator_R(task, likelihood)$revere_fold_task("full"))
 
-lf_A <- LF_derived$new("A", Lrnr_CDF$new(make_learner(Lrnr_xgboost),
+lf_A <- LF_derived2$new("A", Lrnr_CDF$new(make_learner(Lrnr_xgboost),
                                          10,  cutoffs, cv = F), likelihood, generator_A, type = "mean")
-lf_R <- LF_derived$new("Y", Lrnr_thresh$new(Lrnr_cv$new(make_learner(Pipeline, lrnr_bin, make_learner(Lrnr_wrapper, 5))),
+lf_R <- LF_derived2$new("Y", Lrnr_thresh$new(Lrnr_cv$new(make_learner(Pipeline, lrnr_bin, make_learner(Lrnr_wrapper, 5))),
                                             strata_variable = "A",
                                             cutoffs = cutoffs), likelihood, generator_R, type = "mean")
 
-lf_R <- LF_derived$new("Y", Lrnr_thresh$new( make_learner(Lrnr_xgboost),
-                                            strata_variable = "A", cv = F,
-                                            cutoffs = cutoffs), likelihood, generator_R, type = "mean")
-
+lf_R <- LF_derived2$new("Y", Lrnr_thresh$new( make_learner(Lrnr_xgboost),
+                                              strata_variable = "A", cv = F,
+                                              cutoffs = cutoffs), likelihood, generator_R, type = "mean")
 
 
 
@@ -128,3 +126,4 @@ assertthat::assert_that(max(abs(out - results)) < 0.01)
 
 
 length(unlist(Aout))
+

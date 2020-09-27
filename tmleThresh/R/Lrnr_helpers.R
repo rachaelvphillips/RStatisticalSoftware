@@ -164,9 +164,10 @@ Lrnr_wrapper <- R6Class(
 
     .predict = function(task) {
       ncol <- self$params$ncol
+
       X <- ((task$X))
 
-      out <- (apply(X, 2, function(v) {
+      out <- as.data.table(apply(X, 2, function(v) {
         if(self$params$pack){
           v <- matrix(v, ncol = ncol)
           predictions <- pack_predictions(v)
@@ -188,7 +189,7 @@ Lrnr_chainer <- R6Class(
   inherit = Lrnr_base, portable = TRUE,
   class = TRUE,
   public = list(
-    initialize = function(cutoffs = cutoffs, strata_variable = strata_variable, ...) {
+    initialize = function(cutoffs, strata_variable, ...) {
 
       params <- list(strata_variable = strata_variable, cutoffs = cutoffs,...)
       super$initialize(params = params, ...)
@@ -210,15 +211,16 @@ Lrnr_chainer <- R6Class(
     },
 
     .chain = function(task) {
+      print(proc.time())
       args <- self$params
       cutoffs <- args$cutoffs
-
       strata_variable <- args$strata_variable
 
       if(inherits(task, "delayed")) {
         task <- task$compute()
       }
       if(inherits(task, "sl3_revere_Task")) {
+        print(stop("this shouldnt be"))
         new_generator <- function(task, fold_number) {
           task <- task$revere_fold_task(fold_number)
           data <- task$data
@@ -251,7 +253,7 @@ Lrnr_chainer <- R6Class(
         data <- task$data
         cutoffs <- args$cutoffs
         data_list <- list()
-
+        print(proc.time())
         for(cutoff in cutoffs) {
           Xcopy <- copy(data)
           Xcopy$bin <- cutoff
@@ -259,6 +261,7 @@ Lrnr_chainer <- R6Class(
           Xcopy[[strata_variable]] <- NULL
           data_list[[as.character(cutoff)]] <- Xcopy
         }
+        print(proc.time())
         data <- rbindlist(data_list)
 
         nodes <- task$nodes
@@ -267,7 +270,7 @@ Lrnr_chainer <- R6Class(
         task <- sl3_Task$new(data, nodes = nodes)
 
       }
-
+      print(proc.time())
       return(task)
     },
     .required_packages = NULL

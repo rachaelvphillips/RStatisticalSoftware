@@ -1,0 +1,138 @@
+---
+title: "EfficientThresh"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min = -1, max = 1) +
+  node("S", distr = "runif",  min = -5, max = 5) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( -7 + 1 + S + W ))) +
+  node("Z", distr = "rbinom", size = 1 , prob = Y*0.5 + (1-Y)*(0.8)) +
+  node("pZ", distr = "rconst",const = Y*0.5 + (1-Y)*(0.8)) 
+setD <- set.DAG(D)
+data <- sim(setD, n = 100500)
+mean(data$Y[data$Z==1])
+mean(data$Y[data$Z==0])
+mean(data$Z[data$Y==1])
+mean(data$Z[data$Y==0])
+```
+
+
+```{r}
+rmults <- function(n, size, prob) {
+  size = size[1]
+  prob = prob[1]
+  apply(rmultinom(n = n, 1:size, rep(prob, size))==1, 2, which)
+
+}
+rmults(2, c(5,5), c(1/5,1/5))
+
+
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "rmults", size = 15 , prob = 1/15) +
+  node("W", distr = "rconst", const = W1 + 1) +
+  node("S", distr = "runif",  min = -5, max = 5) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis((S ))) + 
+    node("pY", distr = "rconst",const = plogis((S )))
+
+
+setD <- set.DAG(D)
+dat <- sim(setD, n = 1000)
+dat
+
+```
+
+
+```{r}
+npsem <- list(define_node("W", "W", c()),
+     define_node("A", "S", "W"),
+     define_node("Y", "Y", c("A", "W")))
+
+task <- tmle3_Task$new(dat, npsem)
+```
+
+
+
+```{r}
+learner_list <- list(
+  "A" = Lrnr_condensier$new(),
+  "Y" = Lrnr_glm$new()
+)
+
+LF_A <- LF_fit$new("A", learner_list[["A"]])
+LF_Y <- LF_fit$new("Y", learner_list[["Y"]], type = "mean")
+likelihood <- Likelihood$new(list(LF_A, LF_Y))
+likelihood <- likelihood$train(task)
+
+```
+
+
+
+
+```{r}
+data.table(likelihood$get_likelihood(task, "A"))
+data.table(likelihood$get_likelihood(task, "Y"))
+```
+
+
+
+
+```{r}
+library(R6)
+
+data <- data.table(id = task$id, A = task$get_tmle_node("A"))
+A_grid <- quantile(data$A)
+param <- Param_thresh_eff$new(likelihood)
+```
+
+
+```{r}
+longtask <- param$make_long_task(task)
+
+v = param$clever_covariates(longtask, for_fitting = F)
+v1 = param$clever_covariates(task, for_fitting = F)
+```
+
+```{r}
+
+dat <-cbind(longtask$get_data(,"trueid"), A = longtask$get_tmle_node("A"), W = longtask$get_tmle_node("W"), Atrue = task$get_tmle_node("A"), Wtrue = task$get_tmle_node("W"), id = task$id)
+dat
+indv <- which(abs(dat$A - dat$Atrue) < 1e-3 & abs(dat$W - dat$Wtrue) <  1e-3 & dat$id == dat$trueid)
+
+ids <- dat$trueid[indv]
+ids <-  as.numeric(as.character((ids)))
+data.table(v1$Y[ids,])
+data.table(v$Y[indv,])
+data.table(v1$Y[ids,]) - data.table(v$Y[indv,] )
+ data.table(v1$A[ids,]) - data.table(v$A[indv,] )
+
+```
+```{r}
+library(dplyr)
+long_g_id <- v$long_g_id[,c("id", "g")]
+long_g_id
+t = proc.time()
+ long_g_id[, c(0, cumsum(g)[-length(g)]), by = id]
+proc.time() - t
+t = proc.time()
+long_g_id[, frollsum(.SD, 2, na.rm=T, align = "right"), by = id]
+ proc.time() - t
+ 
+ t = proc.time()
+ h = 1 -v$cdf[, .SD[5] , by = id][[2]]
+ proc.time() - t
+```
+
+
+

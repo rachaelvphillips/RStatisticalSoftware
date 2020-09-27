@@ -40,29 +40,31 @@
 #'     }
 #' }
 #' @export
-Param_thresh <- R6Class(
-  classname = "Param_thresh",
+Param_thresh_survival <- R6Class(
+  classname = "Param_thresh_survival",
   portable = TRUE,
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1) {
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = c("Nt"), type = 1, target_times = NULL) {
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
 
-      compute_thresh_estimate(likelihood = observed_likelihood, fold_number = "full", type = type)
-      compute_thresh_estimate(likelihood = observed_likelihood, fold_number = "validation", type = type)
+      #compute_thresh_estimate(likelihood = observed_likelihood, fold_number = "full", type = type)
+      #compute_thresh_estimate(likelihood = observed_likelihood, fold_number = "validation", type = type)
 
 
-      private$.censoring_node <- (observed_likelihood$censoring_nodes[[outcome_node]])
+      private$.censoring_node <-"At"
       private$.thresh_node <- thresh_node
-      cutoffs <- likelihood$factor_list$Y$learner$cutoffs
+      cutoffs <- observed_likelihood$factor_list$Nt$learner$cutoffs
+
       private$.cutoffs <- cutoffs
       private$.strict_threshold <- F
-      private$.cf_task <- cf_task
+      private$.target_times <- target_times
+      #rivate$.cf_task <- cf_task
       private$.type_est <- type
 
     },
-    clever_covariates = function(tmle_task = NULL, fold_number = "full") {
+    clever_covariates = function(tmle_task = NULL, fold_number = "full", for_fitting = F) {
       if (is.null(tmle_task)) {
         tmle_task <- self$observed_likelihood$training_task
       }
@@ -73,50 +75,133 @@ Param_thresh <- R6Class(
       cdfS <- as.vector(self$observed_likelihood$get_likelihood(tmle_task, thresh_node, fold_number))
 
       cdfS <- bound(cdfS, c(0.0005, .9995))
+      cdfS_wide <- matrix(cdfS, ncol = length(cutoffs))
       if("A_learned" %in% names(tmle_task$npsem)) {
         S <- self$observed_likelihood$get_likelihood(tmle_task, "A_learned", fold_number)
       } else {
         S <- tmle_task$get_tmle_node(thresh_node)
       }
 
-      if(!is.null(censoring_node)) {
-        pCensoring <- self$observed_likelihood$get_likelihood(tmle_task, censoring_node, fold_number)
-        uncensored <- as.vector(as.numeric(as.numeric(tmle_task$get_tmle_node(censoring_node))==1))
-      } else {
-        pCensoring <- 1
-        uncensored <- 1
-      }
-      uncensored <- 1
+
       if(private$.type_est == 1) {
         indS <- as.vector(unlist(lapply(cutoffs, function(cutoff) {as.numeric(S >= cutoff)})))
       } else if(private$.type_est == 0) {
         indS <- as.vector(unlist(lapply(cutoffs, function(cutoff) {as.numeric(S < cutoff)})))
       }
-      #Uses
+      indS_wide <- matrix(indS, ncol = length(cutoffs))
 
-      HA <- indS * uncensored / (pCensoring * (1-cdfS))
-      n = tmle_task$nrow
+      #Uses
+      times <- sort(tmle_task$npsem[["Nt"]]$time)
+
+      if(!tmle_task$force_at_risk) {
+        cf_task <- tmle_task$clone()
+        cf_task$force_at_risk <- T
+      } else {
+        cf_task <- tmle_task
+      }
+
+      Q <- matrix(self$observed_likelihood$get_likelihood(cf_task, "Nt", fold_number), ncol = length(cutoffs))
+      # Survival of N
+
+      Q <- bound(Q, 0.0005)
+      Q_surv <- apply(Q, 2, function(v) {
+        #Survival stacked by person
+        as.vector((apply( 1 -matrix(v, ncol = length(times), byrow = T), 1, cumprod)))
+      })
+      #Survival left continuous of A
+      G <- self$observed_likelihood$get_likelihood(cf_task, "At", fold_number)
+      G <- bound(G, 0.0005)
+      G_surv <- apply( 1 -matrix(G, ncol = length(times), byrow = T), 1, cumprod)
+      G_surv <- as.vector(rbind(rep(1, ncol(G_surv)), G_surv[-1,]))
+
+
+      if(nrow(Q) != nrow(Q_surv)) {
+        stop("Row numbers of surv and hazard dont match.")
+      }
+
+
+
+      # Gets stacked clever covariates
+
+      hk_at_tgt <- function(tgt_time) {
+        return(as.vector(do.call(cbind, lapply(1:ncol(Q_surv), function(j) {
+          cdfS <- 1 - cdfS_wide[,j]
+
+          indS <- indS_wide[,j]
+          Q_surv <- Q_surv[,j]
+          G_surv <- G_surv
+          Q_surv <- matrix(Q_surv, ncol = length(times), byrow = F)
+          G_surv <- matrix(G_surv, ncol = length(times), byrow = F)
+          index_set_to_zero <- which(times > tgt_time)
+
+          # Get survival at target time
+          Q_surv_tgt <- Q_surv[,which(tgt_time ==times)]
+          # This is the clever covariate matrix at a single target time
+
+
+          clever_cov = -1 *(indS*Q_surv_tgt/cdfS)/ (G_surv*Q_surv)
+          if(length(index_set_to_zero) >0){
+            clever_cov[,index_set_to_zero] <- 0
+          }
+          return(as.vector(t(clever_cov)))
+        }))))
+      }
+      target_times <- self$target_times
+      if(is.null(target_times)) {
+        target_times <- times
+        private$.target_times <- times
+      }
+      HA <- as.matrix(do.call(cbind, lapply(target_times, hk_at_tgt)))
+      at_risk <- unlist(tmle_task$get_regression_task("Nt", drop_censored = F, expand = T)$get_data(,"at_risk"))
+
+      zero_rows <- as.numeric(at_risk == 1)
+      HA <- HA * zero_rows
+      observed_N <- tmle_task$get_tmle_node("Nt", include_time = T, include_id = T, expand= T)
+
+      IC_N <- NULL
+      if(for_fitting) {
+        observed_N_wide <- reshape(observed_N, idvar = "id", timevar = "t", direction = "wide")
+        observed_N_wide$id <- NULL
+        # TODO this is crazy slow, code better and dont recompute
+        to_dNt <- function(v){
+          dt = c(0,diff((v)))
+          return(dt)
+        }
+        # Converts to dNt format
+        observed_dN_wide <- t(apply(observed_N_wide, 1, to_dNt))
+
+
+
+
+        jump_time <- nrow(observed_N_wide) - apply(observed_N_wide, 1, sum) + 1
+        t_mat <- matrix(1:ncol(observed_dN_wide), ncol = ncol(observed_dN_wide), nrow = nrow(observed_dN_wide), byrow = T )
+        # TODO dont recompute this every time
+        ind = t_mat <= jump_time
+        residuals = as.vector((as.vector(t(observed_dN_wide)) - Q)*as.vector(t(ind)))
+        IC_N <- HA*residuals
+        IC_N <- do.call(cbind, unlist(apply(IC_N, 2, function(v) {
+          list(matrix(v, ncol = length(cutoffs)))
+        }), recursive = F))
+      }
+
+      n = nrow(observed_N)
       k = length(cutoffs)
-      H <- matrix(0, nrow = length(HA), ncol = k)
+      H <- matrix(0, nrow = nrow(HA), ncol = k*ncol(HA))
       for(i in 1:k){
         first <- (i-1)*n + 1
         last <- (i)*n
-        H[first:last,i] <- HA[first:last]
+        j = 1:ncol(HA) + (i-1)*ncol(HA)
+        H[first:last,j] <- HA[first:last,]
       }
 
-      if(any(!dplyr::near(rowSums(H),HA))){
-        stop("oops")
-      }
-      if(length(indS)!= length(cdfS)) {
-        stop("Uneven lengths in cdfS and indS")
-      }
-
-      return(list(Y = H))
+      return(list(Nt = H, IC = list(Nt = IC_N)))
     },
     estimates = function(tmle_task = NULL, fold_number = "full") {
       if (is.null(tmle_task)) {
         tmle_task <- self$observed_likelihood$training_task
       }
+      cf_task <- tmle_task$clone()
+      cf_task$force_at_risk <- TRUE
       thresh_node <- private$.thresh_node
       censoring_node <- private$.censoring_node
       cutoffs <- private$.cutoffs
@@ -124,7 +209,7 @@ Param_thresh <- R6Class(
       intervention_nodes <- union(names(self$intervention_list_treatment), names(self$intervention_list_control))
 
       # clever_covariates happen here (for this param) only, but this is repeated computation
-      HA <- matrix(rowSums(self$clever_covariates(tmle_task, fold_number)[[self$outcome_node]]), nrow = tmle_task$nrow)
+      IC_N <- self$clever_covariates(tmle_task, fold_number)$IC[[self$outcome_node]]
 
       Y <- matrix(tmle_task$get_tmle_node(self$outcome_node, impute_censoring = TRUE), nrow = tmle_task$nrow)
 
@@ -138,7 +223,7 @@ Param_thresh <- R6Class(
       psi <- colMeans(EY1)
 
 
-      IC <- HA * (as.vector(Y) - EY)  + t((t(EY1)  - psi))
+      IC <- IC_N  + t((t(EY1)  - psi))
       #weights <- tmle_task$get_regression_task(self$outcome_node)$weights
       result <- list(psi = psi, IC = IC )
       return(result)
@@ -155,6 +240,9 @@ Param_thresh <- R6Class(
 
     update_nodes = function() {
       return(c(self$outcome_node))
+    },
+    target_times = function() {
+      private$.target_times
     }
   ),
   private = list(
@@ -169,6 +257,7 @@ Param_thresh <- R6Class(
     .cutoffs = NULL,
     .strict_threshold = NULL,
     .cf_task = NULL,
-    .type_est = NULL
+    .type_est = NULL,
+    .target_times = NULL
   )
 )

@@ -173,7 +173,8 @@ halnet <- R6Class("halnet", private = list(
   buildSuperLearner = function(){
 
     sl3_library = private$buildLibrary()
-    sl3_superlearner = make_learner(Pipeline, Lrnr_cv$new(sl3_library), make_learner(Lrnr_cv_selector))
+    sl3_superlearner = Lrnr_sl$new(sl3_library, Lrnr_cv_selector$new())
+    #sl3_superlearner = make_learner(Pipeline, Lrnr_cv$new(sl3_library), make_learner(Lrnr_cv_selector))
     if(!is.null(self$learners_spec$subset_learner)){
       sl3_superlearner = make_learner(Pipeline, self$learners_spec$subset_learner, sl3_superlearner)
       sl3_library = make_learner(Pipeline, self$learners_spec$subset_learner, sl3_library)
@@ -346,30 +347,13 @@ public = list(
     return(fit)
   },
   predict = function(newTask = NULL, CV_pred = F){
+    fold = ifelse(CV_pred, "validation", "full")
 
 
-    if(!CV_pred){
-      lrnr =  self$learners_spec$sl3_library
-    }
-    else{
-      lrnr =  self$learners_spec$sl3_superlearner
-    }
+    lrnr =  self$learners_spec$sl3_superlearner
 
-    if(!CV_pred){
 
-      coefs = which(self$learners_spec$sl3_superlearner$learner_fits$Lrnr_cv_selector$coefficients==1)
-      if(is.null(newTask)){
-        predmat = data.frame(lrnr$predict())
-        return(list(predmat,predmat[,coefs, drop = F]))
-      }
-      predmat = data.frame(lrnr$predict(newTask))
-      return(list(predmat,predmat[,coefs, drop=F]))
-    }
-
-    if(is.null(newTask)){
-      return(lrnr$predict())
-    }
-    return(lrnr$predict(newTask))
+    return(lrnr$predict_fold(newTask, fold))
   },
 
 
@@ -391,7 +375,7 @@ public = list(
 
   },
   cv_risk = function(){
-    self$learners_spec$sl3_superlearner$learner_fits[[1]]$cv_risk(loss_squared_error)
+    self$learners_spec$sl3_superlearner$cv_risk(loss_squared_error)
 
   },
   validate = function(task = NULL, CV_pred = F){
@@ -400,7 +384,7 @@ public = list(
     }
 
     truth = task$get_node("outcome")
-    mat = self$predict(task, CV_pred = CV_pred, at_optimal = F )
+    mat = self$predict(task, CV_pred = CV_pred)
     out = data.frame(t(apply(mat, MARGIN = 2, function(x){c(cor(x,truth),mean((truth-x)^2))})))
     colnames(out) = c("R", "MSE")
     out1=out[order(-out$R),]
