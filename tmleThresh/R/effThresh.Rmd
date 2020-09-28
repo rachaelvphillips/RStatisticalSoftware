@@ -7,9 +7,13 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r, include = F}
+devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
+
+```
 
 ```{r}
-
+library(tmle3)
 library(simcausal)
 D <- DAG.empty()
 D <- D +
@@ -42,7 +46,10 @@ D <- DAG.empty()
 D <- D +
   node("W1", distr = "rmults", size = 15 , prob = 1/15) +
   node("W", distr = "rconst", const = W1 + 1) +
-  node("S", distr = "runif",  min = -5, max = 5) +
+  node("W2", distr = "rmults", size = 15 , prob = 1/15) +
+  node("Wa", distr = "rconst", const = W1 + 1) +
+  node("Sd", distr = "rmults",  size = 10, prob = plogis((W-8)/20)) +
+  node("S", distr = "rnorm", mean = (W-8)/8) +
   node("Y", distr = "rbinom", size =1 , prob = plogis((S ))) + 
     node("pY", distr = "rconst",const = plogis((S )))
 
@@ -52,7 +59,10 @@ dat <- sim(setD, n = 1000)
 dat
 
 ```
+```{r}
+devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
 
+```
 
 ```{r}
 npsem <- list(define_node("W", "W", c()),
@@ -62,11 +72,13 @@ npsem <- list(define_node("W", "W", c()),
 task <- tmle3_Task$new(dat, npsem)
 ```
 
-
-
+```{r}
+task$npsem$A$variable_type
+```
+Lrnr_pooled_hazards
 ```{r}
 learner_list <- list(
-  "A" = Lrnr_condensier$new(),
+  "A" = Lrnr_density_discretize$new(),
   "Y" = Lrnr_glm$new()
 )
 
@@ -74,35 +86,60 @@ LF_A <- LF_fit$new("A", learner_list[["A"]])
 LF_Y <- LF_fit$new("Y", learner_list[["Y"]], type = "mean")
 likelihood <- Likelihood$new(list(LF_A, LF_Y))
 likelihood <- likelihood$train(task)
-
+tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "logistic", "A" = "EIC"), updater = list(one_dimensional = T, constrain_step = T, delta_epsilon = list("Y" = 1e-3, "A" = function(x) {
+  res = 0.9/max(abs(x))
+  
+  res <- min(res, 0.1)
+  return(res)
+}), convergence_type = "scaled_var"))
 ```
-
-
-
-
-```{r}
-data.table(likelihood$get_likelihood(task, "A"))
-data.table(likelihood$get_likelihood(task, "Y"))
-```
-
 
 
 
 ```{r}
 library(R6)
+mean(-log(tlik$get_likelihood(task, "A")))
+param <- Param_thresh_eff$new(tlik, discretize_g = F)
+```
+1.371835
 
-data <- data.table(id = task$id, A = task$get_tmle_node("A"))
-A_grid <- quantile(data$A)
-param <- Param_thresh_eff$new(likelihood)
+```{r}
+mean(-log(tlik$get_likelihood(task, "A")))
+#v=param$clever_covariates(task, node = "A", for_fitting = F)
+mean(-log(tlik$get_likelihood(task, "A")))
+```
+1.354231
+
+```{r, include = T}
+for(i in 1:2) {
+tlik$updater$update_step(tlik, task)
+}
+```
+
+
+
+```{r}
+v = param$clever_covariates(task, for_fitting = T, node = "A")
+data.table(apply(v$IC$A,2,var))
+weights_A <- 1/apply(v$IC$A,2,var)
+weights_A <- weights_A #/(sum(weights_A))
+#norm(colMeans(v$IC$A)*sqrt(weights_A), type="2")/sqrt(10)
+norm(colMeans(v$IC$A)*1, type="2")/sqrt(10)
+print(data.table(v$psi_W))
 ```
 
 
 ```{r}
 longtask <- param$make_long_task(task)
-
-v = param$clever_covariates(longtask, for_fitting = F)
-v1 = param$clever_covariates(task, for_fitting = F)
+quantile(tlik$get_likelihood(longtask, "A"))
+quantile(tlik$get_likelihood(task, "A"))
 ```
+
+```{r}
+
+mean(-log(tlik$get_likelihood(task, "A")))
+```
+2.328143
 
 ```{r}
 

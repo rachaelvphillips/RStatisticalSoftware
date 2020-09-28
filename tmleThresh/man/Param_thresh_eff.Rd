@@ -85,7 +85,8 @@ Other Parameters:
   outcome_node = "Y",
   type = 1,
   thresholds = NULL,
-  num_bins = 100
+  num_bins = 200,
+  discretize_g = F
 )}\if{html}{\out{</div>}}
 }
 
@@ -98,7 +99,8 @@ Other Parameters:
 \if{html}{\out{<div class="r">}}\preformatted{Param_thresh_eff$clever_covariates(
   tmle_task = NULL,
   fold_number = "full",
-  for_fitting = F
+  for_fitting = F,
+  node = NULL
 )}\if{html}{\out{</div>}}
 }
 
