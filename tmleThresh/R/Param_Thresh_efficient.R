@@ -46,8 +46,8 @@ Param_thresh_eff <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, num_bins = 200, discretize_type = c("equal_mass", "equal_range")) {
-      discretize_g = F
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, num_bins = 200, discretize_type = c("mix", "equal_mass", "equal_range"), discretize_g = T) {
+
       discretize_type <- match.arg(discretize_type)
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
 
@@ -61,7 +61,22 @@ Param_thresh_eff <- R6Class(
       }
       else {
       #A_grid <- sl3:::make_bins(range, "equal_mass", num_bins)
-      A_grid <- sl3:::make_bins(range, discretize_type, num_bins)
+        if(discretize_type == "mix") {
+          A_grid1 <- sl3:::make_bins(range, "equal_mass", round(num_bins * 0.85))
+          min_diff1 <- min(abs(diff(A_grid1)))
+          A_grid2 <- sl3:::make_bins(range, "equal_range", round(num_bins * 0.3))
+          min_diff2 <- min(abs(diff(A_grid2)))
+          A_grid <- sort(union(A_grid1, A_grid2))
+          min_diff <- min(min_diff2, min_diff1)
+          print(length(A_grid))
+          remove <- setdiff(which(diff(A_grid) <min_diff) +1, c(length(A_grid)) )
+          remove <- intersect(remove, seq(2, length(A_grid), 2))
+          print(paste0("Removed: ", length(remove)))
+
+          A_grid <- A_grid[-remove]
+        } else {
+          A_grid <- sl3:::make_bins(range, discretize_type, num_bins)
+        }
       #A_grid <- seq(0, 1, length.out = num_bins)
       #A_grid <- sort(unique(quantile(range, A_grid, type = 3)))
       private$.censoring_node <- (observed_likelihood$censoring_nodes[[outcome_node]])
@@ -149,11 +164,15 @@ Param_thresh_eff <- R6Class(
           #\g_int <- na.omit(long_g_id[, frollsum(.SD, 2, na.rm=T, align = "right"), by = id,.SDcols = "g"])[[2]] /2
           g_int <- (long_g_id[, .SD[-nrow(.SD)], by = id, .SDcols = "g"])[[2]]
 
-          if(F & private$.discretize_g == T & tmle_task$uuid != long_task$uuid & for_fitting){
+          #TODO do we want our density/mean and integrals to be exact?
+          if(private$.discretize_g == T && for_fitting){
             g_discrete <- matrix(g_int, nrow = length(unique(A_diff$id)), byrow = T)
             match_index <- findInterval(A, A_grid, all.inside = T)
             index_mat <- cbind(1:length(A), match_index)
             g_discrete <- g_discrete[index_mat]
+            print("risk")
+            print(mean(-log(g_discrete)))
+            print(mean(-log(g)))
             g <- g_discrete
           }
           #g_int <- na.omit(long_g_id[, .SD[-.N], by = id,.SDcols = "g"])[[2]]
@@ -208,7 +227,7 @@ Param_thresh_eff <- R6Class(
           step_number <- likelihood$cache$get_update_step(likelihood_factor, task, fold_number, node = "A")
           step_number_long <- likelihood$cache$get_update_step(likelihood_factor, long_task, fold_number, node = "A")
 
-          if(any(norm_C > 1)) {
+          if(any(norm_C > 1) ) {
             likelihood$cache$set_values(likelihood_factor, task, step_number, fold_number, g, node = "A")
             likelihood$cache$set_values(likelihood_factor, long_task, step_number_long, fold_number, long_g_id$g, node = "A")
           }
@@ -294,8 +313,8 @@ Param_thresh_eff <- R6Class(
         }))
 
         IC_A <- IC_A * a_mat
-        print(max(abs(IC_A)))
-        print("IC")
+       # print(max(abs(IC_A)))
+      #  print("IC")
 
         for(i in 1:ncol(IC_A)) {
         IC_id <- data.table(IC = IC_A[,i], id = long_g_id$id)
@@ -305,7 +324,7 @@ Param_thresh_eff <- R6Class(
         IC_new$A_g <- integral$A_g
 
         center <-  IC_new[, sum(IC* A_g), by = id][[2]]
-        print(max(center))
+       # print(max(center))
         #IC_A[,i] <- IC_A[,i] - center
         }
 

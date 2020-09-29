@@ -211,7 +211,7 @@ Lrnr_chainer <- R6Class(
     },
 
     .chain = function(task) {
-      print(proc.time())
+
       args <- self$params
       cutoffs <- args$cutoffs
       strata_variable <- args$strata_variable
@@ -253,7 +253,7 @@ Lrnr_chainer <- R6Class(
         data <- task$data
         cutoffs <- args$cutoffs
         data_list <- list()
-        print(proc.time())
+
         for(cutoff in cutoffs) {
           Xcopy <- copy(data)
           Xcopy$bin <- cutoff
@@ -261,7 +261,7 @@ Lrnr_chainer <- R6Class(
           Xcopy[[strata_variable]] <- NULL
           data_list[[as.character(cutoff)]] <- Xcopy
         }
-        print(proc.time())
+
         data <- rbindlist(data_list)
 
         nodes <- task$nodes
@@ -270,7 +270,7 @@ Lrnr_chainer <- R6Class(
         task <- sl3_Task$new(data, nodes = nodes)
 
       }
-      print(proc.time())
+
       return(task)
     },
     .required_packages = NULL

@@ -106,20 +106,16 @@ tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "
   return(res)
 }), convergence_type = "scaled_var"))
 mean(-log(tlik$get_likelihood(task, "A")))
-param <- Param_thresh_eff$new(tlik,  num_bins= 213, discretize_type = "equal_range")
+param <- Param_thresh_eff$new(tlik,  num_bins= 200, discretize_type = "mix", discretize_g = T)
 ```
 
 
-```{r}
-long_task <- param$make_long_task(task)
-long_task$data
-g <- tlik$get_likelihood(task, "A")
-```
+
 
 
 ```{r, include = F}
 mean(-log(tlik$get_likelihood(task, "A")))
-for(i in 1:1) {
+for(i in 1:5) {
 tlik$updater$update_step(tlik, task)
 }
 mean(-log(tlik$get_likelihood(task, "A")))

@@ -55,8 +55,8 @@ make_thresh_npsem <- function(node_list, data_adaptive = F) {
 
 }
 #' @export
-make_thresh_task <- function(data, npsem, ...) {
-  tmle3_Task$new(data, npsem, long_format = F, ...)
+make_thresh_task <- function(data, npsem, weights = NULL) {
+  tmle3_Task$new(data, npsem, long_format = F, weights = weights)
 }
 
 #' @export
@@ -384,7 +384,7 @@ Lrnr_CDF <- R6::R6Class(
       return(lrnr)
     },
     .process_task = function(task, cutoffs = NULL, training = F) {
-      print(proc.time())
+
       args <- self$params
       num_bins <- args$num_bins
 
@@ -395,7 +395,7 @@ Lrnr_CDF <- R6::R6Class(
         task1 <- task$revere_fold_task("validation")
         data <- task1$data
         Y <- task1$Y
-        print(proc.time())
+
         if(is.null(cutoffs)) {
           #cutoffs <- as.vector(quantile(Y, seq(0, 1, length.out = num_bins)))
           min_Y <- min(Y)
@@ -474,7 +474,7 @@ Lrnr_CDF <- R6::R6Class(
         }
         pooled_task <- sl3_revere_Task$new(new_generator, task)
       } else {
-        print(proc.time())
+
         data <- task$data
         Y <- task$Y
         if(is.null(cutoffs)) {
@@ -514,7 +514,7 @@ Lrnr_CDF <- R6::R6Class(
       return(list(task = pooled_task, cutoffs = cutoffs, folds = new_folds))
     },
     .train = function(task, fit) {
-      print(proc.time())
+
 
         return(list(lrnr = fit))
     },

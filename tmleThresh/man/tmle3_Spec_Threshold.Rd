@@ -50,7 +50,7 @@ Defines a TML Estimator (except for the data)
 \if{latex}{\out{\hypertarget{method-make_tmle_task}{}}}
 \subsection{Method \code{make_tmle_task()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_tmle_task(data, node_list)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_tmle_task(data, node_list, weights = NULL)}\if{html}{\out{</div>}}
 }
 
 }

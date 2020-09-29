@@ -58,7 +58,7 @@ Param_thresh <- R6Class(
       cutoffs <- likelihood$factor_list$Y$learner$cutoffs
       private$.cutoffs <- cutoffs
       private$.strict_threshold <- F
-      private$.cf_task <- cf_task
+      #private$.cf_task <- cf_task
       private$.type_est <- type
 
     },

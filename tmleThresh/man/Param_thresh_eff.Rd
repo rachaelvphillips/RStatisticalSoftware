@@ -86,7 +86,8 @@ Other Parameters:
   type = 1,
   thresholds = NULL,
   num_bins = 200,
-  discretize_type = c("equal_mass", "equal_range")
+  discretize_type = c("mix", "equal_mass", "equal_range"),
+  discretize_g = T
 )}\if{html}{\out{</div>}}
 }
 

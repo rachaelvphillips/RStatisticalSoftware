@@ -18,9 +18,9 @@ tmle3_Spec_Threshold <- R6Class(
         cdf_bins = cdf_bins, data_adaptive = data_adaptive, cv = cv, ...
       )
     },
-    make_tmle_task = function(data, node_list) {
+    make_tmle_task = function(data, node_list, weights = NULL) {
       npsem <- make_thresh_npsem(node_list, data_adaptive = self$options$data_adaptive)
-      tmle_task <- make_thresh_task(data, npsem)
+      tmle_task <- make_thresh_task(data, npsem, weights = weights)
       return(tmle_task)
     },
     make_initial_likelihood = function(tmle_task, learner_list = NULL) {
