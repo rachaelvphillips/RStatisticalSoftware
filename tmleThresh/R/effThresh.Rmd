@@ -51,6 +51,7 @@ D <- D +
   node("Sd", distr = "rmults",  size = 10, prob = plogis((W-8)/20)) +
   node("S", distr = "rnorm", mean = (W-8)/8) +
   node("Y", distr = "rbinom", size =1 , prob = plogis((S ))) + 
+   node("Yd", distr = "rbinom", size =1 , prob = plogis((S - 5))) + 
     node("pY", distr = "rconst",const = plogis((S )))
 
 
@@ -87,7 +88,7 @@ LF_Y <- LF_fit$new("Y", learner_list[["Y"]], type = "mean")
 likelihood <- Likelihood$new(list(LF_A, LF_Y))
 likelihood <- likelihood$train(task)
 tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "logistic", "A" = "EIC"), updater = list(one_dimensional = T, constrain_step = T, delta_epsilon = list("Y" = 1e-3, "A" = function(x) {
-  res = 0.9/max(abs(x))
+  res = 0.75/max(abs(x))
   
   res <- min(res, 0.1)
   return(res)
@@ -98,28 +99,40 @@ tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "
 
 ```{r}
 library(R6)
+tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "logistic", "A" = "EIC"), updater = list(one_dimensional = T, constrain_step = T, delta_epsilon = list("Y" = 1e-3, "A" = function(x) {
+  res = 0.75/max(abs(x))
+  
+  res <- min(res, 0.1)
+  return(res)
+}), convergence_type = "scaled_var"))
 mean(-log(tlik$get_likelihood(task, "A")))
-param <- Param_thresh_eff$new(tlik, discretize_g = F)
+param <- Param_thresh_eff$new(tlik,  num_bins= 213, discretize_type = "equal_range")
 ```
-1.371835
+
+
+```{r}
+long_task <- param$make_long_task(task)
+long_task$data
+g <- tlik$get_likelihood(task, "A")
+```
+
+
+```{r, include = F}
+mean(-log(tlik$get_likelihood(task, "A")))
+for(i in 1:1) {
+tlik$updater$update_step(tlik, task)
+}
+mean(-log(tlik$get_likelihood(task, "A")))
+```
 
 ```{r}
 mean(-log(tlik$get_likelihood(task, "A")))
-#v=param$clever_covariates(task, node = "A", for_fitting = F)
-mean(-log(tlik$get_likelihood(task, "A")))
+
 ```
-1.354231
-
-```{r, include = T}
-for(i in 1:2) {
-tlik$updater$update_step(tlik, task)
-}
-```
-
-
 
 ```{r}
 v = param$clever_covariates(task, for_fitting = T, node = "A")
+
 data.table(apply(v$IC$A,2,var))
 weights_A <- 1/apply(v$IC$A,2,var)
 weights_A <- weights_A #/(sum(weights_A))

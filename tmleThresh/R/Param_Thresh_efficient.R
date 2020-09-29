@@ -46,7 +46,9 @@ Param_thresh_eff <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, num_bins = 200, discretize_g = F ) {
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, num_bins = 200, discretize_type = c("equal_mass", "equal_range")) {
+      discretize_g = F
+      discretize_type <- match.arg(discretize_type)
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
 
 
@@ -58,15 +60,19 @@ Param_thresh_eff <- R6Class(
         thresholds <- A_grid
       }
       else {
-      A_grid <- sl3:::make_bins(range, "equal_mass", num_bins)
+      #A_grid <- sl3:::make_bins(range, "equal_mass", num_bins)
+      A_grid <- sl3:::make_bins(range, discretize_type, num_bins)
       #A_grid <- seq(0, 1, length.out = num_bins)
       #A_grid <- sort(unique(quantile(range, A_grid, type = 3)))
       private$.censoring_node <- (observed_likelihood$censoring_nodes[[outcome_node]])
       private$.thresh_node <- thresh_node
       if(is.null(thresholds)) {
         if(length(A_grid) > 10) {
-          thresholds <- A_grid[round(seq.int(round(length(A_grid) * 0.05), round(length(A_grid) * 0.95), 10))]
-        } else {
+          thresholds <- quantile(range, seq(0.05, 0.95, length.out = 10))
+          thresholds <- A_grid[findInterval(thresholds, A_grid)]
+          #thresholds <- c(A_grid[190])
+
+          } else {
           thresholds <- A_grid
         }
       }
@@ -109,7 +115,11 @@ Param_thresh_eff <- R6Class(
       if(long_task$uuid == tmle_task$uuid) {
         is_long <- T
       }
+
       g_long <- as.vector(likelihood$get_likelihood(long_task, "A"))
+      if(any(g_long <0)) {
+        stop("Negative density epsilon to big")
+      }
       Q_long <- as.vector(likelihood$get_likelihood(long_task, "Y"))
 
       long_g_id <- data.table(A = long_task$get_tmle_node("A", include_id = F), g = g_long, id = NA)
@@ -128,6 +138,7 @@ Param_thresh_eff <- R6Class(
       }
       cdf <- private$.cache_shared$cdf
       psi_W <- private$.cache_shared$psi_W
+      integral <- private$.cache_shared$integral
       if(!is.null(cdf)) {
         #print(data.table(matrix(cdf, nrow = 1000, byrow = F)))
 
@@ -135,8 +146,8 @@ Param_thresh_eff <- R6Class(
       if(is.null(cdf)) {
         if(variable_type == "continuous") {
           A_diff <- long_g_id[,  diff(A), by = id]
-          #g_int <- na.omit(long_g_id[, frollsum(.SD, 2, na.rm=T, align = "right"), by = id,.SDcols = "g"])[[2]] /2
-          g_int <- na.omit(long_g_id[, .SD[-nrow(.SD)], by = id, .SDcols = "g"])[[2]]
+          #\g_int <- na.omit(long_g_id[, frollsum(.SD, 2, na.rm=T, align = "right"), by = id,.SDcols = "g"])[[2]] /2
+          g_int <- (long_g_id[, .SD[-nrow(.SD)], by = id, .SDcols = "g"])[[2]]
 
           if(F & private$.discretize_g == T & tmle_task$uuid != long_task$uuid & for_fitting){
             g_discrete <- matrix(g_int, nrow = length(unique(A_diff$id)), byrow = T)
@@ -147,60 +158,78 @@ Param_thresh_eff <- R6Class(
           }
           #g_int <- na.omit(long_g_id[, .SD[-.N], by = id,.SDcols = "g"])[[2]]
           #Q_int <- na.omit(Q_long_id[, frollsum(.SD, 2, na.rm=T, align = "right"), by = id, .SDcols = "Q"])[[2]] /2
-          Q_int <- na.omit(Q_long_id[, .SD[-nrow(.SD)], by = id, .SDcols = "Q"])[[2]]
+          Q_int <- (Q_long_id[, .SD[-nrow(.SD)], by = id, .SDcols = "Q"])[[2]]
 
           A_int <- long_g_id[, A, by = id][[2]]
           integral <- data.table(A_diff,  g = g_int, Q = Q_int)
           setnames(integral, c("id", "A_diff", "g", "Q"))
-          cdf <- integral[, c(0,cumsum(A_diff*g)), by = id]
+          integral[, A_g := A_diff*g]
+
+          #cdf <- integral[, c(0,cumsum(A_diff*g)), by = id]
+          cdf <- integral[, c(0,cumsum(A_g)), by = id]
+          #cdf <- integral[,  c(rev(cumsum(rev(A_g ))),0), by = id]
+
+          #old_cdf <- (integral[,  c(0,cumsum(A_g )), by = id])
+          #setnames(cdf, c("id", "int"))
+          #cdf <- cdf[,  int[1] - int, by = id]
 
           norm_C <- cdf[, last(.SD), by = id][[2]]
-          if(any(abs(norm_C - 1) > 1e-5 )) {
+
+          if(any(abs(norm_C - 1) > 1e-6 )) {
+            print(sum(norm_C > 1+1e-9))
             print(quantile(norm_C))
+
             warning("Density no longer integrates to 1")
           }
 
-          norm_C <- 1
+          #norm_C <- 1
           cdf <- cdf[[2]]
           cdf <- as.vector(matrix(cdf, ncol = length(A_grid), byrow = T))
-          print(data.table(matrix(cdf, nrow = 1000)))
-          if(for_fitting & FALSE) {
-
+          if(T & for_fitting & any(norm_C > 1)) {
             long_g_id$g <- long_g_id$g/norm_C
-
             g <- g/norm_C
-
             integral$g <- as.vector(t(matrix(integral$g,  ncol = length(A_grid)-1, byrow = T)/norm_C))
             cdf <- cdf /norm_C
           }
 
-          psi_W <- integral[,  c(rev(cumsum(rev(A_diff * g * Q ))),0), by = id]
+          psi_W <- integral[,  c(rev(cumsum(rev(A_g * Q ))),0), by = id]
+          psi_W_other <- integral[,  c(0, cumsum(Q*A_g  )), by = id]
+          setnames(psi_W_other, c("id", "int"))
+
+          psi_W_other <- psi_W_other[,  int[.N] - int, by = id]
+          psi_W <- psi_W_other
           psi_W$A <- A_int
           setnames(psi_W, c("id", "int", "A"))
 
           private$.cache_shared$cdf <- cdf
           private$.cache_shared$psi_W <- psi_W
-
+          private$.cache_shared$integral <- integral
           likelihood_factor <- likelihood$factor_list[["A"]]
           step_number <- likelihood$cache$get_update_step(likelihood_factor, task, fold_number, node = "A")
           step_number_long <- likelihood$cache$get_update_step(likelihood_factor, long_task, fold_number, node = "A")
-          if(FALSE) {
+
+          if(any(norm_C > 1)) {
             likelihood$cache$set_values(likelihood_factor, task, step_number, fold_number, g, node = "A")
+            likelihood$cache$set_values(likelihood_factor, long_task, step_number_long, fold_number, long_g_id$g, node = "A")
           }
-          likelihood$cache$set_values(likelihood_factor, long_task, step_number_long, fold_number, long_g_id$g, node = "A")
 
 
         } else {
-          A_int <- long_g_id[, A, by = id][[2]]
+          #A_int <- long_g_id[, A, by = id][[2]]
           A_diff <- 1
           integral <- data.table(long_g_id$id, A = A_diff,  g = long_g_id$g, Q = Q_long_id$Q)
           setnames(integral, c("id", "A_diff", "g", "Q"))
+          integral[, A_g := g]
           cdf <- integral[, c(0, cumsum(g)[-length(g)]), by = id]
+          norm_C <- integral[,  sum(g), by = id][[2]]
+          print(quantile(norm_C))
           cdf <- cdf[[2]]
           cdf <- as.vector(matrix(cdf, ncol = length(A_grid), byrow = T))
+
           psi_W <- integral[,  rev(cumsum(rev( g * Q ))), by = id]
-          psi_W$A <- A_int
-          setnames(psi_W, c("id", "int", "A"))
+          #psi_W$A <- A_int
+          setnames(psi_W, c("id", "int"))
+          integral <- integral[,.SD, by = id]
         }
 
       }
@@ -246,9 +275,13 @@ Param_thresh_eff <- R6Class(
       psi_Wb <- as.vector(matrix(psi_Wb, ncol = length(A_grid), byrow = T)[,indices])
       #print(data.table(matrix(psi_Wb, ncol = length(thresholds))))
       survlong <-  1 - cdfb
-      survlong <- bound(survlong, c(0.0005,1))
+      if(min(survlong) < 0.0005) {
+        warning("very small survival prob")
+      }
+      survlong <- bound(survlong, c(0.0005,10))
+
       psi_Wlong <- psi_Wb / survlong
-      print( proc.time() - t)
+
       if(is.null(node) || (!is.null(node) & node == "A")) {
       if(is_long) {
         Qwide <- matrix(Q, nrow = length(unique(trueid)))
@@ -261,6 +294,21 @@ Param_thresh_eff <- R6Class(
         }))
 
         IC_A <- IC_A * a_mat
+        print(max(abs(IC_A)))
+        print("IC")
+
+        for(i in 1:ncol(IC_A)) {
+        IC_id <- data.table(IC = IC_A[,i], id = long_g_id$id)
+        IC_new <- IC_id[, IC[-.N], by = id]
+        #IC_new <- IC_id[, IC, by = id]
+        setnames(IC_new, c("id", "IC"))
+        IC_new$A_g <- integral$A_g
+
+        center <-  IC_new[, sum(IC* A_g), by = id][[2]]
+        print(max(center))
+        #IC_A[,i] <- IC_A[,i] - center
+        }
+
 
       } else {
 
@@ -304,8 +352,7 @@ Param_thresh_eff <- R6Class(
       } else {
         H_Y <- NULL
       }
-      print("H")
-      print( proc.time() - t)
+
 
       # H_Y <- as.matrix(do.call(cbind, lapply(thresholds, function(thresh) {
       #   ind <- as.numeric(A >= thresh)
