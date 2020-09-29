@@ -1,0 +1,53 @@
+---
+title: "Method1_simulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+setD=generate_covariates()
+p0 = 0.2
+p1 = 1
+# Y follows a logit model
+dat_logit=simu_logit_cov(0.4,n=1000,p0=p0,p1=p1,seed=1,setD=setD, beta1 = -1)
+data <- data.table(dat_logit)
+data$weights <- ifelse(data$Y==1, 1/p1,1/p0)
+#data$weights <- 1
+```
+
+
+```{r}
+node_list <- list("W" = c("W4", "W5", "W6"), "A" = "S", "Y" = "Y")
+
+tmle_spec <- tmle3_Spec_Threshold$new(data_adaptive = F,
+                                      threshold_function = function(A) {as.vector(quantile(A, seq(0.05, 0.90, length.out = 10)))})
+
+data
+task <- tmle_spec$make_tmle_task(data, node_list, weights = "weights")
+task$get_regression_task("Y")$data
+```
+
+
+```{r}
+likelihood <- tmle_spec$make_initial_likelihood(task, list("A" = Lrnr_glm$new(), "A_learned" = NULL, "Y" = Lrnr_glm$new()))
+
+updater <- tmle_spec$make_updater()
+tlik <- tmle_spec$make_targeted_likelihood(likelihood, updater)
+
+params <- tmle_spec$make_params(task, tlik)
+```
+
+
+```{r}
+# NO targeting yet.
+#CDF- P(A<v|W) from ML
+data.table(matrix(tlik$get_likelihood(task, "A"), nrow=1000))
+# E[Y|A>=v,W] estimate based on ML
+data.table(matrix(tlik$get_likelihood(task, "Y"), nrow=1000))
+compute_thresh_estimate(tlik, task, return_estimate = T)
+
+```
