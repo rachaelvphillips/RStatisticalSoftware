@@ -55,7 +55,10 @@ make_thresh_npsem <- function(node_list, data_adaptive = F) {
 
 }
 #' @export
-make_thresh_task <- function(data, npsem, weights = NULL) {
+make_thresh_task <- function(data, npsem, weights = NULL, discretize_treatment = F, num_bins = 20) {
+  if(discretize_treatment) {
+    data <- discretize_variable(data, npsem[["A"]]$variables, num_bins)
+  }
   tmle3_Task$new(data, npsem, long_format = F, weights = weights)
 }
 
@@ -147,6 +150,73 @@ make_thresh_likelihood <- function(tmle_task, learner_list,
   likelihood <- likelihood_def$train(tmle_task)
   return(likelihood)
 }
+
+
+
+
+#' @export
+make_thresh_likelihood_eff <- function(tmle_task, learner_list ) {
+  # covariates
+  W_factor <- define_lf(LF_emp, "W")
+
+  # treatment (bound likelihood away from 0 (and 1 if binary))
+  A_type <- tmle_task$npsem[["A"]]$variable_type
+  if (A_type$type == "continous") {
+    A_bound <- c(1 / tmle_task$nrow, Inf)
+  } else if (A_type$type %in% c("binomial", "categorical")) {
+    A_bound <- 0.025
+  } else {
+    A_bound <- NULL
+  }
+
+
+
+
+  Y_type <- tmle_task$npsem[["Y"]]$variable_type
+
+
+
+
+  A_factor <- define_lf(LF_fit, "A", learner = learner_list[["A"]], bound = A_bound)
+
+  # outcome
+
+  Y_factor <- LF_fit$new("Y", learner_list[["Y"]], type = "mean")
+
+
+
+
+
+
+  factor_list <- list(W_factor, A_factor, Y_factor)
+
+
+
+
+
+  # add outcome censoring factor if necessary
+  if (!is.null(tmle_task$npsem[["Y"]]$censoring_node)) {
+    if (is.null(learner_list[["delta_Y"]])) {
+      stop("Y is subject to censoring, but no learner was specified for censoring mechanism delta_Y")
+    }
+    #TODO
+    delta_Y_factor <- define_lf(LF_fit, "delta_Y", learner = learner_list[["delta_Y"]], type = "mean", bound = c(0.025, 1))
+    factor_list <- c(factor_list, delta_Y_factor)
+  }
+
+  if (!is.null(tmle_task$npsem[["A"]]$censoring_node)) {
+    stop("A is subject to censoring, this isn't supported yet")
+  }
+
+  if (!is.null(tmle_task$npsem[["W"]]$censoring_node)) {
+    stop("W is subject to censoring, this isn't supported yet")
+  }
+
+  likelihood_def <- Likelihood$new(factor_list)
+  likelihood <- likelihood_def$train(tmle_task)
+  return(likelihood)
+}
+
 
 
 #' @export

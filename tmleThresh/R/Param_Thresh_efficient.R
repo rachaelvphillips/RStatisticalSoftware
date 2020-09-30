@@ -166,6 +166,8 @@ Param_thresh_eff <- R6Class(
 
           #TODO do we want our density/mean and integrals to be exact?
           if(private$.discretize_g == T && for_fitting){
+            #Only do once
+            private$.discretize_g <- F
             g_discrete <- matrix(g_int, nrow = length(unique(A_diff$id)), byrow = T)
             match_index <- findInterval(A, A_grid, all.inside = T)
             index_mat <- cbind(1:length(A), match_index)
