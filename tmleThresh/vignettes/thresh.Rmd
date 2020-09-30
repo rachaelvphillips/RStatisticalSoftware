@@ -1,0 +1,107 @@
+---
+title: "thresh"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
+
+
+```
+
+
+```{r}
+devtools::install_github("tlverse/sl3", ref = "devel")
+library(tmle3)
+library(sl3)
+library(hal9001fast)
+```
+
+
+
+```{r}
+
+#rmultinom(n = 2, c(1,2,3,4,5), rep(1/5,5))
+rmults <- function(n, size, prob) {
+  size = size[1]
+  prob = prob[1]
+  apply(rmultinom(n = n, 1:size, rep(prob, size))==1, 2, which)
+
+}
+rmults(2, c(5,5), c(1/5,1/5))
+```
+
+```{r}
+
+
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "rmults", size = 15 , prob = 1/15) +
+  node("W", distr = "rconst", const = W1 + 1) +
+  node("S", distr = "runif",  min = -5, max = 5) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis((S ))) + 
+    node("pY", distr = "rconst",const = plogis((S )))
+
+
+setD <- set.DAG(D)
+dat <- sim(setD, n = 1500)
+dat
+
+```
+
+
+```{r}
+spec <- tmle3_Spec_Threshold$new(threshold_values  = quantile(dat$S, c(0.05, 0.1, 0.2, 0.4, 0.6)))
+dat
+lrnr_bin <- make_learner(Lrnr_glm_fast)
+fit <- tmle3(spec, dat, list(W = "W", A = "S", Y = "Y"), list(A = lrnr_bin, Y = lrnr_bin))
+```
+
+
+```{r}
+task <- fit$tmle_task
+colMeans(fit$tmle_params[[1]]$estimates(task)$IC)
+apply(fit$tmle_params[[1]]$estimates(task)$IC, 2, var)
+```
+
+
+
+
+
+
+
+
+
+```{r}
+quantile(dat$S, c(0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 0.9))
+cutoff = -3
+
+
+summary_from_estimates(task, list(est), simultaneous_ci = F , param_types = "threshold")
+
+np_estimate <- function(task, cutoff) {
+  A <- task$get_tmle_node("A")
+  Y <- task$get_tmle_node("Y")
+  sum(Y * (A >= cutoff)) / sum(A >= cutoff)
+}
+np_estimate(task, -3)
+```
+
+
+
+
+
+
+```{r}
+
+adjusted_sim(1000)
+```
+
+
+
+

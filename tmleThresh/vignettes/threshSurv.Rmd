@@ -1,0 +1,184 @@
+---
+title: "threshSurv"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+devtools::document()
+```
+
+```{r}
+
+devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
+```
+
+```{r}
+library(data.table)
+rmults <- function(n, size, prob) {
+  size = size[1]
+  prob = prob[1]
+  apply(rmultinom(n = n, 1:size, rep(prob, size))==1, 2, which)
+
+}
+
+
+
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "rmults", size = 15 , prob = 1/15) +
+  node("W", distr = "rconst", const = W1 + 1) +
+  node("S", distr = "runif",  min = -5, max = 5) +
+  node("Tcont", distr = "rweibull", shape = 0.7, scale = 7* abs(W/5 + S/6)  ) +
+  node("T", distr = "rconst", const = min(ceiling(Tcont), 12) ) +
+  node("Ccont", distr = "rweibull", shape = 0.7, scale = 7* abs(W/5 + S/6)    ) +
+  node("C", distr = "rconst", const = min(ceiling(Ccont), 12) ) +
+  node("Ttilde", distr = "rconst", const = min(T,C)) +
+  node("Delta", distr = "rconst", const = as.numeric(T <= C) )
+
+
+setD <- set.DAG(D)
+data <- sim(setD, n = 2500)
+data <- as.data.table(data)
+data$id <- data$ID
+data$ID <- NULL
+data
+data <- data[data$T <= 7]
+
+```
+
+```{r}
+data
+times <- 1:max(data$Ttilde)
+long_data <- rbindlist(lapply(times, function(time) {
+  data <- copy(data)
+  data$t <- time
+  data$Nt <- as.numeric(data$Ttilde == time & data$Delta == 1)
+  data$At <- as.numeric(data$Ttilde == time & data$Delta == 0)
+  data <- data[, c("id", "t", "W", "S", "Nt", "At", "Delta", "Ttilde")]
+  return(data)
+}))
+
+baseline <- data[,c("id", "W", "S", "Delta", "Ttilde")]
+baseline$Nt <- 0
+baseline$At <- 0
+baseline$t <- 0
+long_data <- rbind(baseline, long_data)
+
+
+setkey(long_data, id ,t)
+long_data[,Nt := as.numeric(dplyr::cumany(Nt)), by = id]
+long_data[,At := as.numeric(dplyr::cumany(At)), by = id]
+long_data
+
+
+```
+
+```{r}
+library(tmle3)
+nodes <- c("At", "Nt")
+competing_risks_indicator <- function(data, time, args, cols) {
+    all_risks <- setdiff(cols, "t")
+    parents <- args$parents
+
+
+    past_jump_id <- data[t<time, last(.SD), .SDcols = all_risks, by = id]
+
+    past_jump_id <- past_jump_id$id[rowSums(past_jump_id[, ..all_risks]) == 0]
+    if(length(parents) > 0){
+      cur_jump_id <- data[id %in% past_jump_id, last(.SD), .SDcols = parents, by = id]
+      cur_jump_id <- cur_jump_id$id[rowSums(cur_jump_id[, ..parents]) == 0]
+    } else {
+      cur_jump_id <- past_jump_id
+    }
+    set(data, , "keep", as.numeric(data$id %in% cur_jump_id) )
+    return(data[, c("id", "keep")])
+  }
+  risk_set_map_Nt <- Summary_measure$new(c(nodes, "t"), competing_risks_indicator, args_to_pass = list(parents = c()), group_by_id = F)
+  risk_set_map_At <- Summary_measure$new(c(nodes, "t"), competing_risks_indicator, args_to_pass = list(parents = c("Nt")), group_by_id = F)
+
+
+times <- 1:max(data$Ttilde)
+npsem <- list(
+  define_node("W", "W", c(), time = 0),
+  define_node("A", "S", c("W"), time = 0),
+  define_node("Nt", "Nt", c("W", "A"), time = times, risk_set_map = risk_set_map_Nt ),
+  define_node("At", "At", c("W", "A"), time = times, risk_set_map = risk_set_map_At)
+)
+
+task <- tmle3_Task$new(long_data, npsem, long_format = T)
+task$force_at_risk
+data.table(task$get_tmle_node("At", compute_risk_set = T, force_time_value = 3, expand = F))
+task$get_tmle_node("At", compute_risk_set = T, expand = T, include_id = T, include_time = T, force_time_value = 3)
+
+task$get_tmle_node("Nt", compute_risk_set = T, expand = F, include_id = T, include_time = T)
+
+```
+
+
+```{r}
+library(sl3)
+lrnr <- Lrnr_thresh$new(Lrnr_glm$new(), "S", cutoffs = quantile(task$get_tmle_node("A"), c(0.1, 0.3, 0.5, 0.8)), cv = F )
+regtask <- task$get_regression_task("Nt", expand = F, is_time_variant = T)
+regtask$data
+lrnr_train <- lrnr$train(regtask)
+lrnr_train$fit_object$task$data
+predtask <- task$get_regression_task("Nt", expand = T, is_time_variant = T)
+predtask$data
+preds <- data.table(matrix(lrnr_train$predict(predtask), ncol = 4))
+```
+
+```{r}
+unlist(apply(matrix(0, 100, 5), 2, function(v) {
+  list(matrix(v, nrow = 50))
+}), recursive = F)
+```
+
+```{r}
+observed <- (task$get_tmle_node("W", format = T))
+uniq_obs <- unique(observed)
+counts <- unlist(apply(uniq_obs, 1, function(obs){ sum(1 * as.numeric(apply(observed, 1, function(new_obs){
+
+        all(new_obs == obs)})))}))
+```
+```{r}
+
+data.table(c(1,2,3))[NA]
+```
+
+```{r}
+uniq_obs
+observed
+observed1 <- observed 
+match_index <- (uniq_obs[observed1, which = T, on = colnames(uniq_obs)])
+
+big <- data.table(weights = observed[[1]], ind = match_index)
+big[,sum(weights), by = ind]
+```
+```{r}
+
+npsem <- make_thresh_npsem_survival(list("W" = "W", "A" = "S", "Nt" = "Nt", "At" = "At"), max(long_data$Ttilde))
+task <- make_thresh_task_survival(long_data, npsem)
+lik <- make_thresh_likelihood_survival(task, list("A" = Lrnr_glm$new(), "Nt" = Lrnr_glm$new(), "At" = Lrnr_cv$new(Lrnr_glm$new(), full_fit = T)), cv = F)
+```
+
+
+```{r}
+length(unique(long_data$id))
+data.table(lik$get_likelihood(task, "At"))
+data.table(lik$get_likelihood(task, "Nt"))
+param <- Param_thresh_survival$new(lik)
+lapply(param$clever_covariates(task), data.table)
+```
+
+
+```{r}
+  generator_At <- learner_marker_task_generator(learned_marker_node = learned_marker_node, learned_marker_var = "A", marker_node = "A", node = "At", data_adaptive = data_adaptive, is_time_variant = T)
+
+
+
+```
+
+
+
