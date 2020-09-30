@@ -56,9 +56,11 @@ make_thresh_npsem <- function(node_list, data_adaptive = F) {
 }
 #' @export
 make_thresh_task <- function(data, npsem, weights = NULL, discretize_treatment = F, num_bins = 20) {
+  data <- as.data.table(data)
   if(discretize_treatment) {
-    data <- discretize_variable(data, npsem[["A"]]$variables, num_bins)
+    #data <- discretize_variable(data, npsem[["A"]]$variables, num_bins)
   }
+
   tmle3_Task$new(data, npsem, long_format = F, weights = weights)
 }
 

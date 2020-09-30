@@ -28,7 +28,7 @@ tmle_spec <- tmle3_Spec_Threshold$new(data_adaptive = F,
 
 data
 task <- tmle_spec$make_tmle_task(data, node_list, weights = "weights")
-task$get_regression_task("Y")$data
+
 ```
 
 
