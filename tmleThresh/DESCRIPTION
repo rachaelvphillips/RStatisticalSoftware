@@ -13,11 +13,12 @@ RoxygenNote: 7.1.1
 Depends: 
   R (>= 3.0.0), 
   R6,
-  tmle3, 
   sl3, 
   delayed, 
   origami, 
   data.table
 Suggests: 
     testthat
+Remotes:
+    github::Larsvanderlaan/tmle3,
     
