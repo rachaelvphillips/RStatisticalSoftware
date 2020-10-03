@@ -55,7 +55,7 @@ Param_thresh <- R6Class(
 
       private$.censoring_node <- (observed_likelihood$censoring_nodes[[outcome_node]])
       private$.thresh_node <- thresh_node
-      cutoffs <- likelihood$factor_list$Y$learner$cutoffs
+      cutoffs <- observed_likelihood$factor_list$Y$learner$cutoffs
       private$.cutoffs <- cutoffs
       private$.strict_threshold <- F
       #private$.cf_task <- cf_task
@@ -135,12 +135,12 @@ Param_thresh <- R6Class(
       EY1 <- matrix(compute_thresh_estimate(self$observed_likelihood, tmle_task, type = private$.type_est, fold_number = fold_number, return_estimate = F), nrow = tmle_task$nrow)
       #EY1 <- matrix(self$observed_likelihood$get_likelihood(cf_task, self$outcome_node, fold_number), nrow = tmle_task$nrow)
 
-      psi <- colMeans(EY1)
+      psi <- colSums(EY1 * tmle_task$weights) / sum(tmle_task$weights)
 
 
       IC <- HA * (as.vector(Y) - EY)  + t((t(EY1)  - psi))
       #weights <- tmle_task$get_regression_task(self$outcome_node)$weights
-      result <- list(psi = psi, IC = IC )
+      result <- list(psi = psi, IC = IC, psi_W =  EY1)
       return(result)
     }
   ),

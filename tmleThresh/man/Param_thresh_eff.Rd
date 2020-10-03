@@ -85,6 +85,7 @@ Other Parameters:
   outcome_node = "Y",
   type = 1,
   thresholds = NULL,
+  threshold_end_quantiles = c(0.1, 0.9),
   num_bins = 200,
   discretize_type = c("mix", "equal_mass", "equal_range"),
   discretize_g = T

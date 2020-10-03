@@ -4,11 +4,19 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+#remotes::install_github("Larsvanderlaan/RStatisticalSoftware/tmleThresh")
+devtools::document()
 ```
 
+
+
+
 ```{r}
+library(tmleThresh)
+library(simcausal)
 library(dplyr)
+library(data.table)
+library(tmle3)
 setD=generate_covariates()
 p0 = 0.2
 p1 = 1
@@ -19,21 +27,25 @@ data$weights <- ifelse(data$Y==1, 1/p1,1/p0)
 #data$weights <- 1
 ```
 
-
 ```{r}
-node_list <- list("W" = c("W4", "W5", "W6"), "A" = "S", "Y" = "Y")
-
-tmle_spec <- tmle3_Spec_Threshold$new(data_adaptive = F,
-                                      threshold_function = function(A) {as.vector(quantile(A, seq(0.05, 0.90, length.out = 10)))})
-
+data <- na.omit(data)
 data
-task <- tmle_spec$make_tmle_task(data, node_list, weights = "weights")
-
 ```
 
 
+
+
 ```{r}
-likelihood <- tmle_spec$make_initial_likelihood(task, list("A" = Lrnr_glm$new(), "A_learned" = NULL, "Y" = Lrnr_glm$new()))
+devtools::document()
+tmle <- tmle3(tmle_spec, data, node_list, learner_list)
+```
+
+```{r}
+summary_from_estimates
+```
+
+```{r}
+likelihood <- tmle_spec$make_initial_likelihood(task, list("A" = Lrnr_glm$new(), "A_learned" = NULL, "Y" = Lrnr_glm_fast$new()))
 
 updater <- tmle_spec$make_updater()
 tlik <- tmle_spec$make_targeted_likelihood(likelihood, updater)
@@ -45,9 +57,49 @@ params <- tmle_spec$make_params(task, tlik)
 ```{r}
 # NO targeting yet.
 #CDF- P(A<v|W) from ML
-data.table(matrix(tlik$get_likelihood(task, "A"), nrow=1000))
+#data.table(matrix(tlik$get_likelihood(task, "A"), nrow=1000))
 # E[Y|A>=v,W] estimate based on ML
-data.table(matrix(tlik$get_likelihood(task, "Y"), nrow=1000))
-compute_thresh_estimate(tlik, task, return_estimate = T)
+data.table(matrix(tlik$get_likelihood(task, "Y"), nrow=5193))
+
+data.table((matrix(compute_thresh_estimate(tlik, task, return_estimate = F) , nrow=5193, byrow = F)))
+
+data.table(colSums(matrix(compute_thresh_estimate(tlik, task, return_estimate = F) , nrow=5193)* data$weights) / sum(data$weights))
+
+
 
 ```
+#weighted
+[1] 0.2823269 0.2739822 0.2613733 0.2496323 0.2356257
+ [6] 0.2231124 0.2079685 0.1913277 0.1727198 0.1625123
+ 
+ #true
+ [1] 0.3828620 0.3659422 0.3449978 0.3212674 0.3001604
+ [6] 0.2777670 0.2633254 0.2398421 0.2182639 0.1974295
+
+
+
+
+```{r}
+
+for(v in vs) {
+  num = sum(data$Y * (data$S >= v) * data$weights )
+denom = sum((data$S >= v) * data$weights )
+print(num/denom)
+
+  
+  
+}
+
+
+```
+
+[1] 0.1088914
+[1] 0.09784341
+[1] 0.09022637
+[1] 0.08219397
+[1] 0.07555758
+[1] 0.06799063
+[1] 0.06005306
+[1] 0.05323705
+[1] 0.04373565
+[1] 0.03460838

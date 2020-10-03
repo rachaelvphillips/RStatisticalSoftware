@@ -14,7 +14,27 @@ derived_generator <- function(type = "univ") {
 
 make_generator <- function(likelihood, type = "IPW") {
 
-  gen_task_univ <- function(tmle_task, fold_number) {
+  gen_task_univ_A <- function(tmle_task, fold_number) {
+    task <- tmle_task$get_regression_task("RR")
+    X <- task$X
+    g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
+    A <- tmle_task$get_tmle_node("A", format = T)[[1]]
+    Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
+    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
+    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
+    ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
+
+    data <- cbind(data.table(Y = task$Y, A = A, Q = Q, g = g, g1 = ifelse(A==1, g, 1-g), invg = 1/g, ER1 = ER1, ER0 = ER0, weights = task$weights), X)
+    data$Qg1 <- data$ER1 / data$g1
+    data$Qg0 <- data$ER0 / (1-data$g1)
+    covariates <- c(colnames(X))
+    outcome  <- "A"
+    new_task <- sl3_Task$new(data, covariates = covariates, offset = "g1", outcome = outcome,  weights = "weights", folds = task$folds)
+    return(new_task)
+  }
+
+  gen_task_univ_Y <- function(tmle_task, fold_number) {
     task <- tmle_task$get_regression_task("RR")
     X <- task$X
     g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
@@ -101,9 +121,12 @@ make_generator <- function(likelihood, type = "IPW") {
     return(gen_task_IPW)
   } else if (type == "plugin") {
     return(gen_task_plugin)
-  } else if(type == "univ"){
-    return(gen_task_univ)
-    }
+  } else if(type == "univ_Y"){
+    return(gen_task_univ_Y)
+  }
+  else if(type == "univ_A"){
+    return(gen_task_univ_A)
+  }
   else {
     return(gen_task_general)
   }

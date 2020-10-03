@@ -19,25 +19,23 @@ library(data.table)
 D <- DAG.empty()
 D <- D +
   node("W1", distr = "runif", min = -1, max = 1) +
-   node("W", distr = "rconst", const = round(W1,1)/3) +
-  node("Z1", distr = "runif", min = -0.5, max = 0.5) +
-   node("Z", distr = "rconst", const = round(Z1/3,1)/2 +W  ) +
-   node("U1", distr = "rnorm", mean = 0, sd = 0.3) +
+   node("W", distr = "rconst", const = round(W1/3,1)) +
+  node("Z1", distr = "runif", min = -0.3, max = 0.3) +
+   node("Z", distr = "rconst", const = round(Z1/5,1) +W  ) +
+   node("U1", distr = "rnorm", mean = 0, sd = 0.2) +
    node("U", distr = "rconst", const = round(U1,1)) +
-  node("W2a", distr = "runif", min = -1, max = 1) +
-   node("W2", distr = "rconst", const = round(W2a,1)/3) +
-  node("W3a", distr = "runif", min = -1, max = 1) +
-   node("W3", distr = "rconst", const = round(W3a,1)/3) +
   node("A", distr = "rbinom", size = 1, prob = plogis((0) ) )+
   node("g", distr = "rconst", const = plogis((0 )) )+
-  node("R", distr = "rbinom", size = 1, prob = plogis(.2 + W2/2 + W2/4*A  - W3/4*A - W3/2 + W2*W3 + 8*U*W - 8*Z*U + 8*U* W+ (U + W - Z/2) - Z*A - .4*A + 5*A*W ) )+
-    node("gR", distr = "rconst",  const =plogis(.2 + W2/2 + W2/4*A  - W3/4*A - W3/2 + W2*W3 + 8*U*W - 8*Z*U + 8*U* W+ (U + W - Z/2) - Z*A - .4*A + 5*A*W ) )+
-    node("ER1", distr = "rconst",  const =plogis(.2 + W2/2 + W2/4  - W3/4 - W3/2 + W2*W3 + 8*U*W - 8*Z*U + 8*U* W+ (U + W - Z/2) - Z - .4 + 5*W ) )+
-    node("ER0", distr = "rconst",  const =plogis(.2 + W2/2  - W3/2 + W2*W3 + 8*U*W - 8*Z*U + 8*U* W+ (U + W - Z/2)  ) ) +
-  node("LRR", distr = "rconst", const = log(ER1/ER0))
+  node("R", distr = "rbinom", size = 1, prob = plogis(.2 +  (U + W - Z/2)^2 - Z*A - .4*A + 5*A*W ) )+
+    node("gR", distr = "rconst",  const = plogis(.2 +  (U + W- Z/2)^2 - Z*A +.4*A + 5*A*W ) )+
+
+  node("R1", distr = "rconst", const = plogis(.2 +  (U + W - Z/2)^2 - Z - .4 + 5*W ) )+
+    node("R0", distr = "rconst", const =  plogis(.2 + (U + W - Z/2)^2  ) )+
+      node("RR", distr = "rconst", const = (R1/R0) ) +
+  node("LRR", distr = "rconst", const = log(RR) ) 
 
 setD <- set.DAG(D, vecfun = c("bound", "round"))
-data <- sim(setD, n = 1500)
+data <- sim(setD, n = 30000)
 data <- setDT(data)
 data$id <- data$ID
 data$ID <- NULL
@@ -52,192 +50,47 @@ setkey(data, id ,t)
 library(tmle3)
 library(sl3)
 library(uuid)
-library(RRtmle)
-npsem <- list(define_node("W", c("W", "U", "Z", "W2", "W3"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0), define_node("Z", "Z",  variable_type = variable_type("continuous")),
+npsem <- list(define_node("W", c("W", "U", "Z"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0), define_node("Z", "Z",  variable_type = variable_type("continuous")),
              
-              define_node("Rinit", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")),
-              define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")))
+              define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("continuous")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")))
 task <- tmle3_Task$new(data, npsem, long_format = F)
 data
 ```
 
-```{r, include = F}
-library(delayed)
+```{r}
 factor_list <- list(LF_emp$new("W"), 
                     LF_fit$new("A", make_learner(Lrnr_mean)),
-                     LF_fit$new("R", Lrnr_cv$new(make_learner(Lrnr_glm, max_depth = 2), full_fit = T), type = "mean")
+                     LF_fit$new("R", make_learner(Lrnr_glm), type = "mean")
 )
 lik <- Likelihood$new(factor_list)
 lik <- lik$train(task)
-lrnr_sieve <- make_learner(Lrnr_glmnet_relaxed, relax_lambda = "best")
-lrnr_derived <-  Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 4, max_degree = 1)
-lrnr_derived <- make_learner(Lrnr_undersmooth, basis_generator = hal_basis(max_degree = 1))
-
-lrnr_derived <- make_learner(Lrnr_sl, lrnr_derived, metalearner = Lrnr_cv_selector$new())
-lik_copy <- lik$clone()
-smoothR <- LF_derived$new("R", lrnr_derived, lik_copy, derived_generator())
-smoothR <- train_lf(smoothR, task)
-old <- unlist(lik$get_likelihood(task, "R"))
-lik$add_factors(smoothR)
-new = smoothR$get_likelihood(task)[[1]]
+tlik <- Targeted_Likelihood$new(lik)
 ```
-
-
-
 
 ```{r}
 likelihood <- lik
 rev <- make_revere(task, likelihood, "gen")
+```
 
 
+```{r, include = F}
 
-lrnr_xgboost1 = Lrnr_LRR_xgboost$new(method = "IPW", max_depth = 2)
-lrnr_xgboost2 = Lrnr_LRR_xgboost$new(method = "plugin", max_depth = 2)
-lrnr_hal <- Lrnr_LRR_hal9001$new(method = "plugin", max_degree = 1)
-
-
-sl <- make_super_learner(list(lrnr_xgboost1,lrnr_xgboost2, Lrnr_LRR_subst$new(), Lrnr_LRR_glm$new(method = "IPW"), Lrnr_LRR_glm$new(method = "plugin"),lrnr_hal
-                             ), task, likelihood )
-
+lrnr = Lrnr_LRR_hal9001$new(max_degree = 3, method = "IPW",grad_desc = F)
+sl <- make_super_learner(list(lrnr,  Lrnr_LRR_subst$new()), task, likelihood )
 trained <- sl$train(rev)
 trained
-
-
-truerisk <- function(preds) {
-  LRR <- preds
-  A <- data$A
-  g <- data$g 
-  R<- data$R
-  Q <- data$gR
-  ER <- Q
-  ER1 <- data$ER1
-  ER0 <- data$ER0
-  C1 <- A/g * (R - ER) + ER1
-  C2 <- C1 + (1-A)/g * (R - ER) + ER0
-  loss <- C1*-1*LRR + C2 * log(1 + exp(LRR))
-  mean(loss)
-
-}
-losss <- make_eff_loss(task, likelihood )
-trained$fit_object$full_fit
-
-
-
 ```
-
-
 
 ```{r}
-loss <- losss
-trained$fit_object$cv_fit$cv_risk(loss)
-trained
-other <- trained$fit_object$cv_fit$predict_fold(rev, "validation")
-other
-
-truerisk(other[[1]])
-truerisk(other[[2]])
-truerisk(other[[3]])
-truerisk(other[[4]])
-print("k")
+loss <- make_eff_loss(task, likelihood )
+trained$fit_object$learner_fits$CV_Stack$cv_risk(loss)
 
 
-mean(loss(other[[1]]))
-mean(loss(other[[2]]))
-mean(loss(other[[3]]))
-mean(loss(other[[4]]))       
-     
-   
 ```
-
-
-```{r}
-rev$revere_fold_task("validation")$get_data()
-rev$revere_fold_task(1)$get_data()
-data.table(trained$predict_fold(rev, "validation"))
-data.table(trained$predict_fold(rev$revere_fold_task("validation"), "validation"))
-```
-
-
 
 ```{r}
 
+data.table(exp(trained$predict(rev)), data$RR)
+mean((exp(trained$predict(rev))- data$RR)^2)
 
 ```
-
-
-```{r}
-genuniv <- make_generator(likelihood, "univ")
-tsk <- genuniv(task, "full")
-tsk$get_data()
-tsk$revere_fold_task("full")$get_data()
-```
-
-
-
-```{r, include = T}
-library(future)
-library(delayed)
-plan(multisession, workers = 1)
-lrnr_sieve <- make_learner(Lrnr_glmnet_relaxed, relax_lambda = "best")
-lrnr_glm <- make_learner(Lrnr_glm)
-learners <- list(Lrnr_universal$new(lrnr_sieve, through_weights = F, nbasis = 25, max_degree = 1),
-                 Lrnr_universal$new(lrnr_sieve, through_weights = T, nbasis = 100, max_degree = 2, through_offset = T),
-                 Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 100, max_degree = 1),
-                 Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 50, max_degree = 1),
-                  Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 10, max_degree = 1),
-                  Lrnr_universal$new(lrnr_glm, through_weights = F, nbasis = 10, max_degree = 2)
-)
-
-learners <- learners[2]
-stack <- do.call(function(...) {
-  make_learner(Stack, ...)
-}, learners)
-
-lrnr_sl <- make_learner(Lrnr_sl, learners, metalearner = Lrnr_cv_selector$new())
-lrnr_sl <-  learners[[1]]$train(tsk)
-```
-
-
-
-```{r}
-f <- trained$predict(rev)
-ER <- lik$get_likelihood(task, "R")
-
-pred = lrnr_sl$predict(tsk)
-ER <- lik$get_likelihood(task, "R")
-g <- lik$get_likelihood(task, "A")
-A <- tsk$get_data(,"A")[[1]]
-R <- task$get_data(,"R")[[1]]
-mean(A/g * (R - ER) * f)
-mean((1-A)/g * (R - ER) * f)
-mean((1/g) * (R - ER) * log(1+ exp(f)))
-mean(1/g * (R - ER) * f)
-mean((R - ER) )
-mean((R - ER)^2 )
-
-ER <- pred
-g <- lik$get_likelihood(task, "A")
-A <- tsk$get_data(,"A")[[1]]
-R <- task$get_data(,"R")[[1]]
-mean(A/g * (R - ER) * f)
-mean((1-A)/g * (R - ER) * f)
-mean((1/g) * (R - ER) * log(1+ exp(f)))
-mean(1/g * (R - ER) * f)
-mean((R - ER) )
-mean((R - ER)^2 )
-```
-
-
-
-```{r}
-
-lrnr <- Lrnr_universal_hal9001$new(max_degree = 2, thresh = 1)
-
-lrnr <- lrnr$train(tsk)
-
-```
-
-
-
-
-

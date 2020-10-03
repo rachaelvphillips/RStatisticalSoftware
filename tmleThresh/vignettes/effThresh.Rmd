@@ -87,12 +87,16 @@ LF_A <- LF_fit$new("A", learner_list[["A"]])
 LF_Y <- LF_fit$new("Y", learner_list[["Y"]], type = "mean")
 likelihood <- Likelihood$new(list(LF_A, LF_Y))
 likelihood <- likelihood$train(task)
+
+```
+
+```{r}
 tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "logistic", "A" = "EIC"), updater = list(one_dimensional = T, constrain_step = T, delta_epsilon = list("Y" = 1e-3, "A" = function(x) {
   res = 0.75/max(abs(x))
   
   res <- min(res, 0.1)
   return(res)
-}), convergence_type = "scaled_var"))
+}), convergence_type = "scaled_var", lower_bound = 0.0001))
 ```
 
 
@@ -104,7 +108,7 @@ tlik <- Targeted_Likelihood$new(likelihood, submodel_type_by_node = list("Y" = "
   
   res <- min(res, 0.1)
   return(res)
-}), convergence_type = "scaled_var"))
+}), convergence_type = "sample_size", lower_bound = 0.0001))
 mean(-log(tlik$get_likelihood(task, "A")))
 param <- Param_thresh_eff$new(tlik,  num_bins= 200, discretize_type = "mix", discretize_g = T)
 ```
@@ -121,6 +125,15 @@ tlik$updater$update_step(tlik, task)
 mean(-log(tlik$get_likelihood(task, "A")))
 ```
 
+```{r}
+
+min(tlik$get_likelihood(long_task, "A"))
+```
+
+```{r}
+long_task <- param$make_long_task(task)
+
+```
 ```{r}
 mean(-log(tlik$get_likelihood(task, "A")))
 

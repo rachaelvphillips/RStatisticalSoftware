@@ -46,7 +46,7 @@ Param_thresh_eff <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, num_bins = 200, discretize_type = c("mix", "equal_mass", "equal_range"), discretize_g = T) {
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, threshold_end_quantiles = c(0.1, 0.9), num_bins = 200, discretize_type = c("mix", "equal_mass", "equal_range"), discretize_g = T) {
 
       discretize_type <- match.arg(discretize_type)
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
@@ -83,7 +83,7 @@ Param_thresh_eff <- R6Class(
       private$.thresh_node <- thresh_node
       if(is.null(thresholds)) {
         if(length(A_grid) > 10) {
-          thresholds <- quantile(range, seq(0.05, 0.95, length.out = 10))
+          thresholds <- quantile(range, seq(threshold_end_quantiles[1], threshold_end_quantiles[2], length.out = 10))
           thresholds <- A_grid[findInterval(thresholds, A_grid)]
           #thresholds <- c(A_grid[190])
 
@@ -228,7 +228,9 @@ Param_thresh_eff <- R6Class(
           likelihood_factor <- likelihood$factor_list[["A"]]
           step_number <- likelihood$cache$get_update_step(likelihood_factor, task, fold_number, node = "A")
           step_number_long <- likelihood$cache$get_update_step(likelihood_factor, long_task, fold_number, node = "A")
-
+          if(step_number != step_number_long) {
+            stop("long task and short task out of sync")
+          }
           if(any(norm_C > 1) ) {
             likelihood$cache$set_values(likelihood_factor, task, step_number, fold_number, g, node = "A")
             likelihood$cache$set_values(likelihood_factor, long_task, step_number_long, fold_number, long_g_id$g, node = "A")
@@ -296,7 +298,7 @@ Param_thresh_eff <- R6Class(
       psi_Wb <- as.vector(matrix(psi_Wb, ncol = length(A_grid), byrow = T)[,indices])
       #print(data.table(matrix(psi_Wb, ncol = length(thresholds))))
       survlong <-  1 - cdfb
-      if(min(survlong) < 0.0005) {
+      if(min(survlong) < 0.008) {
         warning("very small survival prob")
       }
       survlong <- bound(survlong, c(0.0005,10))
@@ -315,7 +317,7 @@ Param_thresh_eff <- R6Class(
         }))
 
         IC_A <- IC_A * a_mat
-       # print(max(abs(IC_A)))
+      #  # print(max(abs(IC_A)))
       #  print("IC")
 
         for(i in 1:ncol(IC_A)) {
@@ -324,9 +326,14 @@ Param_thresh_eff <- R6Class(
         #IC_new <- IC_id[, IC, by = id]
         setnames(IC_new, c("id", "IC"))
         IC_new$A_g <- integral$A_g
+        IC_new$A_diff <- integral$A_diff
+        IC_new$g <- integral$g
 
         center <-  IC_new[, sum(IC* A_g), by = id][[2]]
-       # print(max(center))
+        print("c")
+       print(max(abs(center)))
+       center <-  IC_new[, sum((1 + .01 * IC)*g* A_diff), by = id][[2]]
+       print(max(abs(center)))
         #IC_A[,i] <- IC_A[,i] - center
         }
 

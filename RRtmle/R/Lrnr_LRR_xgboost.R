@@ -45,7 +45,7 @@ Lrnr_LRR_xgboost <- R6Class(
     .predict = function(task = NULL) {
       X <- task$X_intercept
       fit_obj <- self$fit_object
-      predictions <- predict(fit_obj, as.matrix(X), outputmargin = T)
+      predictions <- as.vector(predict(fit_obj, as.matrix(X), outputmargin = T))
 
 
       return(predictions)

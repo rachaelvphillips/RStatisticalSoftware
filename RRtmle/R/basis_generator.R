@@ -19,7 +19,7 @@ hal_basis <- function(max_degree = 2, bins = 350, smoothness_orders = 0, include
 }
 class(hal_basis) <- "basis_config"
 
-fourier_basis <- function(nbasis = 50, max_degree = 2, ...) {
+fourier_basis <- function(nbasis = 50, max_degree = 2, unpenalized = NULL, ...) {
   nbasis <- nbasis
   max_degree <- max_degree
   generator <- function(X) {
@@ -47,14 +47,23 @@ fourier_basis <- function(nbasis = 50, max_degree = 2, ...) {
         return(out)
       }))
       data <- matrix(as.vector(as.matrix(data)), ncol = num_orig)
+      colnames(data) <- var_names
+      if(max_degree == 1) {
+        form <- formula(paste0("~."))
 
-      form <- formula(paste0("~.^", max_degree))
+      } else {
+        form <- formula(paste0("~.^", max_degree))
+
+      }
       data <- model.frame(form, data = as.data.frame(data))
       data <- model.matrix(form, data = data)
 
       data <- data[,-1]
+      var_names <- colnames(data)
       data <- do.call(cbind, unlist(apply(data, 2, function(v) {list(matrix(v, ncol = k))}), recursive = F))
       data <- as.matrix(data)
+      new_names <- sapply(var_names, function(a) paste0(a, "_", 1:k))
+      colnames(data) <- new_names
       return(data)
     }
 

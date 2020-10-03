@@ -1,12 +1,13 @@
 
 library(simcausal)
+#'@export
 rmults <- function(n, size, prob) {
   size = size[1]
   prob = prob[1]
   apply(rmultinom(n = n, 1:size, rep(prob, size))==1, 2, which)
 
 }
-
+#'@export
 generate_covariates<-function(){
   # create a DAG object
   D <- DAG.empty()
@@ -28,7 +29,7 @@ expit_combi<-function(lambda,beta0,beta1,w4,w5,w6,s){lambda*expit(beta0+beta1*s+
 probit_combi<-function(beta0,beta1,w4,w5,w6,s){pnorm(beta0+beta1*s+w4/2+w5/2+max(w4*w5,w6)/4-max(abs(w4*w6),abs(w5*w6))/4)}
 
 ##############--------------------------------------------------------------------------------
-
+#'@export
 simu_logit_cov<-function(Risk,lambda=1,beta1=-5,n,p0,p1,seed,setD){
   # Risk: disease risk
   # beta1: slope parameter
@@ -59,8 +60,8 @@ simu_logit_cov<-function(Risk,lambda=1,beta1=-5,n,p0,p1,seed,setD){
   vacy1 <- vacdata[Y==1, ]
   vacy0 <- vacdata[Y==0, ]
 
-  v0obs <- sample(dim(vacy0)[1], trunc(p0*(dim(vacy0)[1])), replace=FALSE)
-  v1obs <- sample(dim(vacy1)[1], trunc(p1*(dim(vacy1)[1])), replace=FALSE)
+  v0obs <- sample(dim(vacy0)[1], trunc(p0*(dim(vacy0)[1])), replace=TRUE)
+  v1obs <- sample(dim(vacy1)[1], trunc(p1*(dim(vacy1)[1])), replace=TRUE)
 
   # Creating subset for subjects observed and not observed respectively under case-cohort subsampling
   vacy0obs <- data.frame(vacy0[v0obs,]) %>% mutate(S_data=1)
@@ -77,7 +78,7 @@ simu_logit_cov<-function(Risk,lambda=1,beta1=-5,n,p0,p1,seed,setD){
 
 
 ##############---------------------------------------------------------------------------
-
+#'@export
 simu_probit_cov<-function(Risk,beta1=-5,n,p0,p1,seed,setD){
 
   # Risk: disease risk
@@ -125,7 +126,7 @@ simu_probit_cov<-function(Risk,beta1=-5,n,p0,p1,seed,setD){
 
 
 ##############---------------------------------------------------------------------------
-
+#'@export
 simu_step<-function(Risk,n,p0,p1,seed,setD){
 
   # Risk: disease risk

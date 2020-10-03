@@ -318,8 +318,8 @@ Lrnr_thresh <- R6::R6Class(
           data <- rbindlist(data_list)
 
           nodes <- task$nodes
-          nodes$id <- NULL
-          nodes$t <- NULL
+          #nodes$id <- NULL
+          #nodes$t <- NULL
           nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
           task <- sl3_Task$new(data, nodes = nodes)
 
@@ -346,8 +346,8 @@ Lrnr_thresh <- R6::R6Class(
         data <- rbindlist(data_list)
 
         nodes <- task$nodes
-        nodes$id <- NULL
-        nodes$t <- NULL
+        #nodes$id <- NULL
+        #nodes$t <- NULL
         nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
         task <- sl3_Task$new(data, nodes = nodes)
 

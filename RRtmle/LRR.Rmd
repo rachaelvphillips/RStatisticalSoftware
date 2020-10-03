@@ -43,7 +43,7 @@ setkey(data, id ,t)
 library(tmle3)
 library(sl3)
 npsem <- list(define_node("W", "W", time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0), 
-              define_node("R", "R", c("W", "A"), time = 0), define_node("RR", "R", c("W"), time = 0))
+              define_node("R", "R", c("W", "A"), time = 0), define_node("RR", "R", c("W", "A"), time = 0))
 task <- tmle3_Task$new(data, npsem, long_format = F)
 
 IPW_RR<- function(tmle_task, g, smoothness = 1) {
@@ -108,4 +108,6 @@ hist(res)
 quantile(res, c(0.025, 0.975))
 hist(res)
 ```
+
+
 
