@@ -79,10 +79,10 @@ Defines a TML Estimator (except for the data)
 \subsection{Method \code{make_updater()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_updater(
-  lower_bound = 0,
   one_dimensional = F,
   constrain_step = F,
   delta_epsilon_Y = 0.01,
+  delta_epsilon = 0.01,
   delta_epsilon_A = 0.05,
   ...
 )}\if{html}{\out{</div>}}

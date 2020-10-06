@@ -52,7 +52,7 @@ tmle3_Spec_Threshold <- R6Class(
       targeted_likelihood <- Targeted_Likelihood$new(likelihood, updater, submodel_type_by_node = submodel_type_by_node)
       return(targeted_likelihood)
     },
-    make_updater = function(lower_bound = 0, one_dimensional = F, constrain_step = F, delta_epsilon_Y = 1e-2, delta_epsilon_A = 0.05,...) {
+    make_updater = function( one_dimensional = F, constrain_step = F, delta_epsilon_Y = 1e-2,delta_epsilon = 0.01, delta_epsilon_A = 0.05,...) {
       if(self$options$method == "cond_mean") {
         constrain_step = T
         one_dimensional = T
@@ -62,10 +62,11 @@ tmle3_Spec_Threshold <- R6Class(
           res <- min(res, delta_epsilon_A)
           return(res)
         })
+        bounds = 0
       } else {
-
+        bounds = 0.0005
       }
-      updater <- tmle3_Update$new(lower_bound = lower_bound, one_dimensional = one_dimensional, constrain_step = constrain_step, delta_epsilon = delta_epsilon, ...)
+      updater <- tmle3_Update$new(bounds = bounds, one_dimensional = one_dimensional, constrain_step = constrain_step, delta_epsilon = delta_epsilon, ...)
     },
     make_params = function(tmle_task, likelihood, ...) {
       thresholds <- self$options$threshold_function

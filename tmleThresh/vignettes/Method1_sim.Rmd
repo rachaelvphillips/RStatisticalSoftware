@@ -9,7 +9,10 @@ devtools::document()
 ```
 
 
+```{r}
 
+remotes::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
+```
 
 ```{r}
 library(simcausal)
@@ -29,6 +32,7 @@ mean(data1$simmed_data$Y)
 ```
 
 ```{r}
+library(simcausal)
 D <- DAG.empty()
 D <- D +
     node("W1", distr = "runif", min = -1, max = 1) +
@@ -50,9 +54,6 @@ vs <- c(0, 0.1, 0.3, 0.5, 0.8)
 for(v in vs) {
   print(sum(dat$Y * (dat$S>=v)) / sum(dat$S >=v))
 }
-```
-
-```{r}
 
 D <- DAG.empty()
 D <- D +
@@ -62,7 +63,7 @@ D <- D +
   node("W3", distr = "rconst", const = min(W3full, 3)) +
   node("Sfull", distr = "rgamma", shape = abs(2.5)  ) +
     node("S", distr = "rconst", const = min(Sfull, 8)/8) +
-  node("pY", distr = "rconst", const = plogis(-5 + 4*S + W1*(W2 >0) - W2*(W1>0) + W3full * S - sin(W2) + cos(W1))) +
+  node("pY", distr = "rconst", const = plogis(-2 + 4*S + W1*(W2 >0) - W2*(W1>0) + W3full * S - sin(W2) + cos(W1))) +
   node("Y", distr = "rbinom", size =1, prob = pY)
 
 
@@ -76,76 +77,27 @@ for(v in vs) {
   print(sum(dat$Y * (dat$S>=v)) / sum(dat$S >=v))
 }
 ```
-```{r}
-dat_logit2<-simu(Risk=0.2,p0=1,p1=1,cov='non_confound',model='logit') 
-dat <- sim(dat_logit2, n =1000)
-dat
-
-```
-
-```{r}
-## 2. non_confound (model: 'logit')
-dat_logit2<-simu(Risk=0.1,p0=1,p1=1,cov='non_confound',model='logit') 
-data2<-sim_thre(dat_logit2,n = 1000,rndseed=1,p=c(0.01,0.03,0.05,0.07,0.09))
-mean(data2$simmed_data$Y)
-plotDAG(dat_logit2)
-
-## 3. confound (model: 'probit') confounder W3 
-dat_probit<-simu(Risk=0.1,p0=1,p1=1,cov='confound',model='probit') 
-data3<-sim_thre(dat_probit,n = 1000,rndseed=1,p=c(0.01,0.03,0.05,0.07,0.09))
-mean(data3$simmed_data$Y)
-plotDAG(dat_probit)
-
-dat_probit
 
 
-```
 
-```{r}
-table(data$Y)
 
-```
+
 
 
 
 ```{r}
-remotes::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
-
-```
-
-```{r}
-
-apply(matrix(targeted_likelihood$get_likelihood(tmle_params[[1]]$make_long_task(tmle_task), "A"), nrow = 2000), 2, quantile)
-```
-
-
-```{r}
-library(caret)
-call_with_args <- sl3:::call_with_args
-rctrlR <- trainControl(method = "cv")
-
-task <- tmle_task$get_regression_task("Y")
-task$outcome_type
-lrnr <- Lrnr_caret$new("glmboost", metric ="RMSE", trControl = rctrlR, family = mboost::Binomial())
-lrnr <- lrnr$train(task)
-
-```
-
-```{r}
-
-
-```
-
-```{r}
+data <- dat
+data
+data$weights <- 1
 library(tmle3)
-lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
-lrnr_Y <- Lrnr_mean$new()
-lrnr_A <- Lrnr_density_discretize$new(lrnr)
+#lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+lrnr_Y <- Lrnr_xgboost$new()
+lrnr_A <- Lrnr_xgboost$new()
 
-tmle_spec <- tmle3_Spec_Threshold$new(method = "cond_mean")
+tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W")
 
 learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
-node_list <- list("W" = c("W4", "W5", "W6"), "A" = "S", "Y" = "Y", weights = "weights")
+node_list <- list("W" = c("W1", "W2", "W3"), "A" = "S", "Y" = "Y", weights = "weights")
 
 start_time <- proc.time()
 
@@ -158,73 +110,30 @@ start_time <- proc.time()
   updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
   targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
 
-  tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood, num_bins = 100, discretize_type = "equal_mass")
+  tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
   
 ```
 
 ```{r}
-
-fun <- function(x = NULL, y){
-  print(x)
-  print(y)
-}
-
-fun(1)
+suppressWarnings(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
 ```
-
-```{r}
-sqrt(weighted.mean(colMeans(fit$estimates[[1]]$IC)^2,  resample::colVars(tmle_params[[1]]$estimates(tmle_task)$IC)))
-
-
-sqrt(weighted.mean(colMeans(tmle_params[[1]]$estimates(tmle_task)$IC)^2,  resample::colVars(tmle_params[[1]]$estimates(tmle_task)$IC)))
-```
-
-```{r}
-fit$summary
-
-```
-
-```{r}
-  
-  
-  updater$tmle_params <- tmle_params
-  params_time <- proc.time()
-
-  fit <- fit_tmle3(tmle_task, targeted_likelihood, tmle_params, updater)
-  fit_time <- proc.time()
-
-  fit$set_timings(start_time, task_time, likelihood_time, params_time, fit_time)
-
-
-```
-
 
 
 ```{r}
-fit$summary
- 
+estimates <- tmle_params[[1]]$estimates(tmle_task)
+# This should be very small
+colMeans(estimates$IC)
+# Estimates of Psi
+estimates$psi
+
+# Estimates and confidence bounds
+summary_from_estimates(tmle_task, list(estimates))
 ```
-[1] 0.3874869
-[1] 0.346651
-[1] 0.3131246
-[1] 0.2715385
-[1] 0.2390909
-[1] 0.2053274
-[1] 0.1914286
-[1] 0.16
-[1] 0.1133333
-[1] 0.08910891
 
 
 
-```{r}
-likelihood <- tmle_spec$make_initial_likelihood(task, list("A" = Lrnr_glm$new(), "A_learned" = NULL, "Y" = Lrnr_glm_fast$new()))
 
-updater <- tmle_spec$make_updater()
-tlik <- tmle_spec$make_targeted_likelihood(likelihood, updater)
 
-params <- tmle_spec$make_params(task, tlik)
-```
 
 
 
