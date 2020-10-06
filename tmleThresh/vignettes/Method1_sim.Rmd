@@ -12,37 +12,210 @@ devtools::document()
 
 
 ```{r}
-library(tmleThresh)
 library(simcausal)
 library(dplyr)
-library(data.table)
+
+
+# variable: covariates W1,W2,W3. Immuresponse S. Disease Y. Sampling G.
+## 3 cases for covariates: cov in {'non_covariate','non_confound','confound'}
+## 4 models for P(Y|S,W): model in {'logit','probit','step','scale'}
+
+# Examples:
+## 1. non-covariate (model:'logit')
+dat_logit<-simu(Risk=0.1,p0=1,p1=1,cov='non_covariate',model='logit') 
+data1<-sim_thre(dat_logit,n = 1000,rndseed=1,p=c(0.01,0.03,0.05,0.07,0.09))
+mean(data1$simmed_data$Y)
+
+```
+
+```{r}
+D <- DAG.empty()
+D <- D +
+    node("W1", distr = "runif", min = -1, max = 1) +
+    node("W2", distr = "rnorm", mean = 0) +
+    node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full, 3)) +
+  node("Sfull", distr = "rgamma", shape = abs(2 + W3full + W3full*W2 + W2*exp(W1) + cos(W2) + sin(W1))  ) +
+    node("S", distr = "rconst", const = min(Sfull, 13)/13) +
+  node("pY", distr = "rconst", const = plogis(-5 + exp(S) + W1*(W2 >0) - W2*(W1>0) + W3full * S - sin(W2) + cos(W1))) +
+  node("Y", distr = "rbinom", size =1, prob = pY)
+
+
+D <- set.DAG(D)
+dat <- sim(D,n =1000)
+dat
+hist(dat$S)
+table(dat$Y)
+vs <- c(0, 0.1, 0.3, 0.5, 0.8)
+for(v in vs) {
+  print(sum(dat$Y * (dat$S>=v)) / sum(dat$S >=v))
+}
+```
+
+```{r}
+
+D <- DAG.empty()
+D <- D +
+    node("W1", distr = "runif", min = -1, max = 1) +
+    node("W2", distr = "rnorm", mean = 0) +
+    node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full, 3)) +
+  node("Sfull", distr = "rgamma", shape = abs(2.5)  ) +
+    node("S", distr = "rconst", const = min(Sfull, 8)/8) +
+  node("pY", distr = "rconst", const = plogis(-5 + 4*S + W1*(W2 >0) - W2*(W1>0) + W3full * S - sin(W2) + cos(W1))) +
+  node("Y", distr = "rbinom", size =1, prob = pY)
+
+
+D <- set.DAG(D)
+dat <- sim(D,n =1000)
+dat
+hist(dat$S)
+table(dat$Y)
+vs <- c(0, 0.1, 0.3, 0.5, 0.8)
+for(v in vs) {
+  print(sum(dat$Y * (dat$S>=v)) / sum(dat$S >=v))
+}
+```
+```{r}
+dat_logit2<-simu(Risk=0.2,p0=1,p1=1,cov='non_confound',model='logit') 
+dat <- sim(dat_logit2, n =1000)
+dat
+
+```
+
+```{r}
+## 2. non_confound (model: 'logit')
+dat_logit2<-simu(Risk=0.1,p0=1,p1=1,cov='non_confound',model='logit') 
+data2<-sim_thre(dat_logit2,n = 1000,rndseed=1,p=c(0.01,0.03,0.05,0.07,0.09))
+mean(data2$simmed_data$Y)
+plotDAG(dat_logit2)
+
+## 3. confound (model: 'probit') confounder W3 
+dat_probit<-simu(Risk=0.1,p0=1,p1=1,cov='confound',model='probit') 
+data3<-sim_thre(dat_probit,n = 1000,rndseed=1,p=c(0.01,0.03,0.05,0.07,0.09))
+mean(data3$simmed_data$Y)
+plotDAG(dat_probit)
+
+dat_probit
+
+
+```
+
+```{r}
+table(data$Y)
+
+```
+
+
+
+```{r}
+remotes::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
+
+```
+
+```{r}
+
+apply(matrix(targeted_likelihood$get_likelihood(tmle_params[[1]]$make_long_task(tmle_task), "A"), nrow = 2000), 2, quantile)
+```
+
+
+```{r}
+library(caret)
+call_with_args <- sl3:::call_with_args
+rctrlR <- trainControl(method = "cv")
+
+task <- tmle_task$get_regression_task("Y")
+task$outcome_type
+lrnr <- Lrnr_caret$new("glmboost", metric ="RMSE", trControl = rctrlR, family = mboost::Binomial())
+lrnr <- lrnr$train(task)
+
+```
+
+```{r}
+
+
+```
+
+```{r}
 library(tmle3)
-setD=generate_covariates()
-p0 = 0.2
-p1 = 1
-# Y follows a logit model
-dat_logit=simu_logit_cov(0.4,n=1000,p0=p0,p1=p1,seed=1,setD=setD, beta1 = -1)
-data <- data.table(dat_logit)
-data$weights <- ifelse(data$Y==1, 1/p1,1/p0)
-#data$weights <- 1
+lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+lrnr_Y <- Lrnr_mean$new()
+lrnr_A <- Lrnr_density_discretize$new(lrnr)
+
+tmle_spec <- tmle3_Spec_Threshold$new(method = "cond_mean")
+
+learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
+node_list <- list("W" = c("W4", "W5", "W6"), "A" = "S", "Y" = "Y", weights = "weights")
+
+start_time <- proc.time()
+
+  tmle_task <- tmle_spec$make_tmle_task(data, node_list)
+  task_time <- proc.time()
+
+  initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
+  likelihood_time <- proc.time()
+
+  updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+  targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+
+  tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood, num_bins = 100, discretize_type = "equal_mass")
+  
 ```
 
 ```{r}
-data <- na.omit(data)
-data
+
+fun <- function(x = NULL, y){
+  print(x)
+  print(y)
+}
+
+fun(1)
 ```
 
+```{r}
+sqrt(weighted.mean(colMeans(fit$estimates[[1]]$IC)^2,  resample::colVars(tmle_params[[1]]$estimates(tmle_task)$IC)))
+
+
+sqrt(weighted.mean(colMeans(tmle_params[[1]]$estimates(tmle_task)$IC)^2,  resample::colVars(tmle_params[[1]]$estimates(tmle_task)$IC)))
+```
+
+```{r}
+fit$summary
+
+```
+
+```{r}
+  
+  
+  updater$tmle_params <- tmle_params
+  params_time <- proc.time()
+
+  fit <- fit_tmle3(tmle_task, targeted_likelihood, tmle_params, updater)
+  fit_time <- proc.time()
+
+  fit$set_timings(start_time, task_time, likelihood_time, params_time, fit_time)
+
+
+```
 
 
 
 ```{r}
-devtools::document()
-tmle <- tmle3(tmle_spec, data, node_list, learner_list)
+fit$summary
+ 
 ```
+[1] 0.3874869
+[1] 0.346651
+[1] 0.3131246
+[1] 0.2715385
+[1] 0.2390909
+[1] 0.2053274
+[1] 0.1914286
+[1] 0.16
+[1] 0.1133333
+[1] 0.08910891
 
-```{r}
-summary_from_estimates
-```
+
 
 ```{r}
 likelihood <- tmle_spec$make_initial_likelihood(task, list("A" = Lrnr_glm$new(), "A_learned" = NULL, "Y" = Lrnr_glm_fast$new()))
@@ -54,33 +227,14 @@ params <- tmle_spec$make_params(task, tlik)
 ```
 
 
-```{r}
-# NO targeting yet.
-#CDF- P(A<v|W) from ML
-#data.table(matrix(tlik$get_likelihood(task, "A"), nrow=1000))
-# E[Y|A>=v,W] estimate based on ML
-data.table(matrix(tlik$get_likelihood(task, "Y"), nrow=5193))
 
-data.table((matrix(compute_thresh_estimate(tlik, task, return_estimate = F) , nrow=5193, byrow = F)))
-
-data.table(colSums(matrix(compute_thresh_estimate(tlik, task, return_estimate = F) , nrow=5193)* data$weights) / sum(data$weights))
-
-
-
-```
-#weighted
-[1] 0.2823269 0.2739822 0.2613733 0.2496323 0.2356257
- [6] 0.2231124 0.2079685 0.1913277 0.1727198 0.1625123
- 
- #true
- [1] 0.3828620 0.3659422 0.3449978 0.3212674 0.3001604
- [6] 0.2777670 0.2633254 0.2398421 0.2182639 0.1974295
 
 
 
 
 ```{r}
-
+threshold_function = function(A) {as.vector(quantile(A, seq(0.1, 0.90, length.out = 10)))}
+vs <- threshold_function(fit$tmle_task$get_tmle_node("A"))
 for(v in vs) {
   num = sum(data$Y * (data$S >= v) * data$weights )
 denom = sum((data$S >= v) * data$weights )
@@ -93,13 +247,4 @@ print(num/denom)
 
 ```
 
-[1] 0.1088914
-[1] 0.09784341
-[1] 0.09022637
-[1] 0.08219397
-[1] 0.07555758
-[1] 0.06799063
-[1] 0.06005306
-[1] 0.05323705
-[1] 0.04373565
-[1] 0.03460838
+

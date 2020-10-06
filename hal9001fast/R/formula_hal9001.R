@@ -179,8 +179,9 @@ formula_hal <-
     }
     X = data[,-which(colnames(data) == outcome), drop = F]
     X_orig = X
-    X = quantizer(X, bins)
-   Y= data[, outcome]
+    #X = quantizer(X, bins)
+
+    Y= data[, outcome]
     names = colnames(X)
     remove = match(remove, colnames(X))
     # Process the variables specified in each term and the monotonicity constraints for each term
@@ -211,7 +212,13 @@ formula_hal <-
     else{
       degree_rest = NULL
     }
+    if(!is.null(degree_rest)) {
+      bins <- bins + rep(0, degree_rest)
 
+    } else {
+      bins <- bins
+
+    }
 
     monotone_type
 
@@ -466,7 +473,11 @@ print(interactions_index)
       if(any(remove %in% interactions_index[[i]])){
         return()
       }
-      new_basis = basis_list_cols_order(interactions_index[[i]], X, order_map, include_zero_order, F)
+      col_index <- interactions_index[[i]]
+      num_bins <- bins[length(col_index)]
+      X <- quantizer(X, num_bins)
+      print(num_bins)
+      new_basis = basis_list_cols_order(col_index, X, order_map, include_zero_order, F)
       if (monotone_type[i] == "i") {
         lower.limits <<- c(lower.limits, rep(0, length(new_basis)))
         upper.limits<<-c(upper.limits, rep(Inf, length(new_basis)))
@@ -495,11 +506,10 @@ print(interactions_index)
     basis_listrest = unlist(
       lapply(
         dot_argument_combos,
-        basis_list_cols_order,
-        X,
-        order_map,
-        include_zero_order,
-        F
+        function(combo) {
+          X <- quantizer(X, bins[length(combo)])
+          basis_list_cols_order(combo, X, order_map, include_zero_order, F)
+        }
       ),
       recursive = F
     )

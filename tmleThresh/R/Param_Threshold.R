@@ -140,7 +140,7 @@ Param_thresh <- R6Class(
 
       IC <- HA * (as.vector(Y) - EY)  + t((t(EY1)  - psi))
       #weights <- tmle_task$get_regression_task(self$outcome_node)$weights
-      result <- list(psi = psi, IC = IC, psi_W =  EY1)
+      result <- list(psi = psi, IC = IC, psi_W =  EY1, residual = (as.vector(Y) - EY))
       return(result)
     }
   ),

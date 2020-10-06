@@ -17,7 +17,7 @@ fit_halfast(
   n_folds = 10,
   foldid = NULL,
   use_min = TRUE,
-  reduce_basis = ifelse(!is.null(X), 1/sqrt(nrow(X))/2, NULL),
+  reduce_basis = min(ifelse(!is.null(X), 1/sqrt(nrow(X))/2, NULL), 0.01),
   screen_basis_main_terms = F,
   screen_basis_interactions = F,
   family = c("gaussian", "binomial", "cox"),
@@ -146,12 +146,6 @@ consult its documentation for a full list of options.}
 \item{yolo}{A \code{logical} indicating whether to print one of a curated
 selection of quotes from the HAL9000 computer, from the critically
 acclaimed epic science-fiction film "2001: A Space Odyssey" (1968).}
-
-\item{formula}{A formula_hal9001 object as returned by \code{formula_hal9001}
-specifying a model structure for hal9001.
-\code{formula_hal9001} allows one to specify which main terms and interactions are included,
-whether certain variables/interactions should be monotonely increasing or decreasing,
-and the smoothness order for each variable.}
 }
 \value{
 Object of class \code{hal9001}, containing a list of basis

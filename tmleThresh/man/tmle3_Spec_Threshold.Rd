@@ -17,6 +17,8 @@ Defines a TML Estimator (except for the data)
 \item \href{#method-new}{\code{tmle3_Spec_Threshold$new()}}
 \item \href{#method-make_tmle_task}{\code{tmle3_Spec_Threshold$make_tmle_task()}}
 \item \href{#method-make_initial_likelihood}{\code{tmle3_Spec_Threshold$make_initial_likelihood()}}
+\item \href{#method-make_targeted_likelihood}{\code{tmle3_Spec_Threshold$make_targeted_likelihood()}}
+\item \href{#method-make_updater}{\code{tmle3_Spec_Threshold$make_updater()}}
 \item \href{#method-make_params}{\code{tmle3_Spec_Threshold$make_params()}}
 \item \href{#method-clone}{\code{tmle3_Spec_Threshold$clone()}}
 }
@@ -24,8 +26,6 @@ Defines a TML Estimator (except for the data)
 \if{html}{
 \out{<details open ><summary>Inherited methods</summary>}
 \itemize{
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="tmle3_Spec" data-id="make_targeted_likelihood">}\href{../../tmle3/html/tmle3_Spec.html#method-make_targeted_likelihood}{\code{tmle3::tmle3_Spec$make_targeted_likelihood()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="tmle3_Spec" data-id="make_updater">}\href{../../tmle3/html/tmle3_Spec.html#method-make_updater}{\code{tmle3::tmle3_Spec$make_updater()}}\out{</span>}
 }
 \out{</details>}
 }
@@ -35,8 +35,9 @@ Defines a TML Estimator (except for the data)
 \subsection{Method \code{new()}}{
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$new(
-  threshold_function = function(A) {     as.vector(quantile(A, seq(0.05, 0.95,
-    length.out = 10))) },
+  method = c("Psi_W", "cond_mean"),
+  threshold_function = function(A) {     as.vector(quantile(A, seq(0.1, 0.9, length.out
+    = 10))) },
   cdf_bins = 10,
   data_adaptive = F,
   cv = data_adaptive,
@@ -50,7 +51,7 @@ Defines a TML Estimator (except for the data)
 \if{latex}{\out{\hypertarget{method-make_tmle_task}{}}}
 \subsection{Method \code{make_tmle_task()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_tmle_task(data, node_list, weights = NULL)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_tmle_task(data, node_list)}\if{html}{\out{</div>}}
 }
 
 }
@@ -64,11 +65,36 @@ Defines a TML Estimator (except for the data)
 
 }
 \if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-make_targeted_likelihood"></a>}}
+\if{latex}{\out{\hypertarget{method-make_targeted_likelihood}{}}}
+\subsection{Method \code{make_targeted_likelihood()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_targeted_likelihood(likelihood, updater)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
+\if{html}{\out{<a id="method-make_updater"></a>}}
+\if{latex}{\out{\hypertarget{method-make_updater}{}}}
+\subsection{Method \code{make_updater()}}{
+\subsection{Usage}{
+\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_updater(
+  lower_bound = 0,
+  one_dimensional = F,
+  constrain_step = F,
+  delta_epsilon_Y = 0.01,
+  delta_epsilon_A = 0.05,
+  ...
+)}\if{html}{\out{</div>}}
+}
+
+}
+\if{html}{\out{<hr>}}
 \if{html}{\out{<a id="method-make_params"></a>}}
 \if{latex}{\out{\hypertarget{method-make_params}{}}}
 \subsection{Method \code{make_params()}}{
 \subsection{Usage}{
-\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_params(tmle_task, likelihood)}\if{html}{\out{</div>}}
+\if{html}{\out{<div class="r">}}\preformatted{tmle3_Spec_Threshold$make_params(tmle_task, likelihood, ...)}\if{html}{\out{</div>}}
 }
 
 }

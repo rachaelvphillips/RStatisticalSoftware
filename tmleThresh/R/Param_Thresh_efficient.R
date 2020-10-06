@@ -46,7 +46,7 @@ Param_thresh_eff <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, threshold_end_quantiles = c(0.1, 0.9), num_bins = 200, discretize_type = c("mix", "equal_mass", "equal_range"), discretize_g = T) {
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, threshold_end_quantiles = c(0.1, 0.9), num_bins = 100, discretize_type = c("equal_mass", "mix", "equal_range"), discretize_g = T) {
 
       discretize_type <- match.arg(discretize_type)
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
@@ -68,14 +68,15 @@ Param_thresh_eff <- R6Class(
           min_diff2 <- min(abs(diff(A_grid2)))
           A_grid <- sort(union(A_grid1, A_grid2))
           min_diff <- min(min_diff2, min_diff1)
-          print(length(A_grid))
+          #print(length(A_grid))
           remove <- setdiff(which(diff(A_grid) <min_diff) +1, c(length(A_grid)) )
           remove <- intersect(remove, seq(2, length(A_grid), 2))
-          print(paste0("Removed: ", length(remove)))
+          #print(paste0("Removed: ", length(remove)))
 
           A_grid <- A_grid[-remove]
         } else {
           A_grid <- sl3:::make_bins(range, discretize_type, num_bins)
+          #print(length(A_grid))
         }
       #A_grid <- seq(0, 1, length.out = num_bins)
       #A_grid <- sort(unique(quantile(range, A_grid, type = 3)))
@@ -84,12 +85,14 @@ Param_thresh_eff <- R6Class(
       if(is.null(thresholds)) {
         if(length(A_grid) > 10) {
           thresholds <- quantile(range, seq(threshold_end_quantiles[1], threshold_end_quantiles[2], length.out = 10))
-          thresholds <- A_grid[findInterval(thresholds, A_grid)]
+
           #thresholds <- c(A_grid[190])
 
           } else {
           thresholds <- A_grid
         }
+      } else {
+        thresholds <- A_grid[findInterval(thresholds, A_grid)]
       }
 
       #print(thresholds %in% A_grid)
@@ -133,7 +136,16 @@ Param_thresh_eff <- R6Class(
 
       g_long <- as.vector(likelihood$get_likelihood(long_task, "A"))
       if(any(g_long <0)) {
-        stop("Negative density epsilon to big")
+        g_long[g_long < 0] <- 0
+        likelihood_factor <- likelihood$factor_list[["A"]]
+        step_number_long <- likelihood$cache$get_update_step(likelihood_factor, long_task, fold_number, node = "A")
+        if(is.null(step_number_long)) {
+          step_number_long <- 0
+        }
+
+        likelihood$cache$set_values(likelihood_factor, long_task, step_number_long, fold_number, g_long, node = "A")
+
+        warning("Negative density detected. Setting to 0.")
       }
       Q_long <- as.vector(likelihood$get_likelihood(long_task, "Y"))
 
@@ -148,7 +160,7 @@ Param_thresh_eff <- R6Class(
 
 
       # Store common information based on long_task (only recompute when fitting)
-      if(for_fitting){
+      if(T){
         private$.cache_shared <- list()
       }
       cdf <- private$.cache_shared$cdf
@@ -172,9 +184,7 @@ Param_thresh_eff <- R6Class(
             match_index <- findInterval(A, A_grid, all.inside = T)
             index_mat <- cbind(1:length(A), match_index)
             g_discrete <- g_discrete[index_mat]
-            print("risk")
-            print(mean(-log(g_discrete)))
-            print(mean(-log(g)))
+
             g <- g_discrete
           }
           #g_int <- na.omit(long_g_id[, .SD[-.N], by = id,.SDcols = "g"])[[2]]
@@ -196,24 +206,37 @@ Param_thresh_eff <- R6Class(
 
           norm_C <- cdf[, last(.SD), by = id][[2]]
 
-          if(any(abs(norm_C - 1) > 1e-6 )) {
+          if(any(abs(norm_C - 1) > 1e-9 )) {
             print(sum(norm_C > 1+1e-9))
             print(quantile(norm_C))
-
+            renorm <- T
             warning("Density no longer integrates to 1")
+          } else {
+            renorm <- F
           }
 
           #norm_C <- 1
           cdf <- cdf[[2]]
           cdf <- as.vector(matrix(cdf, ncol = length(A_grid), byrow = T))
-          if(T & for_fitting & any(norm_C > 1)) {
+          if(renorm) {
+            print("Renormalizing")
             long_g_id$g <- long_g_id$g/norm_C
             g <- g/norm_C
             integral$g <- as.vector(t(matrix(integral$g,  ncol = length(A_grid)-1, byrow = T)/norm_C))
             cdf <- cdf /norm_C
+            integral[, A_g := A_diff*g]
+
+            integralnew <- copy(integral)
+            integralnew[, A_g := A_diff*g]
+            cdfnew <- integralnew[, c(0,cumsum(A_g)), by = id]
+            norm_C <- cdfnew[, last(.SD), by = id][[2]]
+            if(any(abs(norm_C - 1) > 1e-9 )) {
+
+              stop("Normalization failed")
+            }
           }
 
-          psi_W <- integral[,  c(rev(cumsum(rev(A_g * Q ))),0), by = id]
+          #psi_W <- integral[,  c(rev(cumsum(rev(A_g * Q ))),0), by = id]
           psi_W_other <- integral[,  c(0, cumsum(Q*A_g  )), by = id]
           setnames(psi_W_other, c("id", "int"))
 
@@ -226,13 +249,19 @@ Param_thresh_eff <- R6Class(
           private$.cache_shared$psi_W <- psi_W
           private$.cache_shared$integral <- integral
           likelihood_factor <- likelihood$factor_list[["A"]]
-          step_number <- likelihood$cache$get_update_step(likelihood_factor, task, fold_number, node = "A")
+          step_number <- likelihood$cache$get_update_step(likelihood_factor, tmle_task, fold_number, node = "A")
           step_number_long <- likelihood$cache$get_update_step(likelihood_factor, long_task, fold_number, node = "A")
+          if(is.null(step_number)) {
+            step_number <- 0
+          }
+          if(is.null(step_number_long)) {
+            step_number_long <- 0
+          }
           if(step_number != step_number_long) {
             stop("long task and short task out of sync")
           }
-          if(any(norm_C > 1) ) {
-            likelihood$cache$set_values(likelihood_factor, task, step_number, fold_number, g, node = "A")
+          if(renorm ) {
+            likelihood$cache$set_values(likelihood_factor, tmle_task, step_number, fold_number, g, node = "A")
             likelihood$cache$set_values(likelihood_factor, long_task, step_number_long, fold_number, long_g_id$g, node = "A")
           }
 
@@ -245,7 +274,7 @@ Param_thresh_eff <- R6Class(
           integral[, A_g := g]
           cdf <- integral[, c(0, cumsum(g)[-length(g)]), by = id]
           norm_C <- integral[,  sum(g), by = id][[2]]
-          print(quantile(norm_C))
+
           cdf <- cdf[[2]]
           cdf <- as.vector(matrix(cdf, ncol = length(A_grid), byrow = T))
 
@@ -298,10 +327,11 @@ Param_thresh_eff <- R6Class(
       psi_Wb <- as.vector(matrix(psi_Wb, ncol = length(A_grid), byrow = T)[,indices])
       #print(data.table(matrix(psi_Wb, ncol = length(thresholds))))
       survlong <-  1 - cdfb
-      if(min(survlong) < 0.008) {
+      if(min(survlong) < 0.00008) {
+        #print(quantile(survlong))
         warning("very small survival prob")
       }
-      survlong <- bound(survlong, c(0.0005,10))
+      survlong <- bound(survlong, c(0.00005,10))
 
       psi_Wlong <- psi_Wb / survlong
 
@@ -329,11 +359,14 @@ Param_thresh_eff <- R6Class(
         IC_new$A_diff <- integral$A_diff
         IC_new$g <- integral$g
 
-        center <-  IC_new[, sum(IC* A_g), by = id][[2]]
-        print("c")
-       print(max(abs(center)))
-       center <-  IC_new[, sum((1 + .01 * IC)*g* A_diff), by = id][[2]]
-       print(max(abs(center)))
+        center <-  IC_new[, sum(IC*g* A_diff), by = id][[2]]
+        if(max(abs(center)) > 1e-9) {
+          print(max(abs(center)))
+        }
+       center <-  IC_new[, sum((1 + .1 * IC)*g* A_diff), by = id][[2]]
+       if((max(abs(center)) -1) > 1e-6) {
+         print(max(abs(center)))
+       }
         #IC_A[,i] <- IC_A[,i] - center
         }
 
@@ -349,21 +382,7 @@ Param_thresh_eff <- R6Class(
         IC_A <- NULL
       }
       psi_W <-  matrix(psi_Wlong, ncol = length(thresholds))
-      #print(data.table(matrix(survlong, ncol = length(thresholds))))
-      # results <- lapply(thresholds, function(a) {
-      #   index <- which.min( abs(A_grid - a))
-      #   surv <- 1 - cdf[, .SD[index] , by = id][[2]]
-      #
-      #   psi_W <- psi_W[, int[index], by = id][[2]] / surv
-      #
-      #
-      #   IC <- (Q - psi_W ) * (A>=a) / surv
-      #
-      #   return(list(IC = IC, psi_W = psi_W))
-      # })
-      # IC_A <-  as.matrix(do.call(cbind, lapply(results, `[[`, "IC")))
 
-      #phi_W <-  as.matrix(do.call(cbind, lapply(results, `[[`, "psi_W")))
       if(is.null(node) || (!is.null(node) & node == "Y")) {
       if(is_long) {
         survwide <- matrix(survlong, ncol = length(thresholds))
@@ -382,23 +401,16 @@ Param_thresh_eff <- R6Class(
       }
 
 
-      # H_Y <- as.matrix(do.call(cbind, lapply(thresholds, function(thresh) {
-      #   ind <- as.numeric(A >= thresh)
-      #   index <- which.min( abs(A_grid - thresh))
-      #
-      #   surv <- 1 - cdf[, .SD[index] , by = id][[2]]
-      #   H_Y <- ind/surv
-      # })))
 
 
       EIC_Y <- NULL
       EIC_A <- NULL
 
       if(for_fitting) {
-        if(is.null(node) | node == "Y") {
+        if(is.null(node) || node == "Y") {
           EIC_Y <- H_Y * (Y - Q)
         }
-        if(is.null(node) | node == "A") {
+        if(is.null(node) || node == "A") {
           EIC_A <- IC_A
         }
 
@@ -439,12 +451,12 @@ Param_thresh_eff <- R6Class(
       thresh_node <- private$.thresh_node
       censoring_node <- private$.censoring_node
       thresholds <- private$.thresholds
-      H <- self$clever_covariates(task, fold_number, for_fitting = T)
+      H <- self$clever_covariates(tmle_task, fold_number, for_fitting = T)
       IC <- H$IC
       IC_A <- IC$A
       IC_Y <- IC$Y
       psi_W <- H$psi_W
-      psi <- colMeans(psi_W)
+      psi <- self$empirical_mean(tmle_task, psi_W)
       IC_W <- t(t(psi_W) - psi)
       IC <- IC_W + IC_A + IC_Y
       result <- list(psi = psi, IC = IC)

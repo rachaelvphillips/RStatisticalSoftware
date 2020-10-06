@@ -13,7 +13,7 @@ devtools::document()
 
 
 ```{r}
-n = 10000
+n = 1000
 X = cbind(rnorm(n), rnorm(n), rnorm(n),  rnorm(n),  rnorm(n),  rnorm(n))
 colnames(X) = 1:ncol(X)
 
@@ -24,10 +24,11 @@ colnames(data) = c("y", colnames(X))
 
 
 ```{r}
+
 t = proc.time()
-form = formula_hal("y ~  .^2", smoothness_orders = 1, data, bins = 100, screen_cor_pval = 0.1)
+form = formula_hal("y ~  h(1,2)", smoothness_orders = 1, data, bins = c(100,5), screen_cor_pval = 0.1)
 form
-#fit <- fit_hal(form)
+
 proc.time() - t
 
 ```

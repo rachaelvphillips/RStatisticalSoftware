@@ -14,11 +14,7 @@
 #'  directly get appended into the design matrix (no basis expansion). No L-1
 #'  penalization is performed on these covariates.
 #' @param Y A \code{numeric} vector of obervations of the outcome variable.
-#' @param formula A formula_hal9001 object as returned by \code{formula_hal9001}
-#' specifying a model structure for hal9001.
-#' \code{formula_hal9001} allows one to specify which main terms and interactions are included,
-#' whether certain variables/interactions should be monotonely increasing or decreasing,
-#' and the smoothness order for each variable.
+
 #' @param max_degree The highest order of interaction terms for which the basis
 #'  functions ought to be generated. The default (\code{NULL}) corresponds to
 #'  generating basis functions for the full dimensionality of the input matrix.
@@ -137,7 +133,7 @@ fit_halfast <- function(X = NULL,
                     n_folds = 10,
                     foldid = NULL,
                     use_min = TRUE,
-                    reduce_basis = ifelse(!is.null(X), 1/sqrt(nrow(X))/2, NULL),
+                    reduce_basis = min(ifelse(!is.null(X), 1/sqrt(nrow(X))/2, NULL), 0.01),
                     screen_basis_main_terms = F,
                     screen_basis_interactions = F,
                     family = c("gaussian", "binomial", "cox"),
@@ -462,9 +458,9 @@ fit_halfast <- function(X = NULL,
       } else {
         NULL
       },
-    unpenalized_covariates = unpenalized_covariates,
+    unpenalized_covariates = unpenalized_covariates
 
-    formula = formula
+
 
   )
   class(fit) <- "hal9001fast"

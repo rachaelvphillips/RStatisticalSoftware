@@ -220,7 +220,7 @@ Param_thresh_survival <- R6Class(
       EY1 <- matrix(compute_thresh_estimate(self$observed_likelihood, tmle_task, type = private$.type_est, fold_number = fold_number, return_estimate = F), nrow = tmle_task$nrow)
       #EY1 <- matrix(self$observed_likelihood$get_likelihood(cf_task, self$outcome_node, fold_number), nrow = tmle_task$nrow)
 
-      psi <- colMeans(EY1)
+      psi <- self$empirical_mean(tmle_task, EY1)
 
 
       IC <- IC_N  + t((t(EY1)  - psi))

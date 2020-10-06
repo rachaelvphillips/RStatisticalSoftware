@@ -74,8 +74,8 @@ halnet <- R6Class("halnet", private = list(
 
     # lambda_selectors_stack = private$list_to_stack(lapply(1:length(lambda_path), make_lambda_selector))
     # hal_learner = make_learner(Pipeline, hal_matrix_learner, lambda_selectors_stack)
-      #The above isnt needed if we use Stackfixed.R
-     hal_learner = hal_matrix_learner
+    #The above isnt needed if we use Stackfixed.R
+    hal_learner = hal_matrix_learner
     hal_learners = make_learner(Pipeline, make_learner(Lrnr_discretizer, bins = bins),hal_learner)
 
 
@@ -166,7 +166,7 @@ halnet <- R6Class("halnet", private = list(
       }
 
     }
-
+    library <- c(library, self$learners_spec$base_learners, self$learners_spec$extra)
     library_stack = private$list_to_stack(library)
     return(library_stack)
   },
@@ -245,7 +245,7 @@ halnet <- R6Class("halnet", private = list(
     }
 
     private$.learners_spec$lambda_path = round(exp(seq(log(lambda_max)+0.5, log(lambda_max*eps),
-                                                   length.out = K)), digits = 10)
+                                                       length.out = K)), digits = 10)
 
   }
 
@@ -283,8 +283,8 @@ public = list(
   initialize =function(methylTask = NULL, screeners_to_include = c("screen.corP", "screen.biglasso"),  include_meta_learner = T, which_meta_learner = "HAL",
                        screen.pval.fdr_cutoff = c(0.1), screen.biglasso_alpha = c(0.5), screen.max_selected = 300000, screen.pca_dim = 1000,
                        include_groups=T, group_PCA_dim = NULL, alpha = c(1),
-                     enforce_meta_monotone = T, eps = 1e-5, K = 200,
-                     nworkers = 1){
+                       enforce_meta_monotone = T, eps = 1e-5, K = 200,
+                       nworkers = 1){
 
 
     screeners_to_include = c(screeners_to_include)
@@ -309,7 +309,7 @@ public = list(
   visualize = function(){
     return(plot(self$learners_spec$sl3_delayed_learner))
   },
-  train_cv = function(parallel = T, also_full_model = T, verbose = T){
+  train_cv = function(parallel = T, verbose = T){
 
     if(parallel){
       nworkers = self$params$nworkers
@@ -325,27 +325,24 @@ public = list(
 
       private$.learners_spec$sl3_superlearner = cv_fit
     }
-    if(also_full_model){
 
-      self$train_full(parallel, verbose)
-
-    }
     return(cv_fit)
   },
-  train_full = function(parallel = T, verbose = F){
-    if(parallel){
-      lrnr = delayed_learner_train(self$learners_spec$sl3_library, self$learners_spec$trainingTask)
-      sched <- Scheduler$new(lrnr, FutureJob, nworkers = self$params$nworkers, verbose = verbose)
-      fit <- sched$compute()
-      private$.learners_spec$sl3_library = fit
-    }
-    else{
-      fit = self$learners_spec$sl3_library$train(self$learners_spec$trainingTask)
-      private$.learners_spec$sl3_library = fit
-    }
-
-    return(fit)
-  },
+  # },
+  # train_full = function(parallel = T, verbose = F){
+  #   if(parallel){
+  #     lrnr = delayed_learner_train(self$learners_spec$sl3_library, self$learners_spec$trainingTask)
+  #     sched <- Scheduler$new(lrnr, FutureJob, nworkers = self$params$nworkers, verbose = verbose)
+  #     fit <- sched$compute()
+  #     private$.learners_spec$sl3_library = fit
+  #   }
+  #   else{
+  #     fit = self$learners_spec$sl3_library$train(self$learners_spec$trainingTask)
+  #     private$.learners_spec$sl3_library = fit
+  #   }
+  #
+  #   return(fit)
+  # },
   predict = function(newTask = NULL, CV_pred = F){
     fold = ifelse(CV_pred, "validation", "full")
 
@@ -360,7 +357,7 @@ public = list(
   #Replaces a subset of the fields in learners_spec with those contained in spec.
   #Can be used to specify custom base learners and meta learners.
   construct_super_learner_from_spec = function(spec){
-    valid_names = intersect(names(spec), names(self$learners_spec))
+    valid_names = c(intersect(names(spec), names(self$learners_spec)), "extra")
     if(length(valid_names)==0){
       stop("Error: No valid names in spec.")
     }

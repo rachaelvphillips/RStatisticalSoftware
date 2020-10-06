@@ -36,10 +36,6 @@ Inherits from \code{\link{LF_base}}; see that page for documentation on likeliho
     }
 }
 
-\seealso{
-Other Likelihood objects: 
-\code{\link{LF_derived2}}
-}
 \concept{Likelihood objects}
 \keyword{data}
 \section{Super class}{

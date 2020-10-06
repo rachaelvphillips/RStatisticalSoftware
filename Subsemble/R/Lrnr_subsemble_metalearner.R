@@ -8,11 +8,10 @@ Lrnr_subsemble_metalearner <- R6::R6Class(
   classname = "Lrnr_subsemble_metalearner", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
-    initialize = function(meta_lrnr = make_learner(Lrnr_nnls), num_groups, num_preds,...) {
+    initialize = function(meta_lrnr = make_learner(Lrnr_nnls), num_groups,...) {
 
       params <- args_to_list()
       params$num_groups <- num_groups
-      params$num_preds <- num_preds
       private$.name="Subsemble_metalearner"
       super$initialize(params = params, ...)
     },
@@ -39,17 +38,24 @@ Lrnr_subsemble_metalearner <- R6::R6Class(
     .learners = NULL,
     .train_sublearners = function(task) {
 
-      len_pred <- self$params$num_preds
       num_groups = self$params$num_groups
-      # generate training subtasks
-      # X <- task$X
-      # ncol_X = ncol(task$X)
-      ncol_X = num_groups*len_pred
 
 
+      delayed_levels <- function(task, num_groups) {
+        if(inherits(task, "delayed")) {
+          task <- task$compute()
+        }
+        ncol_X <- ncol(task$X)
+        len_pred <- ncol_X/num_groups
+        if(len_pred%%1 != 0) {
+          stop("Number of predictions is not a multiple of the number of groups.")
+        }
+        ids <- rep(1:len_pred, num_groups)
+        levels <- split(1:ncol_X, ids)
+        return(levels)
+      }
 
-      ids <- rep(1:len_pred, num_groups)
-      levels <- split(1:ncol_X, ids)
+      levels <- delayed_fun(delayed_levels)(task, num_groups)
 
       meta_lrnr <- self$params$meta_lrnr
       num_groups <- self$params$num_groups
@@ -68,14 +74,17 @@ Lrnr_subsemble_metalearner <- R6::R6Class(
 
       subtasks <- lapply(1:len_pred, function(i) {
         learner = learners[[i]]
-        level = levels[[i]]
-        subsemble_meta_task <- function(task){
 
+        subsemble_meta_task <- function(task, levels){
+          if(inherits(levels, "delayed")) {
+            levels <- levels$compute()
+          }
+          level <- levels[[i]]
           assert_that(ncol(task$X)==ncol_X)
           return(task$next_in_chain(covariates = colnames(task$X)[level]))
         }
 
-        delayed_task <- delayed_fun(subsemble_meta_task)(task)
+        delayed_task <- delayed_fun(subsemble_meta_task, levels)(task)
         delayed_task$name <- "subsemble_meta_task"
         if (learner$is_trained) {
           return(learner)
