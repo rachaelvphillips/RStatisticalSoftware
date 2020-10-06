@@ -109,7 +109,6 @@ halnet <- R6Class("halnet", private = list(
 
       }
 
-
     }
     if("screen.limma" %in% screeners_to_include){
 
