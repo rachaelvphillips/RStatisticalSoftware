@@ -41,7 +41,7 @@ D <- D +
   node("W3", distr = "rconst", const = min(W3full, 3)) +
   node("Sfull", distr = "rgamma", shape = abs(2 + W3full + W3full*W2 + W2*exp(W1) + cos(W2) + sin(W1))  ) +
     node("S", distr = "rconst", const = min(Sfull, 13)/13) +
-  node("pY", distr = "rconst", const = plogis(-5 + exp(S) + W1*(W2 >0) - W2*(W1>0) + W3full * S - sin(W2) + cos(W1))) +
+  node("pY", distr = "rconst", const = 0.7*plogis(-3 + 4*S + 2*W1*(W2 >0) - 2*W2*(W1>0) + W3 * (S-0.1) - 2*sin(W2) - W3*cos(W1))) +
   node("Y", distr = "rbinom", size =1, prob = pY)
 
 
@@ -63,7 +63,7 @@ D <- D +
   node("W3", distr = "rconst", const = min(W3full, 3)) +
   node("Sfull", distr = "rgamma", shape = abs(2.5)  ) +
     node("S", distr = "rconst", const = min(Sfull, 8)/8) +
-  node("pY", distr = "rconst", const = plogis(-2 + 4*S + W1*(W2 >0) - W2*(W1>0) + W3full * S - sin(W2) + cos(W1))) +
+  node("pY", distr = "rconst", const = 0.7*plogis(-2 + 3*S + 2*W1*(W2 >0) - 2*W2*(W1>0) + W3 * (S-0.1) - 2*sin(W2) - W3*cos(W1))) +
   node("Y", distr = "rbinom", size =1, prob = pY)
 
 
@@ -97,7 +97,7 @@ lrnr_A <- Lrnr_xgboost$new()
 tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W")
 
 learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
-node_list <- list("W" = c("W1", "W2", "W3"), "A" = "S", "Y" = "Y", weights = "weights")
+node_list <- list("W" = c("W1", "W2"), "A" = "S", "Y" = "Y", weights = "weights")
 
 start_time <- proc.time()
 
@@ -112,12 +112,18 @@ start_time <- proc.time()
 
   tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
   
-```
 
-```{r}
 suppressWarnings(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
 ```
-
+0.5622048 0.5803265 0.5945332 0.6072527 0.6172666 0.6261565 0.6488544
+ [8] 0.6725778 0.7239753 0.9393215
+ 
+ 0.5653488 0.5809175 0.5925751 0.6094160 0.6124955 0.6259612 0.6489949
+ [8] 0.6636299 0.7057046 0.9216679
+ 
+ 
+ 0.5622048 0.5803265 0.5945332 0.6072527 0.6172666 0.6261565 0.6488544
+ [8] 0.6725778 0.7239753 0.9393215
 
 ```{r}
 estimates <- tmle_params[[1]]$estimates(tmle_task)
@@ -134,7 +140,42 @@ summary_from_estimates(tmle_task, list(estimates))
 
 
 
+```{r}
+sumry <- summary_from_estimates(tmle_task, list(estimates))
+sumry
+lower <- sumry$lower
+upper <- sumry$upper
+est <- sumry$tmle_est
 
+plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+library(ggplot2)
+
+ ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "red"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+#Estimate thresholds and confidence interval via linear extrapolation
+
+thresh <- function(p) {
+
+   thresh_est <-approx(x = est, y = cutoffs, n = 100, xout = p)$y
+   thresh_upper <-approx(x = lower, y = cutoffs, n = 100, xout = p)$y
+   thresh_lower <-approx(x = upper, y = cutoffs, n = 100, xout = p)$y
+
+  return(c(thresh_lower, thresh_est, thresh_upper))
+}
+
+thresh(0.7)
+```
+
+```{r}
+
+```
 
 
 

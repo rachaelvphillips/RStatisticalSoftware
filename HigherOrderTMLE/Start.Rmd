@@ -7,22 +7,46 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min = -0.8, max = 0.8) +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("A", distr = "rbinom", size = 1,  prob = plogis(W1/2)) +
+  node("g1", distr = "rconst", const = plogis(W1/2)) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( -1 + 1 + A + W - A*W1/2 ))) +
+  node ("EY1", distr = "rconst", const = plogis(( -1 + 1 + 1 + W - 1*W1/2 )))
+setD <- set.DAG(D)
+data <- sim(setD, n = 10000)
+data <- as.data.table(data)
+data
+quantile(data$g1^2)
+quantile(data$EY1)
+```
+
+```{r}
+1/500
+```
+
+
+
 ```{r, include = F}
 library(simcausal)
 results <- list()
 for(i in 1:100) {
 n = 500
 verbose = T
-
+print(i)
 
 D <- DAG.empty()
 D <- D +
   node("W", distr = "runif", min = -0.8, max = 0.8) +
   node("W1", distr = "runif", min = -1, max = 1) +
-  node("A", distr = "rbinom", size = 1,  prob = plogis(W1)) +
-  node("g1", distr = "rconst", const = plogis(W1)) +
-  node("Y", distr = "rbinom", size =1 , prob = plogis(( -1 + 1 + A + W - A*W1/2 ))) +
-  node ("EY1", distr = "rconst", const = plogis(( -1 + 1 + 1 + W - 1*W1/2 )))
+  node("W2", distr = "rbinom", size = 1, prob = 0.5) +
+  node("A", distr = "rbinom", size = 1,  prob = 0.3 +0.7* plogis(W1/2 + W*0.8 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("g1", distr = "rconst", const =0.3 +0.7* plogis(W1^2 - W1/2 + W^2 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =  plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) 
 setD <- set.DAG(D)
 data <- sim(setD, n = n)
 data <- as.data.table(data)
@@ -32,36 +56,49 @@ D <- DAG.empty()
 D <- D +
   node("W", distr = "runif", min = -0.8, max = 0.8) +
   node("W1", distr = "runif", min = -1, max = 1) +
-  node("A", distr = "rbinom", size = 1,  prob = plogis(W1)) +
-  node("g1", distr = "rconst", const = plogis(W1)) +
-  node("Z", distr = "rnorm", mean = 1) +
-  node("Y", distr = "rbinom", size =1 , prob = plogis(( -1 + 1 + A + W - A*W1/2 ) + Z/(n)^(0.25))) +
-  node ("EY1", distr = "rconst", const = plogis(( -1 + 1 + 1 + W - 1*W1/2 )))
+  node("W2", distr = "rbinom", size = 1, prob = 0.5) +
+  node("A", distr = "rbinom", size = 1,  prob = 0.15 +0.7*plogis(W1/2 + W*0.8 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("g1", distr = "rconst", const = 0.15 +0.7*plogis(W1^2 - W1/2 + W^2 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =  plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) 
+
 setD <- set.DAG(D)
 data_bias <- sim(setD, n = n)
 data_bias <- as.data.table(data_bias)
 
 npsem <- list(
-  define_node("W", c("W", "W1"), c()),
+  define_node("W", c("W", "W1", "W2"), c()),
   define_node("A", "A",  c("W")),
   define_node("Y",  "Y", c("A", "W"))
 )
 
 task <- tmle3_Task$new(data, npsem)
-task_bias <- tmle3_Task$new(data_bias, npsem)
+task_bias <- tmle3_Task$new(data, npsem)
 
-lrnr_glm <- Lrnr_glm$new()
-lrnr_mean <- Lrnr_xgboost$new(max_depth = 4)
-lrnr_mean <- Lrnr_mean$new()
+sl <- Lrnr_sl$new(list(Lrnr_xgboost$new(max_depth = 4, gamma = 0, lambda = 0.1), Lrnr_glm$new(), Lrnr_ranger$new()))
+sl <- Lrnr_hal9001$new(max_degree = 2)
+lrnr_glm <- sl
+lrnr_mean <- sl
+#lrnr_mean <- Lrnr_mean$new()
 
-stopping_criterion <- function(n, residual) {return(min(log(n)/n, 1/ sqrt(n) / log(n)))}
+stopping_criterion <- function(n, residual) {return(1/ sqrt(n) / log(n))}
 
-stopping_criterion <- function(n, residual) {return(1/n/log(n))}
+#stopping_criterion <- function(n, residual) {return(1/n/log(n))}
 
 lrnr_undersmooth <- Lrnr_undersmooth$new(stopping_criterion = stopping_criterion)
 
 lrnr_undersmoothA <- lrnr_undersmooth
 lrnr_undersmoothY <- lrnr_undersmooth
+
+lrnr_undersmoothY <- lrnr_undersmoothY$train(task$get_regression_task("Y"))
+
+lrnr_undersmoothA <- lrnr_undersmoothA$train(task$get_regression_task("A"))
+
+num_lambda <- ncol(as.data.table(lrnr_undersmoothY$predict(task$get_regression_task("Y"))))
+num_lambda <- min(num_lambda, ncol(as.data.table(lrnr_undersmoothA$predict(task$get_regression_task("A")))))
+num_lambda
+eic_vec <- c()
+index <- seq(1, num_lambda, 2)
 
 factor_list <- list(
   LF_emp$new("W"),
@@ -69,58 +106,43 @@ factor_list <- list(
   LF_fit$new("Y",lrnr_mean, type = "mean")
 )
 
+likelihood <- Likelihood$new(factor_list)
+likelihood_tilde <- Likelihood$new(factor_list_tilde)
+likelihood <- likelihood$train(task_bias)
+
+for(j in index) {
+lf_Y <- LF_known$new("Y", mean_fun = function(task) {
+  lrnr_undersmoothY$predict(task)[,j]
+}, type = "mean")
+
+lf_A <- LF_known$new("A", mean_fun = function(task) {
+  lrnr_undersmoothA$predict(task)[,j]
+}, type = "mean")
+
+
+
+
 factor_list_tilde <- list(
   LF_emp$new("W"),
-  LF_fit$new("A",lrnr_undersmoothA, type = "mean" ),
-  LF_fit$new("Y",lrnr_undersmoothY, type = "mean" )
+  lf_A,#LF_fit$new("A",lrnr_undersmoothA, type = "mean" ),
+  lf_Y #LF_fit$new("Y",lrnr_undersmoothY, type = "mean" )
 )
 
 task$get_regression_task("A")$data
 task$get_regression_task("Y")$data
 
-likelihood <- Likelihood$new(factor_list)
 likelihood_tilde <- Likelihood$new(factor_list_tilde)
 
-if(verbose) {
-  print("Training likelihoods")
-}
-likelihood <- likelihood$train(task_bias)
-
 likelihood_tilde <- likelihood_tilde$train(task)
-
-if(verbose) {
-  print("Done")
-}
-
-tlik <- Targeted_Likelihood$new(likelihood, updater = list(maxit = 300, convergence_type = "sample_size", cvtmle = F, constrain_step = T, one_dimensional = T, delta_epsilon = c( 0.01)))
+tlik <- Targeted_Likelihood$new(likelihood, updater = list(maxit = 300, convergence_type = "sample_size", cvtmle = F, constrain_step = T, one_dimensional = T, delta_epsilon = c( 0.1)))
 param <- Param_TSM_higher_order$new(tlik, likelihood_tilde)
-print(length(tlik$cache$tasks))
 
-if(verbose) {
-  print("Second order updating")
-}
 
 est <- param$estimates(task)
-if(verbose) {
-  print(  mean(est$IC))
-  print(   mean(est$psi))
-  print(  mean(data$EY1))
-}
+
 
 tlik$updater$update(tlik, task)
-
-if(verbose) {
-  print("Done")
-}
-
-
-#lapply(param$clever_covariates(task, for_fitting = T), data.table)
 est <- param$estimates(task)
-if(verbose) {
-  print(  mean(est$IC))
-  print(   mean(est$psi))
-  print(  mean(data$EY1))
-}
 
 est1 <- mean(est$psi)
 
@@ -130,39 +152,95 @@ Y <- data$Y
 param$update_last(task)
 lik2 <- tlik$get_likelihood(task, "Y")
 
-
-print("first")
-est <- param$estimates(task)
-if(verbose) {
-  print(  mean(est$IC))
-  print(   mean(est$psi))
-  print(  mean(data$EY1))
+print("EIC")
+eic <- mean(task$get_tmle_node("A")/tlik$get_likelihood(task, "A") * (task$get_tmle_node("Y") - lik2))
+print(eic)
+eic_vec <- c(eic_vec, eic)
 }
+
+thresh <- 5/1000
+thresh
+best <- which(abs(eic_vec) <= thresh)
+if(length(best) == 0) {
+  best <- which.min(abs(eic_vec))
+} else {
+  best <- min(best)
+}
+  #best <- which.min(abs(eic_vec))
+print(eic_vec[best])
+best <- index[best]
+
+print(min(eic_vec))
+
+
+lf_Y <- LF_known$new("Y", mean_fun = function(task) {
+  lrnr_undersmoothY$predict(task)[,best]
+}, type = "mean")
+
+lf_A <- LF_known$new("A", mean_fun = function(task) {
+  lrnr_undersmoothA$predict(task)[,best]
+}, type = "mean")
+
+
+
+factor_list_tilde <- list(
+  LF_emp$new("W"),
+  lf_A,#LF_fit$new("A",lrnr_undersmoothA, type = "mean" ),
+  lf_Y #LF_fit$new("Y",lrnr_undersmoothY, type = "mean" )
+)
+
+likelihood_tilde <- Likelihood$new(factor_list_tilde)
+likelihood_tilde <- likelihood_tilde$train(task)
+tlik <- Targeted_Likelihood$new(likelihood, updater = list(maxit = 300, convergence_type = "sample_size", cvtmle = F, constrain_step = T, one_dimensional = T, delta_epsilon = c( 0.01)))
+param <- Param_TSM_higher_order$new(tlik, likelihood_tilde)
+
+
+est <- param$estimates(task)
+
+
+tlik$updater$update(tlik, task)
+est <- param$estimates(task)
+
+est0 <- mean(est$psi)
+
+tilde <- likelihood_tilde$get_likelihood(task, "Y")
+lik1 <- tlik$get_likelihood(task, "Y")
+Y <- data$Y
+param$update_last(task)
+
+
+
+est <- param$estimates(task)
+
 
 est1 <- mean(est$psi)
 
 
-print("old")
+
+
 tlik_old <- Targeted_Likelihood$new(likelihood, updater = list(cvtmle = F))
 param_old <- tmle3::Param_TSM$new(tlik_old, list(LF_static$new("A", value = 1)))
 
 tlik_old$updater$update(tlik_old, task)
-print("old")
+
 est <- param_old$estimates(task, fold_number = "full")
 IC_old <- mean(est$IC)
 psi_old <- mean(est$psi)
-IC_old
+
 est2 <- mean(est$psi)
-print(i)
-results[[i]] <- c(est1, est2)
+
+results[[i]] <- c(est0, est1, est2)
 print(results[[i]])
+if(i%%10 ==0 || i ==1) {
+  write.csv(results, "sim.csv")
+}
 }
 ```
 
 ```{r}
 results[[1]] - truth
 res <- as.data.table(results)
-
+res
 residual <- res - truth
 residual
 residual <- transpose(residual)
@@ -170,6 +248,7 @@ residual
 colMeans(residual)
 resample::colVars(residual)
 (resample::colStdevs(residual))
+
 ```
 
 ```{r, include = T}
@@ -177,13 +256,16 @@ D <- DAG.empty()
 D <- D +
   node("W", distr = "runif", min = -0.8, max = 0.8) +
   node("W1", distr = "runif", min = -1, max = 1) +
-  node("A", distr = "rbinom", size = 1,  prob = plogis(W1)) +
-  node("g1", distr = "rconst", const = plogis(W1)) +
-  node("Y", distr = "rbinom", size =1 , prob = plogis(( -1 + 1 + A + W - A*W1/2 ))) +
-  node ("EY1", distr = "rconst", const = plogis(( -1 + 1 + 1 + W - 1*W1/2 )))
+  node("W2", distr = "rbinom", size = 1, prob = 0.5) +
+  node("A", distr = "rbinom", size = 1,  prob = 0.8*plogis(W1/2 + W*0.8 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("g1", distr = "rconst", const = 0.8*plogis(W1^2 - W1/2 + W^2 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =  plogis(( 1 + W - 1*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) 
 setD <- set.DAG(D)
-data <- sim(setD, n = 150000)
+data <- sim(setD, n = 500)
 data <- as.data.table(data)
 truth = mean(data$EY1)
 truth
+table(data$A)
+quantile(data$g1)
 ```

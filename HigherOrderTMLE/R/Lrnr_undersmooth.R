@@ -152,7 +152,8 @@ Lrnr_undersmooth <- R6Class(
         lambdas <- sort(lambdas, decreasing = T)
 
         preds <- predict(glmnet_fit, newx = x_basis, s = lambdas, type = "response", newoffset = offset)
-        if(self$params$select) {
+        if(!self$params$select) {
+
         fit_object = list(offset_fit = offset_fit, design_generator = design_generator, fit = glmnet_fit, lambda = lambdas, has_offset = !is.null(offset))
         return(fit_object)
         }

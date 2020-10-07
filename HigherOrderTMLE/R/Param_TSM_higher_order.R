@@ -84,8 +84,10 @@ Param_TSM_higher_order <- R6Class(
       Q <- tmle_task$scale(self$observed_likelihood$get_likelihoods(tmle_task, "Y", fold_number), "Y")
       Q1 <- tmle_task$scale(self$observed_likelihood$get_likelihoods(cf_task1, "Y", fold_number), "Y")
 
-
-
+      Q <- bound(Q, 0.0005)
+      g <- bound(g, 0.005)
+      g1 <- bound(g1, 0.005)
+      Q1 <- bound(Q1, 0.0005)
       # First order TMLE
       #####
       if(for_fitting) {
@@ -94,10 +96,10 @@ Param_TSM_higher_order <- R6Class(
 
         Q1 <- bound(Q1, 0.0005)
         offset <- stats::qlogis(Q1)
-        weights <- g_tilde1/bound(g1, 0.0005)
+        weights <- bound(g_tilde1/g1, c(0,10))
 
-        H <- as.matrix(1/bound(g1, 0.0005))
-        H <- bound(H, c(-50,50))
+        H <- as.matrix(1/bound(g1, 0.005))
+        H <- bound(H, c(-10,10))
         data <- list(H = H, observed = observed)
 
 
@@ -108,6 +110,9 @@ Param_TSM_higher_order <- R6Class(
         if(is.na(epsilon)) {
           epsilon <- 0
         }
+        if(is.infinite(epsilon)) {
+          stop("infinite eps")
+        }
         private$.first_epsilon <- epsilon
 
       } else {
@@ -116,19 +121,42 @@ Param_TSM_higher_order <- R6Class(
 
       Q_tmle <- stats::plogis(stats::qlogis(Q) + as.matrix(A/g1) %*% epsilon)
       Q_tmle1 <- stats::plogis(stats::qlogis(Q1) + as.matrix(1/g1) %*% epsilon)
-
+      if(all(Q_tmle==0)) {
+        print(head(Q_tmle))
+        print(head(g1))
+        print(epsilon)
+        stop("tmle 0")
+      }
+      if(all(Q_tmle1==0)) {
+        print(quantile(Q_tmle))
+        print(quantile(g1))
+        print(quantile(Q_tilde1))
+        print(epsilon)
+        print(quantile(1/g1))
+        print(quantile(H))
+        print(quantile(weights))
+        print(quantile(offset))
+        stop("tmle1 0")
+      }
+      if(any(is.na(Q_tmle1))) {
+        stop("NA qtmle1")
+      }
+      if(any(is.na(Q_tmle))) {
+        stop("NA qtmle1")
+      }
+      Q_tmle[is.na(Q_tmle)] <- 0
+      Q_tmle1[is.na(Q_tmle1)] <- 0
       #####
 
 
       # Second order TMLE
       #####
-      Q1Q_1 <- bound(Q1 * (1 - Q1), 0.0005)
-      Q1Q_1_tmle <- bound(Q_tmle1 * (1 - Q_tmle1), 0.0005)
+      Q1Q_1 <- bound(Q1 * (1 - Q1), 0.001)
+      Q1Q_1_tmle <- bound(Q_tmle1 * (1 - Q_tmle1), 0.001)
 
       inv_term <- 1/mean(g_tilde1 / g1^2 *Q1Q_1_tmle)
       prod_term <- mean( Q1Q_1_tmle / g1)
       C_tilde_1 <- inv_term * prod_term
-      print(C_tilde_1)
       C_g <- A/g1
       #####
       # C_y <- A/g1 * Q1Q_1_tmle /Q1Q_1
