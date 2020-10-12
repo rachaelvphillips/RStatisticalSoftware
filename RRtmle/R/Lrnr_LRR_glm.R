@@ -16,8 +16,9 @@ Lrnr_LRR_glm <- R6Class(
     .properties = c("binomial"),
 
     .train = function(task) {
+      print("here")
       method <- self$params$method
-      X <- task$X_intercept
+      X <- cbind(1,task$X)
 
       Y <- task$Y
       if(!is.null(method)) {
@@ -38,18 +39,23 @@ Lrnr_LRR_glm <- R6Class(
         fit_object <- glmnet::cv.glmnet(as.matrix(X), Y, family = binomial(), weights = weights, intercept = F)
         coefs <- coef(fit_object, s = "lambda.min")
        } else {
+         print("k")
         fit_object <- speedglm::speedglm.wfit(Y, as.matrix(X), family = binomial(), weights = weights, intercept = F)
-        coefs <- fit_obj$coef
+        coefs <- fit_object$coef
        }
-      fit_object <- list(coef = coefs)
+
+
+      fit_object <- list(coef = as.vector(coefs))
       return(fit_object)
     },
     .predict = function(task = NULL) {
       fit_obj <- self$fit_object
-      coef <- fit_obj$coef
-      X <- task$X_intercept
+      coef <- as.vector(fit_obj$coef)
+      X <- as.matrix(cbind(1,task$X))
+
       predictions <- X %*% coef
       return(predictions)
-    }
+    },
+    .required_packages = c("glmnet", "speedglm")
   )
 )

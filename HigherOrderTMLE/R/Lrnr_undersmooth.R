@@ -1,5 +1,5 @@
 #' @export
-hal_basis <- function(max_degree = 2, bins = 50, smoothness_orders = 0, include_zero_order = F, include_lower_order = F, ...) {
+hal_basis <- function(max_degree = 3, bins = 50, smoothness_orders = 0, include_zero_order = F, include_lower_order = F, ...) {
   max_degree <- max_degree
   bins <- bins
   smoothness_orders <- smoothness_orders
@@ -141,7 +141,7 @@ Lrnr_undersmooth <- R6Class(
         Y <- task$Y
 
 
-        glmnet_fit <- glmnet::cv.glmnet(x_basis, Y, standardize = self$params$standardize, family = outcome_type, weights = weights, offset = offset)
+        glmnet_fit <- glmnet::cv.glmnet(x_basis, Y, standardize = self$params$standardize, family = outcome_type, weights = weights, offset = offset, nlambda = 120)
         best_beta <- coef(glmnet_fit, s = "lambda.min")
         basis_to_check <- which(best_beta[-1] !=0)
         best_lambda <- glmnet_fit$lambda.min

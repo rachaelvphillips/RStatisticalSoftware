@@ -14,22 +14,7 @@ devtools::document()
 remotes::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
 ```
 
-```{r}
-library(simcausal)
-library(dplyr)
 
-
-# variable: covariates W1,W2,W3. Immuresponse S. Disease Y. Sampling G.
-## 3 cases for covariates: cov in {'non_covariate','non_confound','confound'}
-## 4 models for P(Y|S,W): model in {'logit','probit','step','scale'}
-
-# Examples:
-## 1. non-covariate (model:'logit')
-dat_logit<-simu(Risk=0.1,p0=1,p1=1,cov='non_covariate',model='logit') 
-data1<-sim_thre(dat_logit,n = 1000,rndseed=1,p=c(0.01,0.03,0.05,0.07,0.09))
-mean(data1$simmed_data$Y)
-
-```
 
 ```{r}
 library(simcausal)
@@ -81,7 +66,34 @@ for(v in vs) {
 
 
 
-
+```{r}
+#Donvan estimator
+get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights <- weights/sum(weights)
+  data <- as.data.table(data)
+  IC_list <- list()
+  est_list <- list()
+  for(thresh in thresholds) {
+    meets_thresh <- as.numeric(data[[marker_var]] >= thresh) 
+    cdf <- weighted.mean(meets_thresh, weights)
+    EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
+    thresh <- as.character(thresh)
+    est_list[[thresh]] <- EY
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    
+  }
+  return(list(est = unlist(est_list),
+             IC = do.call(cbind, IC_list) ))
+}
+thresholds <- quantile(data[["S"]], seq(0.1, 0.9, length.out = 10))
+out <- get_estimates(data, "S", "Y", thresholds)
+est <- out$est
+IC <- out$IC
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+lower <- est - radius
+upper <- est + radius
+data.table(lower, est, upper )
+```
 
 
 
@@ -91,6 +103,7 @@ data
 data$weights <- 1
 library(tmle3)
 #lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+# To use machine learning
 lrnr_Y <- Lrnr_xgboost$new()
 lrnr_A <- Lrnr_xgboost$new()
 
@@ -99,31 +112,20 @@ tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W")
 learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
 node_list <- list("W" = c("W1", "W2"), "A" = "S", "Y" = "Y", weights = "weights")
 
-start_time <- proc.time()
 
-  tmle_task <- tmle_spec$make_tmle_task(data, node_list)
-  task_time <- proc.time()
+tmle_task <- tmle_spec$make_tmle_task(data, node_list)
 
-  initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
-  likelihood_time <- proc.time()
+initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
 
-  updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
-  targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
 
-  tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
+tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
   
 
 suppressWarnings(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
 ```
-0.5622048 0.5803265 0.5945332 0.6072527 0.6172666 0.6261565 0.6488544
- [8] 0.6725778 0.7239753 0.9393215
- 
- 0.5653488 0.5809175 0.5925751 0.6094160 0.6124955 0.6259612 0.6489949
- [8] 0.6636299 0.7057046 0.9216679
- 
- 
- 0.5622048 0.5803265 0.5945332 0.6072527 0.6172666 0.6261565 0.6488544
- [8] 0.6725778 0.7239753 0.9393215
+
 
 ```{r}
 estimates <- tmle_params[[1]]$estimates(tmle_task)
@@ -171,10 +173,6 @@ thresh <- function(p) {
 }
 
 thresh(0.7)
-```
-
-```{r}
-
 ```
 
 
