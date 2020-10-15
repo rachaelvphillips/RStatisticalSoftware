@@ -46,9 +46,9 @@ make_generator <- function(likelihood, type = "IPW") {
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
 
     data <- cbind(data.table(Y = task$Y, A = A, Q = Q, g = 1/g, ER1 = ER1, ER0 = ER0, weights = task$weights), X)
-    covariates <- c(colnames(X), "A")
+    covariates <- c(colnames(X), "A", "g", "Q")
     outcome  <- "Y"
-    new_task <- sl3_Task$new(data, covariates = covariates, outcome = outcome,  weights = "weights", folds = task$folds)
+    new_task <- sl3_Task$new(data,  covariates = covariates, outcome = outcome,  weights = "weights", folds = task$folds)
     return(new_task)
   }
 

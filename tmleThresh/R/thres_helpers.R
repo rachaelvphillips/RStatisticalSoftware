@@ -527,7 +527,7 @@ Lrnr_CDF <- R6::R6Class(
             weights <- as.numeric(data$bin <= data$Y) * task$weights
             data$weights <-weights
 
-            #data <- data[keep]
+            data <- data[keep]
             #data <- data[keep]
           } else {
 

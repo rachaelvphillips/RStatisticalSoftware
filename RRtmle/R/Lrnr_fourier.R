@@ -17,7 +17,8 @@ Lrnr_fourier <- R6Class(
         outcome_type <- task$outcome_type$glm_family(return_object = T)
         linkinv_fun <- outcome_type$linkinv
         link_fun <- outcome_type$linkfun
-        print(outcome_type)
+
+
         if(task$has_node("weights")) {
           weights <- task$weights
         } else {
@@ -37,7 +38,7 @@ Lrnr_fourier <- R6Class(
         if(!is.null(self$params$subset_basis)) {
           x_basis <- x_basis[, self$params$subset_basis]
         }
-        print(ncol(x_basis))
+
         if(!is.null(self$params$mult_by)) {
           list_of_x <- list()
           for(column in c(self$params$mult_by)) {
@@ -49,8 +50,11 @@ Lrnr_fourier <- R6Class(
 
         }
         Y <- task$Y
+
         fit <- speedglm::speedglm.wfit(Y, as.matrix(x_basis), family = outcome_type, weights = weights, offset = offset, intercept = F)
+
         coefs <- fit$coef
+
         coefs[is.na(coefs)] <- 0
         fit$coef <- coefs
         fit$linkinv_fun <- linkinv_fun
@@ -73,7 +77,7 @@ Lrnr_fourier <- R6Class(
         levels <- NULL
         fit_objects <- train(task)
       }
-
+      print("done")
       return(list(fit_objects = fit_objects, levels = levels))
     },
     .predict = function(task) {
@@ -128,6 +132,9 @@ Lrnr_fourier <- R6Class(
         for(level in levels) {
           fit_obj <- fit_objects[[level]]
           index <- which(A==level)
+          if(length(index) == 0){
+            next
+          }
           new_task <- task[index]$next_in_chain(covariates = covariates)
           predictions[index] <- predict_once(new_task, fit_obj)
         }
@@ -136,6 +143,8 @@ Lrnr_fourier <- R6Class(
       }
       return(predictions)
 
-    }))
+    },
+    .required_packages = c("glmnet", "speedglm", "fda")
+  ))
 
 
