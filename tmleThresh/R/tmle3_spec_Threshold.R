@@ -70,8 +70,9 @@ tmle3_Spec_Threshold <- R6Class(
     },
     make_params = function(tmle_task, likelihood, ...) {
       thresholds <- self$options$threshold_function
-      thresholds <- thresholds(tmle_task$get_tmle_node("A"))
-
+      if(is.function(thresholds)) {
+        thresholds <- thresholds(tmle_task$get_tmle_node("A"))
+      }
       if(self$options$method == "Psi_W") {
         thres <- Param_thresh$new(likelihood, ...)
 

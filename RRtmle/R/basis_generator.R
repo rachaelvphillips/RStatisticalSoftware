@@ -23,6 +23,7 @@ fourier_basis <- function(nbasis = 50, max_degree = 2, unpenalized = NULL, ...) 
   nbasis <- nbasis
   max_degree <- max_degree
   generator <- function(X) {
+    X <- as.matrix(X)
     basis_list <- list()
     var_names <- c()
     print(colnames(X))
@@ -58,7 +59,7 @@ fourier_basis <- function(nbasis = 50, max_degree = 2, unpenalized = NULL, ...) 
       data <- model.frame(form, data = as.data.frame(data))
       data <- model.matrix(form, data = data)
 
-      data <- data[,-1]
+      data <- as.matrix(data[,-1, drop = F])
       var_names <- colnames(data)
       data <- do.call(cbind, unlist(apply(data, 2, function(v) {list(matrix(v, ncol = k))}), recursive = F))
       data <- as.matrix(data)

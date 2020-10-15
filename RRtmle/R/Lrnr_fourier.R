@@ -77,7 +77,7 @@ Lrnr_fourier <- R6Class(
         levels <- NULL
         fit_objects <- train(task)
       }
-      print("done")
+
       return(list(fit_objects = fit_objects, levels = levels))
     },
     .predict = function(task) {
@@ -111,6 +111,9 @@ Lrnr_fourier <- R6Class(
 
         }
         coefs <- fit$coef
+        coefs[is.na(coefs)] <- 0
+
+
 
 
 

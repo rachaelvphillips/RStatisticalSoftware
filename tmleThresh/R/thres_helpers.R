@@ -40,12 +40,12 @@ make_thresh_npsem <- function(node_list, data_adaptive = F) {
   censoring_indicator <- node_list[["delta_Y"]]
   if(!data_adaptive) {
     npsem <- list(define_node("W", baseline_covariates, c()),
-                  define_node("A", marker_covariates, "W"),
+                  define_node("A", marker_covariates, "W", variable_type = Variable_Type$new("continuous")),
                   define_node("Y", outcome_covariate, c("W", "A"), scale = T))
   } else {
     npsem <- list(define_node("W", baseline_covariates, c()),
-                  define_node("A_learned", outcome_covariate, c("A")),
-                  define_node("A", marker_covariates, "W"),
+                  define_node("A_learned", outcome_covariate, c("A"),  variable_type = Variable_Type$new("continuous")),
+                  define_node("A", marker_covariates, "W",  variable_type = Variable_Type$new("continuous")),
                   define_node("Y", outcome_covariate, c("W", "A"), scale = T))
   }
   if(!is.null(censoring_indicator)) {
@@ -97,7 +97,7 @@ make_thresh_likelihood <- function(tmle_task, learner_list,
   }
 
   if(is.function(cutoffs)) {
-    cutoffs <- cutoffs(Aval)
+    cutoffs <- sort(unique(cutoffs(Aval)))
   }
 
 
@@ -124,7 +124,7 @@ make_thresh_likelihood <- function(tmle_task, learner_list,
     factor_list <- c(list(W_factor, A_factor, Y_factor),short_lik$factor_list)
 
   } else {
-    factor_list <- list(W_factor, A_factor, Y_factor)
+    factor_list <- list(W_factor,  A_factor, Y_factor)
 
   }
 
@@ -433,21 +433,24 @@ Lrnr_CDF <- R6::R6Class(
       args <- self$params
       lrnr <- args$lrnr
       num_bins <- args$num_bins
-
-      out <- private$.process_task(task, training = T)
+      cutoffs <- args$threshs
+      out <- private$.process_task(task, training = T, cutoffs = cutoffs)
 
       folds <- out$folds
       task <- out$task
+      if(!("cv" %in% lrnr$properties)) {
+        task <- task$revere_fold_task("full")
+      }
+      task <- task$revere_fold_task("full")
+      folds <- task$folds
+      cutoffs <- out$cutoffs
+
       if(args$cv) {
         lrnr <- Lrnr_sl$new(lrnr, sl3:::default_metalearner(list(type = "binomial")), folds = folds)
        # lrnr <- Lrnr_cv$new(lrnr, folds = folds)
 
       }
-      if(!("cv" %in% lrnr$properties)) {
-        task <- task$revere_fold_task("full")
-      }
 
-      cutoffs <- out$cutoffs
 
 
       lrnr <- delayed_learner_train(lrnr, task)
@@ -467,17 +470,21 @@ Lrnr_CDF <- R6::R6Class(
         task1 <- task$revere_fold_task("validation")
         data <- task1$data
         Y <- task1$Y
-
+        min_Y <- min(Y)
+        max_Y <- max(Y)
         if(is.null(cutoffs)) {
           #cutoffs <- as.vector(quantile(Y, seq(0, 1, length.out = num_bins)))
-          min_Y <- min(Y)
-          max_Y <- max(Y)
+
           threshs <- c(min_Y, self$params$threshs, max_Y)
           cutoffs <-  unique(quantile(threshs,seq(0, 1, length.out = num_bins),  type = 1))
           cutoffs <- unique(cutoffs)
 
 
+        } else {
+          cutoffs <- sort(union(cutoffs, c(min_Y, max_Y)))
         }
+
+
 
         folds <- task1$folds
         orig_ids <- seq_len(task1$nrow)
@@ -496,10 +503,15 @@ Lrnr_CDF <- R6::R6Class(
 
           data <- task$data
           Y <- task$Y
+          all.inside = T
+          if(sum(Y == max(Y)) > 5) {
+            all.inside = F
+          }
 
           Y <- findInterval(Y, cutoffs, left.open = self$params$type != "left-continuous", all.inside
-                                     = T)
+                                     = all.inside)
           #nested revere task
+
           if(length(unique(Y))!= length(cutoffs) - 1) {
             #stop("oops")
           }
@@ -521,6 +533,7 @@ Lrnr_CDF <- R6::R6Class(
           data <- rbindlist(data_list)
           cluster_ids <- rep(orig_ids, length(cutoffs[-1]))
           new_folds <- id_folds_to_folds(folds, cluster_ids)
+
           if(training) {
             keep <- data$bin <= data$Y
 
@@ -528,6 +541,8 @@ Lrnr_CDF <- R6::R6Class(
             data$weights <-weights
 
             data <- data[keep]
+            new_folds <- subset_folds(new_folds, which(keep))
+            print(data)
             #data <- data[keep]
           } else {
 
@@ -556,8 +571,16 @@ Lrnr_CDF <- R6::R6Class(
           cutoffs <- c(min_Y, unique(quantile(threshs,seq(0, 1, length.out = num_bins),  type = 1)))
           cutoffs <- unique(cutoffs)
         }
+        else {
+          cutoffs <- sort(union(cutoffs, c(min_Y, max_Y)))
+        }
+        all.inside = T
+        if(sum(Y == max(Y)) > 5) {
+          all.inside = F
+        }
+
         Y <- findInterval(Y, cutoffs, left.open = self$params$type != "left-continuous", all.inside
-                                   = T)
+                          = all.inside)
         #nested revere task
 
         data_list <- list()
