@@ -1,0 +1,516 @@
+---
+title: "Day57bindRBD"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+```{r, include = F}
+library(earth)
+library(sl3)
+library(tmleThresh)
+load("dat.mock.rda")
+markers <- c("Day57bindSpike" , "Day57bindRBD"  , "Day57pseudoneut" , "Day57liveneut" )
+
+```
+# 40
+```{r, include = F}
+data <- dat.mock.vacc.seroneg.40
+dim(data)
+
+keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
+marker <- "Day57bindRBD"
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline)]
+data <- na.omit(data)
+sum(is.na(data))
+
+#lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+# To use machine learning
+library(earth)
+
+
+thresholds <- sort(unique(quantile(data[[marker]], seq(0.09, 0.91, length.out = 10))))
+
+
+lrnr_Y <- Lrnr_glm$new()
+lrnr_A <- Lrnr_glm$new()
+
+
+
+tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function = thresholds, cv = F)
+
+learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
+node_list <- list("W" = baseline, "A" = marker, "Y" = outcome)
+
+
+tmle_task <- tmle_spec$make_tmle_task(data, node_list)
+
+initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
+
+updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+
+tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
+
+(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
+
+#Donvan estimator
+
+weights <-1
+get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights <- weights/sum(weights)
+  data <- as.data.table(data)
+  IC_list <- list()
+  est_list <- list()
+  cdf_list <- c()
+  for(thresh in thresholds) {
+    meets_thresh <- as.numeric(data[[marker_var]] >= thresh) 
+    cdf <- weighted.mean(meets_thresh, weights)
+    cdf_list <- c(cdf_list, cdf)
+    EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
+    thresh <- as.character(thresh)
+    est_list[[thresh]] <- EY
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    
+  }
+  return(list(est = unlist(est_list),
+             IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
+}
+out <- get_estimates(data, marker, outcome, thresholds)
+est <- out$est
+IC <- out$IC * weights
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+lower <- est - radius
+upper <- est + radius
+donovan_est <- data.table(lower, est, upper )
+
+estimates <- tmle_params[[1]]$estimates(tmle_task)
+# This should be very small
+# Estimates of Psi
+estimates$psi
+
+# Estimates and confidence bounds
+sumry <- summary_from_estimates(tmle_task, list(estimates))[,-c(1,2,3)]
+lower <- sumry$lower
+upper <- sumry$upper
+est <- sumry$tmle_est
+cutoffs <- thresholds
+```
+
+```{r, include = F}
+plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+library(ggplot2)
+
+ g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "TMLE"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+plot_data <-donovan_est
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+plot_data$cutoffs <- cutoffs
+library(ggplot2)
+
+ g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "Donovan"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+
+
+```
+
+```{r}
+g1
+g2
+
+```
+
+# 30
+```{r, include = F}
+data <- dat.mock.vacc.seroneg.30
+dim(data)
+
+keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
+
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline)]
+data <- na.omit(data)
+sum(is.na(data))
+
+#lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+# To use machine learning
+library(earth)
+
+
+thresholds <- sort(unique(quantile(data[[marker]], seq(0.09, 0.91, length.out = 10))))
+
+
+
+
+
+tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function = thresholds, cv = F)
+
+learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
+node_list <- list("W" = baseline, "A" = marker, "Y" = outcome)
+
+
+tmle_task <- tmle_spec$make_tmle_task(data, node_list)
+
+initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
+
+updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+
+tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
+
+(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
+
+#Donvan estimator
+
+weights <-1
+get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights <- weights/sum(weights)
+  data <- as.data.table(data)
+  IC_list <- list()
+  est_list <- list()
+  cdf_list <- c()
+  for(thresh in thresholds) {
+    meets_thresh <- as.numeric(data[[marker_var]] >= thresh) 
+    cdf <- weighted.mean(meets_thresh, weights)
+    cdf_list <- c(cdf_list, cdf)
+    EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
+    thresh <- as.character(thresh)
+    est_list[[thresh]] <- EY
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    
+  }
+  return(list(est = unlist(est_list),
+             IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
+}
+out <- get_estimates(data, marker, outcome, thresholds)
+est <- out$est
+IC <- out$IC * weights
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+lower <- est - radius
+upper <- est + radius
+donovan_est <- data.table(lower, est, upper )
+
+estimates <- tmle_params[[1]]$estimates(tmle_task)
+# This should be very small
+# Estimates of Psi
+estimates$psi
+
+# Estimates and confidence bounds
+sumry <- summary_from_estimates(tmle_task, list(estimates))[,-c(1,2,3)]
+lower <- sumry$lower
+upper <- sumry$upper
+est <- sumry$tmle_est
+cutoffs <- thresholds
+```
+
+```{r, include = F}
+plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+library(ggplot2)
+
+ g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "TMLE"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+plot_data <-donovan_est
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+plot_data$cutoffs <- cutoffs
+library(ggplot2)
+
+ g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "Donovan"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+
+
+```
+
+```{r}
+g1
+g2
+
+```
+
+
+# 25
+
+```{r, include = F}
+data <- dat.mock.vacc.seroneg.25
+dim(data)
+
+keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
+
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline)]
+data <- na.omit(data)
+sum(is.na(data))
+
+#lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+# To use machine learning
+library(earth)
+
+
+thresholds <- sort(unique(quantile(data[[marker]], seq(0.09, 0.91, length.out = 10))))
+
+
+
+
+tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function = thresholds, cv = F)
+
+learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
+node_list <- list("W" = baseline, "A" = marker, "Y" = outcome)
+
+
+tmle_task <- tmle_spec$make_tmle_task(data, node_list)
+
+initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
+
+updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+
+tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
+
+(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
+
+#Donvan estimator
+
+weights <-1
+get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights <- weights/sum(weights)
+  data <- as.data.table(data)
+  IC_list <- list()
+  est_list <- list()
+  cdf_list <- c()
+  for(thresh in thresholds) {
+    meets_thresh <- as.numeric(data[[marker_var]] >= thresh) 
+    cdf <- weighted.mean(meets_thresh, weights)
+    cdf_list <- c(cdf_list, cdf)
+    EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
+    thresh <- as.character(thresh)
+    est_list[[thresh]] <- EY
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    
+  }
+  return(list(est = unlist(est_list),
+             IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
+}
+out <- get_estimates(data, marker, outcome, thresholds)
+est <- out$est
+IC <- out$IC * weights
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+lower <- est - radius
+upper <- est + radius
+donovan_est <- data.table(lower, est, upper )
+
+estimates <- tmle_params[[1]]$estimates(tmle_task)
+# This should be very small
+# Estimates of Psi
+estimates$psi
+
+# Estimates and confidence bounds
+sumry <- summary_from_estimates(tmle_task, list(estimates))[,-c(1,2,3)]
+lower <- sumry$lower
+upper <- sumry$upper
+est <- sumry$tmle_est
+cutoffs <- thresholds
+```
+
+```{r, include = F}
+plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+library(ggplot2)
+
+ g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "TMLE"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+plot_data <-donovan_est
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+plot_data$cutoffs <- cutoffs
+library(ggplot2)
+
+ g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "Donovan"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+
+
+```
+
+```{r}
+g1
+g2
+
+```
+
+
+# 20
+
+```{r, include = F}
+data <- dat.mock.vacc.seroneg.20
+dim(data)
+
+keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
+
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline)]
+data <- na.omit(data)
+sum(is.na(data))
+
+#lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+# To use machine learning
+library(earth)
+
+
+thresholds <- sort(unique(quantile(data[[marker]], seq(0.09, 0.91, length.out = 10))))
+
+
+
+
+tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function = thresholds, cv = F)
+
+learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
+node_list <- list("W" = baseline, "A" = marker, "Y" = outcome)
+
+
+tmle_task <- tmle_spec$make_tmle_task(data, node_list)
+
+initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
+
+updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+
+tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
+
+(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
+
+#Donvan estimator
+
+weights <-1
+get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights <- weights/sum(weights)
+  data <- as.data.table(data)
+  IC_list <- list()
+  est_list <- list()
+  cdf_list <- c()
+  for(thresh in thresholds) {
+    meets_thresh <- as.numeric(data[[marker_var]] >= thresh) 
+    cdf <- weighted.mean(meets_thresh, weights)
+    cdf_list <- c(cdf_list, cdf)
+    EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
+    thresh <- as.character(thresh)
+    est_list[[thresh]] <- EY
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    
+  }
+  return(list(est = unlist(est_list),
+             IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
+}
+out <- get_estimates(data, marker, outcome, thresholds)
+est <- out$est
+IC <- out$IC * weights
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+lower <- est - radius
+upper <- est + radius
+donovan_est <- data.table(lower, est, upper )
+
+estimates <- tmle_params[[1]]$estimates(tmle_task)
+# This should be very small
+# Estimates of Psi
+estimates$psi
+
+# Estimates and confidence bounds
+sumry <- summary_from_estimates(tmle_task, list(estimates))[,-c(1,2,3)]
+lower <- sumry$lower
+upper <- sumry$upper
+est <- sumry$tmle_est
+cutoffs <- thresholds
+```
+
+```{r, include = F}
+plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+library(ggplot2)
+
+ g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "TMLE"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+plot_data <-donovan_est
+
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+plot_data$cutoffs <- cutoffs
+library(ggplot2)
+
+ g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "Donovan"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+
+
+```
+
+```{r}
+g1
+g2
+
+```
+
+

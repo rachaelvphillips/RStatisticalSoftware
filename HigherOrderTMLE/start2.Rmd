@@ -1,0 +1,421 @@
+---
+title: "rough"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(simcausal)
+library(data.table)
+sim_data <- function(n, bias = F) {
+   
+D <- DAG.empty()
+D <- D +
+  node("Wcont", distr = "runif", min = -0.8 , max = 0.8) +
+   node("W", distr = "rconst", const = round(Wcont, 1)) +
+  node("W1cont", distr = "runif", min = -1, max = 1) +
+   node("W1", distr = "rconst", const = round(W1cont, 1)) +
+  node("Z", distr = "runif", min = 4, max = 5) +
+  node("bias", distr = "rconst", const = bias * Z / n^(0.25) ) + 
+  node("g1", distr = "rconst", const =  0.3 +0.4* plogis(bias + W1^2 - W1/2 + W^2 - 0.5*0.5 + 0.5*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( bias + A + W - A*W1/2 + W1*W + 0.5*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node("EY", distr = "rconst", const = plogis(( bias + A + W - A*W1/2 + W1*W + 0.5*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =   plogis(( 1 + W - 1*W1/2 + W1*W + 0.5*sin(W) + exp(W1)*W1 - W^2 ))) 
+setD <- set.DAG(D)
+data <- sim(setD, n = n)
+data <- as.data.table(data)
+data
+}
+data <- sim_data(3000000)
+truth <- mean(data$EY1)
+```
+
+```{r}
+1/log(1500)
+```
+```{r}
+
+n = 250
+print(n)
+simdata <- fixedsim250
+residual <- na.omit(simdata[, c(4,5,6)]) - truth
+sqrt(n) * colMeans(residual)
+sqrt(n *colMeans(residual^2))
+sqrt(n) * mean(na.omit(simdata$Pnlast))
+sqrt(n) * mean(na.omit(simdata$ICtilde))
+v=apply( na.omit(simdata[, c(4,5,6)]), 2 ,hist)
+
+n = 500
+print(n)
+simdata <- fixedsim500
+residual <- na.omit(simdata[, c(4,5,6)]) - truth
+sqrt(n) * colMeans(residual)
+sqrt(n *colMeans(residual^2))
+sqrt(n) * mean(na.omit(simdata$Pnlast))
+sqrt(n) * mean(na.omit(simdata$ICtilde))
+v=apply( na.omit(simdata[, c(4,5,6)]), 2 ,hist)
+
+n = 1000
+print(n)
+simdata <- fixedsim1000
+residual <- na.omit(simdata[, c(4,5,6)]) - truth
+sqrt(n) * colMeans(residual)
+sqrt(n *colMeans(residual^2))
+sqrt(n) * mean(na.omit(simdata$Pnlast))
+sqrt(n) * mean(na.omit(simdata$ICtilde))
+v=apply( na.omit(simdata[, c(4,5,6)]), 2 ,hist)
+
+
+
+
+n = 1500
+print(n)
+simdata <- fixedsim1500
+
+residual <- na.omit(simdata[, c(4,5,6)]) - truth
+sqrt(n) * colMeans(residual)
+sqrt(n *colMeans(residual^2))
+sqrt(n) * mean(na.omit(simdata$Pnlast))
+sqrt(n) * mean(na.omit(simdata$ICtilde))
+v=apply( na.omit(simdata[, c(4,5,6)]), 2 ,hist)
+```
+
+```{r}
+fixedsim1000
+
+```
+
+```{r}
+na.omit(simn2000)
+
+```
+
+
+```{r}
+devtools::document()
+library(tmle3)
+#remotes::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
+
+```
+
+
+```{r}
+
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min = -0.8, max = 0.8) +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("A", distr = "rbinom", size = 1,  prob = plogis(W1/2)) +
+  node("g1", distr = "rconst", const = plogis(W1/2)) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( -1 + 1 + A + W - A*W1/2 ))) +
+  node ("EY1", distr = "rconst", const = plogis(( -1 + 1 + 1 + W - 1*W1/2 )))
+setD <- set.DAG(D)
+data <- sim(setD, n = 10000)
+data <- as.data.table(data)
+data
+quantile(data$g1^2)
+quantile(data$EY1)
+```
+
+```{r}
+library(simcausal)
+
+sim_data <- function(n, bias = F) {
+  
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min = -0.8 , max = 0.8) +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rbinom", size = 1, prob = 0.5) +
+
+  node("Z", distr = "runif", min = 1, max = 2) +
+  node("bias", distr = "rconst", const = bias * Z / n^(0.25) ) + 
+  node("g1", distr = "rconst", const =  0.3 +0.4* plogis(bias + W1^2 - W1/2 + W^2 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( bias + A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =   plogis(( 1 + W - 1*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) 
+setD <- set.DAG(D)
+data <- sim(setD, n = n)
+data <- as.data.table(data)
+data
+}
+dat <- sim_data(1000, T)
+length(unique(dat$W))
+length(unique(dat$W1))
+```
+
+```{r}
+results <- data.frame(Pnlast = NA, ICtilde = NA, est_sec = NA, est_first = NA, est_standard = NA)
+results <- results[rep(NA, 1000),]
+
+```
+
+```{r}
+results
+
+```
+```{r, include = F}
+library(simcausal)
+
+for(i in 1:1000) {
+n = 500
+verbose = T
+print(i)
+
+data <- sim_data(n, F)
+data_bias <-sim_data(n , T)
+
+npsem <- list(
+  define_node("W", c("W", "W1", "W2"), c()),
+  define_node("A", "A",  c("W")),
+  define_node("Y",  "Y", c("A", "W"))
+)
+
+task <- tmle3_Task$new(data, npsem)
+task_bias <- tmle3_Task$new(data_bias, npsem)
+
+lrnr <- Lrnr_xgboost$new(max_depth = 5, gamma = 0.05, lambda = 0.1)
+
+#lrnr_mean <- Lrnr_mean$new()
+stopping_criterion <- function(n, residual) {return(1/ sqrt(n) / log(n))}
+lrnr_undersmooth <- Lrnr_undersmooth$new(stopping_criterion = stopping_criterion)
+lrnr_undersmoothA <- lrnr_undersmooth
+lrnr_undersmoothY <- lrnr_undersmooth
+lrnr_undersmoothY <- lrnr_undersmoothY$train(task$get_regression_task("Y"))
+lrnr_undersmoothA <- lrnr_undersmoothA$train(task$get_regression_task("A"))
+
+num_lambda <- ncol(as.data.table(lrnr_undersmoothY$predict(task$get_regression_task("Y"))))
+num_lambda <- min(num_lambda, ncol(as.data.table(lrnr_undersmoothA$predict(task$get_regression_task("A")))))
+num_lambda
+
+
+eic_vec <- c()
+eic_vec_tilde <- c()
+index <- seq(1, num_lambda, 1)
+
+factor_list <- list(
+  LF_emp$new("W"),
+  LF_fit$new("A",lrnr, type = "mean"),
+  LF_fit$new("Y",lrnr, type = "mean")
+)
+
+
+likelihood <- Likelihood$new(factor_list)
+
+likelihood <- likelihood$train(task_bias)
+
+for(j in index) {
+lf_Y <- LF_known$new("Y", mean_fun = function(task) {
+  lrnr_undersmoothY$predict(task)[,j]
+}, type = "mean")
+
+lf_A <- LF_known$new("A", mean_fun = function(task) {
+  lrnr_undersmoothA$predict(task)[,j]
+}, type = "mean")
+
+
+
+
+factor_list_tilde <- list(
+  LF_emp$new("W"),
+  lf_A,#LF_fit$new("A",lrnr_undersmoothA, type = "mean" ),
+  lf_Y #LF_fit$new("Y",lrnr_undersmoothY, type = "mean" )
+)
+
+likelihood_tilde <- Likelihood$new(factor_list_tilde)
+likelihood_tilde <- likelihood_tilde$train(task)
+tlik <- Targeted_Likelihood$new(likelihood, updater = list(maxit = 300, convergence_type = "scaled_var", cvtmle = F, constrain_step = T, one_dimensional = T, delta_epsilon = c( 0.01)))
+param <- Param_TSM_higher_order$new(tlik, likelihood_tilde)
+tlik$updater$update(tlik, task)
+est <- param$estimates(task)
+est1 <- mean(est$psi)
+ICtildesum <- sum(colMeans(est$ICtilde))
+eic_vec_tilde <-c(eic_vec_tilde, ICtildesum)
+  
+  
+tilde <- likelihood_tilde$get_likelihood(task, "Y")
+lik1 <- tlik$get_likelihood(task, "Y")
+Y <- data$Y
+param$update_last(task)
+lik2 <- tlik$get_likelihood(task, "Y")
+
+print("EIC")
+eic <- mean(task$get_tmle_node("A")/tlik$get_likelihood(task, "A") * (task$get_tmle_node("Y") - lik2))
+print(eic)
+eic_vec <- c(eic_vec, eic)
+}
+
+thresh <- 2/sqrt(n)/log(n)
+thresh
+best1 <- which(abs(eic_vec) <= thresh)
+best2 <- which(abs(eic_vec_tilde) <= thresh)
+print(eic_vec)
+print(eic_vec_tilde)
+best <- intersect(best1, best2)
+if(length(best) == 0) {
+  best <- which.min(abs(eic_vec) + abs(eic_vec_tilde))
+} else {
+  best <- min(best)
+}
+
+  #best <- which.min(abs(eic_vec))
+print(eic_vec[best])
+print(eic_vec_tilde[best])
+best <- index[best]
+
+
+
+lf_Y <- LF_known$new("Y", mean_fun = function(task) {
+  lrnr_undersmoothY$predict(task)[,best]
+}, type = "mean")
+
+lf_A <- LF_known$new("A", mean_fun = function(task) {
+  lrnr_undersmoothA$predict(task)[,best]
+}, type = "mean")
+
+
+
+factor_list_tilde <- list(
+  LF_emp$new("W"),
+  lf_A,#LF_fit$new("A",lrnr_undersmoothA, type = "mean" ),
+  lf_Y #LF_fit$new("Y",lrnr_undersmoothY, type = "mean" )
+)
+
+likelihood_tilde <- Likelihood$new(factor_list_tilde)
+likelihood_tilde <- likelihood_tilde$train(task)
+tlik <- Targeted_Likelihood$new(likelihood, updater = list(maxit = 300, convergence_type = "scaled_var", cvtmle = F, constrain_step = T, one_dimensional = T, delta_epsilon = c( 0.01)))
+param <- Param_TSM_higher_order$new(tlik, likelihood_tilde)
+est <- param$estimates(task)
+est0 <- mean(est$psi)
+
+ICtilde <- colMeans(est$ICtilde)
+print("ICtildebefore")
+print(ICtilde)
+
+tlik$updater$update(tlik, task)
+est <- param$estimates(task)
+est0 <- mean(est$psi)
+
+ICtilde <- colMeans(est$ICtilde)
+print("ICtilde")
+print(ICtilde)
+tilde <- likelihood_tilde$get_likelihood(task, "Y")
+lik1 <- tlik$get_likelihood(task, "Y")
+Y <- data$Y
+param$update_last(task)
+est <- param$estimates(task)
+est1 <- mean(est$psi)
+
+print("EIC")
+lik2 <- tlik$get_likelihood(task, "Y")
+eic <- mean(task$get_tmle_node("A")/tlik$get_likelihood(task, "A") * (task$get_tmle_node("Y") - lik2))
+print(eic)
+
+
+
+tlik_old <- Targeted_Likelihood$new(likelihood, updater = list(cvtmle = F))
+param_old <- tmle3::Param_TSM$new(tlik_old, list(LF_static$new("A", value = 1)))
+
+tlik_old$updater$update(tlik_old, task)
+
+est <- param_old$estimates(task, fold_number = "full")
+IC_old <- mean(est$IC)
+psi_old <- mean(est$psi)
+
+est2 <- mean(est$psi)
+res <- c(eic, sum(ICtilde), est0, est1, est2)
+print(res)
+results[i,] <- res
+
+if(i%%10 ==0 || i ==1) {
+  write.csv(results, "sim500.csv")
+}
+}
+```
+
+
+```{r}
+1/sqrt(n)/log(n)
+results
+```
+
+```{r}
+results[[1]] - truth
+res <- as.data.table(results)
+res
+residual <- res - truth
+residual
+residual <- transpose(residual)
+residual
+colMeans(residual)
+resample::colVars(residual)
+(resample::colStdevs(residual))
+
+```
+
+```{r, include = T}
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min = -0.8, max = 0.8) +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rbinom", size = 1, prob = 0.5) +
+  node("A", distr = "rbinom", size = 1,  prob = 0.8*plogis(W1/2 + W*0.8 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("g1", distr = "rconst", const = 0.8*plogis(W1^2 - W1/2 + W^2 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =  plogis(( 1 + W - 1*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) 
+setD <- set.DAG(D)
+data <- sim(setD, n = 500)
+data <- as.data.table(data)
+truth = mean(data$EY1)
+truth
+table(data$A)
+quantile(data$g1)
+```
+
+
+
+
+
+
+```{r}
+n = 1000
+results <- sim2
+results$X1 <- NULL
+apply(results,1, hist)
+res <- as.data.table(results)
+
+residual <- res - truth
+
+residual <- transpose(residual)
+residual
+sqrt(n) * colMeans(residual)
+sqrt(colMeans(residual^2))
+n * (colMeans(residual)^2 + (colMeans(residual^2)))
+```
+
+```{r, include = T}
+library(simcausal)
+library(data.table)
+D <- DAG.empty()
+D <- D +
+  node("W", distr = "runif", min = -0.8, max = 0.8) +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rbinom", size = 1, prob = 0.5) +
+  node("A", distr = "rbinom", size = 1,  prob = 0.3 + 0.7*plogis(W1/2 + W*0.8 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("g1", distr = "rconst", const = 0.3 + 0.7*plogis(W1^2 - W1/2 + W^2 - W2*0.5 + W2*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("Y", distr = "rbinom", size =1 , prob =  plogis(( A + W - A*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =  plogis(( 1 + W - 1*W1/2 + W1*W + W2*sin(W) + exp(W1)*W1 - W^2 ))) 
+setD <- set.DAG(D)
+data <- sim(setD, n = 5000000)
+data
+data <- as.data.table(data)
+truth = mean(data$EY1)
+truth
+quantile(data$EY1)
+quantile(data$g1)
+```

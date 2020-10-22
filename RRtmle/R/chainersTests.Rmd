@@ -1,0 +1,122 @@
+---
+title: "chin"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+n=5000
+library(simcausal)
+library(data.table)
+bound <- Vectorize(tmle3::bound)
+D <- DAG.empty()
+D <- D +
+  node("W1f", distr = "runif", min = -1, max = 1) +
+  node("W2f", distr = "runif", min = -1, max = 1) +
+  node("W3f", distr = "runif", min = -1, max = 1) +
+  node("W4f", distr = "runif", min = -1, max = 1) +
+  node("W5f", distr = "runif", min = -1, max = 1) +
+   node("W1", distr = "rconst", const = round(W1f,1)) +
+   node("W2", distr = "rconst", const = round(W2f,1)) +
+   node("W3", distr = "rconst", const = round(W3f,1)) +
+   node("W4", distr = "rconst", const = round(W4f,1)) +
+   node("W5", distr = "rconst", const = round(W5f,1)) +
+  
+  node("g", distr = "rconst", const = plogis(W1 + W2 +  W3 + W2*sin(W3) + W4 + W5  ) )+
+  node("A", distr = "rbinom", size = 1, prob = g )+
+    node("gRtilde", distr = "rconst",  const =  plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + A - A*cos(W3) + A*W1 - A*sin(W2))) +
+   node("gRtilde1", distr = "rconst",  const =   plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + 1 - 1*cos(W3) + 1*W1 - 1*sin(W2))) +
+   node("gRtilde0", distr = "rconst",  const =   plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + 0 - 0*cos(W3) + 0*W1 - 0*sin(W2))) +
+   node("gR", distr = "rconst",  const =  bound(gRtilde, 0.05) ) +
+  node("R", distr = "rbinom", size = 1, prob = gR)+
+  node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
+
+
+setD <- set.DAG(D, vecfun = c("bound", "round"))
+data <- sim(setD, n = n)
+data <- setDT(data)
+data$id <- data$ID
+data$ID <- NULL
+data$t <- 0
+data$id <- as.factor(data$id)
+
+setkey(data, id ,t)
+print(data)
+#})}
+
+
+
+
+
+library(tmle3)
+library(sl3)
+library(uuid)
+npsem <- list(define_node("W", c("W1", "W2", "W3", "W4", "W5"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0),
+             
+              define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("binomial")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")))
+task <- tmle3_Task$new(data, npsem, long_format = F)
+
+
+mean_fun_R_bias <- function(task) {
+  A <- task$data[["A"]]
+  W1 <- task$data[["W1"]]
+  W2 <- task$data[["W2"]]
+  W3 <- task$data[["W3"]]
+  W4 <- task$data[["W4"]]
+  W5 <- task$data[["W5"]]
+  truth <-  plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + A - A*cos(W3) + A*W1 - A*sin(W2))
+  return(bound(truth + abs( (W1 + W2 + W3 + W4 + W5)/5)/(n)^(0.33), 0.01))
+}
+mean_fun_A_bias <- function(task) {
+  W1 <- task$data[["W1"]]
+  W2 <- task$data[["W2"]]
+  W3 <- task$data[["W3"]]
+  W4 <- task$data[["W4"]]
+  W5 <- task$data[["W5"]]
+  truth <- plogis(W1 + W2 +  W3 + W2*sin(W3) + W4 + W5  ) 
+  g1 <- (bound(truth + abs( (W1 + W2 + W3 + W4 + W5)/5)/(n)^(0.33), 0.01))
+  return(g1)
+}
+
+LF_A_bias <- LF_known$new("A", density_fun  = mean_fun_A_bias)
+LF_R_bias <- LF_known$new("R", mean_fun = mean_fun_R_bias, type = "mean")
+
+factor_list <- list(LF_emp$new("W"), 
+                    LF_A_bias,
+                     LF_R_bias
+)
+
+lik <- Likelihood$new(factor_list)
+lik <- lik$train(task)
+rev <- make_revere(task, lik, "gen")
+library(fda)
+library(speedglm)
+library(glmnet)
+library(stats)
+
+rev_univ <- make_generator(lik, "gen")
+task_full <- rev_univ(task, "full")
+
+```
+
+
+```{r}
+sieve_learner = Lrnr_fourier$new(fourier_basis(2,1), stratify_by = "A", mult_by = c("ginv"))
+
+lrnr_chain <- Lrnr_LRR_plugin$new(sieve_learner = sieve_learner)
+lrnr_chain <- lrnr_chain$train(task_full)
+
+dat <- task_full$get_data()
+dat
+data.table(dat$ER1, dat$ER0)
+
+lrnr_chain$chain(task_full)$data
+
+
+
+```
+
+

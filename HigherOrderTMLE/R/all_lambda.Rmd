@@ -1,0 +1,209 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Sampling
+library(simcausal)
+library(data.table)
+
+sim_data <- function(n, bias = F) {
+   
+D <- DAG.empty()
+D <- D +
+  node("Wcont", distr = "runif", min = -0.8 , max = 0.8) +
+   node("W", distr = "rconst", const = round(Wcont, 1)) +
+  node("W1cont", distr = "runif", min = -1, max = 1) +
+   node("W1", distr = "rconst", const = round(W1cont, 1)) +
+  node("Z", distr = "runif", min = 4, max = 5) +
+  node("bias", distr = "rconst", const = bias * Z / n^(0.25) ) + 
+  node("g1", distr = "rconst", const =  0.3 +0.4* plogis(bias + W1^2 - W1/2 + W^2 - 0.5*0.5 + 0.5*W - W*W1 - W*sin(W1) + W1*cos(W))) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+  node("Y", distr = "rbinom", size =1 , prob = plogis(( bias + A + W - A*W1/2 + W1*W + 0.5*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node("EY", distr = "rconst", const = plogis(( bias + A + W - A*W1/2 + W1*W + 0.5*sin(W) + exp(W1)*W1 - W^2 ))) +
+  node ("EY1", distr = "rconst", const =   plogis(( 1 + W - 1*W1/2 + W1*W + 0.5*sin(W) + exp(W1)*W1 - W^2 ))) 
+setD <- set.DAG(D)
+data <- sim(setD, n = n)
+data <- as.data.table(data)
+data
+}
+data_bias <-sim_data(5000000 , F)
+mean(data_bias$EY1)
+```
+
+
+
+
+```{r}
+results <- data.frame(matrix(NA, nrow = 1000, ncol = 100))
+resultsEICtilde <- data.frame(matrix(NA, nrow = 1000, ncol = 100))
+resultsEICPn <- data.frame(matrix(NA, nrow = 1000, ncol = 100))
+ 
+```
+
+```{r}
+write.csv(results, "resultsall1500.csv")
+write.csv(resultsEICtilde, "resultsalltilde1500.csv")
+write.csv(resultsEICPn, "resultsallpn1500.csv")
+
+```
+
+```{r}
+results <- read.csv("resultsall1500.csv")
+resultsEICtilde <- read.csv("resultsalltilde1500.csv")
+resultsEICPn <- read.csv("resultsallpn1500.csv")
+
+n = 1500
+bias <- na.omit(as.vector(unlist(apply((results - .7245819), 2, mean, na.rm = T))))
+orders <- order(bias)[1:10]
+vars <- na.omit(as.vector(unlist(apply(results - .7245819, 2, sd, na.rm = T))))
+tilde <- na.omit(as.vector(unlist(apply(resultsEICtilde, 2, mean, na.rm = T))))
+pn <- na.omit(as.vector(unlist(apply(resultsEICPn, 2, mean, na.rm = T))))
+
+ sqrt(n)*bias[orders]
+ n *vars[orders]
+ sqrt(n)*tilde[orders]
+sqrt(n)*pn[orders]
+
+results <- read.csv("resultsall1000.csv")
+resultsEICtilde <- read.csv("resultsalltilde1000.csv")
+resultsEICPn <- read.csv("resultsallpn1000.csv")
+
+n = 1000
+bias <- na.omit(as.vector(unlist(apply((results - .7245819), 2, mean, na.rm = T))))
+orders <- order(bias)[1:10]
+vars <- na.omit(as.vector(unlist(apply(results - .7245819, 2, sd, na.rm = T))))
+tilde <- na.omit(as.vector(unlist(apply(resultsEICtilde, 2, mean, na.rm = T))))
+pn <- na.omit(as.vector(unlist(apply(resultsEICPn, 2, mean, na.rm = T))))
+
+ sqrt(n)*bias[orders]
+ n *vars[orders]
+ sqrt(n)*tilde[orders]
+sqrt(n)*pn[orders]
+```
+
+```{r}
+results
+
+```
+
+```{r}
+# results <- data.frame(Pnlast = NA, ICtilde = NA, est_sec = NA, est_first = NA, est_standard = NA)
+# results <- results[rep(NA, 1000),]
+
+for(i in 48:500){
+print(i)
+n = 1500
+data <- sim_data(n, F)
+bias <- runif(n , min = 0.5, max = 1) * 0.75/n^(0.25)
+gbias <- bound(data$g1 + bias, 0.05)
+Qbias <- bound(data$EY + bias, 0.05)
+
+data_bias <-sim_data(n , T)
+
+lf_A_bias <- LF_known$new("A", mean_fun = function(...) {return(gbias)}, type = "mean")
+lf_Y_bias <- LF_known$new("Y", mean_fun = function(...) {return(Qbias)}, type = "mean")
+
+npsem <- list(
+  define_node("W", c("W", "W1"), c()),
+  define_node("A", "A",  c("W")),
+  define_node("Y",  "Y", c("A", "W"))
+)
+
+task <- tmle3_Task$new(data, npsem)
+task_bias <- tmle3_Task$new(data_bias, npsem)
+
+lrnr <- Lrnr_xgboost$new(max_depth = 5, gamma = 0.05, lambda = 0.1)
+
+lrnr_undersmooth <- Lrnr_undersmooth$new()
+lrnr_undersmoothA <- lrnr_undersmooth
+lrnr_undersmoothY <- lrnr_undersmooth
+lrnr_undersmoothY <- lrnr_undersmoothY$train(task$get_regression_task("Y"))
+lrnr_undersmoothA <- lrnr_undersmoothA$train(task$get_regression_task("A"))
+
+num_lambda_Y <- ncol(as.data.table(lrnr_undersmoothY$predict(task$get_regression_task("Y"))))
+num_lambda_A <-  ncol(as.data.table(lrnr_undersmoothA$predict(task$get_regression_task("A"))))
+
+factor_list <- list(
+  LF_emp$new("W"),
+  lf_A_bias,
+  lf_Y_bias
+)
+
+# factor_list <- list(
+#   LF_emp$new("W"),
+#   LF_fit$new("A",lrnr, type = "mean"),
+#   LF_fit$new("Y", Lrnr_mean$new(), type = "mean")
+# )
+
+likelihood <- Likelihood$new(factor_list)
+
+likelihood <- likelihood$train(task_bias)
+
+get_lik_tilde <- function(indexA, indexY) {
+  lf_Y <- LF_known$new("Y", mean_fun = function(task) {
+  lrnr_undersmoothY$predict(task)[,indexY]
+}, type = "mean")
+lf_A <- LF_known$new("A", mean_fun = function(task) {
+  lrnr_undersmoothA$predict(task)[,indexA]
+}, type = "mean")
+factor_list_tilde <- list(
+  LF_emp$new("W"),
+  lf_A,#LF_fit$new("A",lrnr_undersmoothA, type = "mean" ),
+  lf_Y #LF_fit$new("Y",lrnr_undersmoothY, type = "mean" )
+)
+likelihood_tilde <- Likelihood$new(factor_list_tilde)
+likelihood_tilde <- likelihood_tilde$train(task)
+return(likelihood_tilde)
+}
+
+search_set <- seq_len(min(num_lambda_A, num_lambda_Y))
+search_set <- expand.grid(1:10, 1:10)
+
+for(index in 1:nrow(search_set)) {
+  try({
+  index_A <- search_set[index,2]
+  index_Y <- search_set[index,1]
+  print(paste0("Y", index_Y, "A", index_A))
+  likelihood_tilde <- get_lik_tilde(index_A, index_Y)
+  tlik <- Targeted_Likelihood$new(likelihood, updater = list(maxit = 300, convergence_type = "scaled_var", cvtmle = F, constrain_step = T, one_dimensional = T, delta_epsilon = c( 0.1)))
+    param <- Param_TSM_higher_order$new(tlik, likelihood_tilde)
+    
+  tlik$updater$update(tlik, task)
+  est <- param$estimates(task)
+  eictilde <- mean(rowSums(est$ICtilde))
+  param$update_last(task)
+  lik2 <- tlik$get_likelihood(task, "Y")
+  eic <- mean(task$get_tmle_node("A")/tlik$get_likelihood(task, "A") * (task$get_tmle_node("Y") - lik2))
+    est <- param$estimates(task, fold_number = "full")
+   est1 <-  est$psi
+   print(est1)
+   print(eic)
+   print(eictilde)
+  #   
+  # 
+  # tlik_old <- Targeted_Likelihood$new(likelihood, updater = list(cvtmle = F))
+  # param_old <- tmle3::Param_TSM$new(tlik_old, list(LF_static$new("A", value = 1)))
+  # tlik_old$updater$update(tlik_old, task)
+  # est <- param_old$estimates(task, fold_number = "full")
+  # est2 <-  est$psi
+  results[i, index] <- est1
+  resultsEICPn[i, index] <- eic
+  resultsEICtilde[i, index] <- eictilde
+
+})
+}
+}
+```
+
+
+```{r}
+search_set <- expand.grid(1:10, 1:10)
+
+```
+

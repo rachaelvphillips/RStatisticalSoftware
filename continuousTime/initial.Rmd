@@ -1,0 +1,97 @@
+---
+title: "Initial"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+#remotes::install_github("osofr/simcausal")
+#remotes::install_github("tlverse/hal9001", ref = "devel")
+library(hal9001)
+library(simcausal)
+library(data.table)
+library(Matrix)
+```
+
+
+```{r, include = F}
+# generate data
+
+D <- DAG.empty()
+
+D <- D + 
+  node("W", distr = "runif", min = -1, max = 1)+
+  node("A", distr = "rbinom", size = 1, prob = plogis(W))+
+  node("Tfull", distr = "rweibull", scale = 3.9, shape = 1.5 )+
+  node("T", distr = "rconst", const = min(ceiling(Tfull), 12) ) +
+  node("Cfull", distr = "rweibull", scale = 4.9, shape = 1.6 )+
+  node("C", distr = "rconst", const = min(ceiling(Cfull), 12) ) +
+  node("Ttilde", distr = "rconst", const = min(T, C) ) +
+   node("Delta", distr = "rconst", const = as.numeric(T <= C )) 
+D <- set.DAG(D)
+data <- data.table(sim(D, n = 1000))
+
+```
+
+```{r}
+#Prepare data
+
+data_obs <- data[, c("ID", "W", "A", "Ttilde", "Delta")]
+# Expand data so there is a row for t =0 and each observed event time for each person.
+unique_t <- union(0,sort(unique(data_obs$Ttilde)))
+index <- unlist(lapply(1:nrow(data_obs), function(i) rep(i, length(unique_t))))
+data_expanded <- data_obs[index]
+data_expanded[ , t:= unique_t , by = "ID"]
+# Event indicators
+data_expanded[ , dNt := Delta * (Ttilde == t)]
+data_expanded[ , dAt := (1-Delta) * (Ttilde == t)]
+# Counting process indicators (encodes risk set)
+data_expanded[, Nt := cumsum(dNt), by = ID]
+data_expanded[, At := cumsum(dAt), by = ID]
+data_expanded
+
+covariates <- "W"
+#Bin data
+set(data_expanded, , covariates, apply(data_expanded[, covariates, with = F], 2, function(v) {
+  grid <- quantile(v, seq(0, 0.95, length.out = 10))
+  grid[findInterval(v, grid)]
+}))
+data_expanded
+covariate_data <- data_expanded[, c("t", "W", "A")]
+```
+
+
+```{r}
+#Based on binned covariate data, generate list of basis functions 
+basis_list <- hal9001::enumerate_basis(as.matrix(covariate_data), max_degree = 2)
+#Construct design matrix from list of basis functions
+x_basis <- hal9001::make_design_matrix(as.matrix(covariate_data), basis_list)
+
+
+# Get copy_map of rows
+tx_basis <- Matrix::t(x_basis)
+row_copy_map <- hal9001::make_copy_map(tx_basis)
+
+# Invert copy map
+# Maps each row to its unique counterpart
+row_copy_map.rev <- split(rep(names(row_copy_map), lengths(row_copy_map)), unlist(row_copy_map))
+
+#Extract number of events and total risk time for each unique row from data
+data_expanded$uniqrow <- unlist(row_copy_map.rev)
+data_expanded[, tdiff := c(diff(t),0), by = ID]
+data_expanded[,.SD,by = uniqrow]
+# For each group specified by uniqrow, count number of events
+number_of_events <- data_expanded[ , sum(dNt) , by = c("uniqrow")]
+# For each group, get time at risk
+# (1-At)*(dNt + 1-Nt) just means the person is at risk if 
+#not censored/hasn't died strictly before current time.
+risk_time <- data_expanded[ , sum(tdiff * (1-At)*(dNt + 1-Nt)) , by = c("uniqrow")]
+number_of_events
+risk_time
+```
+
+

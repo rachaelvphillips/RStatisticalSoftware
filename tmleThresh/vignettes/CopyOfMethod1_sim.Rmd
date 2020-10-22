@@ -1,0 +1,176 @@
+---
+title: "Method1_simulation"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+#remotes::install_github("Larsvanderlaan/RStatisticalSoftware/tmleThresh")
+devtools::document()
+```
+
+
+```{r}
+
+#remotes::install_github("Larsvanderlaan/RStatisticalSoftware/tmleThresh")
+```
+
+
+
+```{r}
+library(simcausal)
+
+D <- DAG.empty()
+D <- D +
+    node("W1", distr = "runif", min = -1, max = 1) +
+    node("W2", distr = "rnorm", mean = 0) +
+    node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full, 3)) +
+  node("Sfull", distr = "rgamma", shape = abs(2.5)  ) +
+    node("S", distr = "rconst", const = min(Sfull, 8)/8) +
+  node("pY", distr = "rconst", const = 0.7*plogis(-2 + 3*S + 2*W1*(W2 >0) - 2*W2*(W1>0) + W3 * (S-0.1) - 2*sin(W2) - W3*cos(W1))) +
+  node("Y", distr = "rbinom", size =1, prob = pY)
+
+
+D <- set.DAG(D)
+dat <- sim(D,n =3000)
+
+```
+
+
+
+
+```{r}
+threshold_function = function(A) {as.vector(quantile(A, seq(0.1, 0.90, length.out = 7)))}
+
+#Donvan estimator
+data <- dat
+weights <- 1/ifelse(data$Y==1, 1, 0.2)
+get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights <- weights/sum(weights)
+  data <- as.data.table(data)
+  IC_list <- list()
+  est_list <- list()
+  cdf_list <- c()
+  for(thresh in thresholds) {
+    meets_thresh <- as.numeric(data[[marker_var]] >= thresh) 
+    cdf <- weighted.mean(meets_thresh, weights)
+    cdf_list <- c(cdf_list, cdf)
+    EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
+    thresh <- as.character(thresh)
+    est_list[[thresh]] <- EY
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    
+  }
+  return(list(est = unlist(est_list),
+             IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
+}
+thresholds <- threshold_function(data$S)
+out <- get_estimates(data, "S", "Y", thresholds, weights)
+est <- out$est
+IC <- out$IC * weights
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+lower <- est - radius
+upper <- est + radius
+data.table(lower, est, upper )
+```
+
+
+
+
+```{r}
+library(earth)
+
+data <- dat
+data$weights <- 1
+library(xgboost)
+library(tmle3)
+#lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
+# To use machine learning
+lrnr_Y <- Lrnr_earth$new()
+lrnr_A <- Lrnr_earth$new()
+
+threshold_function = function(A) {as.vector(quantile(A, seq(0.1, 0.90, length.out = 7)))}
+
+
+
+tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function =threshold_function, cv = F)
+
+learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
+node_list <- list("W" = c("W1", "W2", "W3"), "A" = "S", "Y" = "Y", weights = "weights")
+
+
+tmle_task <- tmle_spec$make_tmle_task(data, node_list)
+
+initial_likelihood <- tmle_spec$make_initial_likelihood(tmle_task, learner_list)
+
+updater <- tmle_spec$make_updater(maxit = 100, verbose = T)
+targeted_likelihood <- tmle_spec$make_targeted_likelihood(initial_likelihood, updater)
+
+tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
+print("psi")
+tmle_params[[1]]$estimates(tmle_task)$psi
+
+suppressWarnings(targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
+```
+
+
+
+
+
+```{r}
+estimates <- tmle_params[[1]]$estimates(tmle_task)
+# This should be very small
+
+# Estimates of Psi
+estimates$psi
+as.vector(est)
+# Estimates and confidence bounds
+summary_from_estimates(tmle_task, list(estimates))
+```
+
+
+
+
+
+```{r}
+sumry <- summary_from_estimates(tmle_task, list(estimates))
+sumry
+lower <- sumry$lower
+upper <- sumry$upper
+est <- sumry$tmle_est
+
+plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
+cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
+library(ggplot2)
+
+ ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_smooth(aes(colour = "red"),se = F)+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(breaks = plot_data$cutoffs)
+ 
+#Estimate thresholds and confidence interval via linear extrapolation
+
+thresh <- function(p) {
+
+   thresh_est <-approx(x = est, y = cutoffs, n = 100, xout = p)$y
+   thresh_upper <-approx(x = lower, y = cutoffs, n = 100, xout = p)$y
+   thresh_lower <-approx(x = upper, y = cutoffs, n = 100, xout = p)$y
+
+  return(c(thresh_lower, thresh_est, thresh_upper))
+}
+
+
+```
+
+
+
+
+
+
+
+
