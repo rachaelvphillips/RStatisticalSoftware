@@ -12,7 +12,9 @@ Lrnr_fourier <- R6Class(
   private = list(
 
     .train = function(task) {
+      print(task$nrow)
       train <- function(task) {
+        print(task$nrow)
         basis_generator <- self$params$basis_generator
         outcome_type <- task$outcome_type$glm_family(return_object = T)
         linkinv_fun <- outcome_type$linkinv
@@ -25,7 +27,7 @@ Lrnr_fourier <- R6Class(
           weights <- NULL
         }
         if(task$has_node("offset")) {
-          offset <- task$offset_transformed(link_fun)
+          offset <- task$offset_transformed(link_fun, for_prediction = T)
         } else {
           offset <- NULL
         }
@@ -38,7 +40,14 @@ Lrnr_fourier <- R6Class(
         if(!is.null(self$params$subset_basis)) {
           x_basis <- x_basis[, self$params$subset_basis]
         }
-
+        keep <- NULL
+        RR <- log(task$get_data(,"RR")[[1]])
+        fit <- cv.glmnet( as.matrix(x_basis), RR, family = "gaussian", weights = weights, offset = offset, intercept = F)
+        keep <- which(abs(coef(fit, s = "lambda.1se")[-1]) >= 1e-4)
+        print("screened")
+        print(ncol(x_basis))
+        print(length(keep))
+        x_basis <- x_basis[,keep, drop = F]
         if(!is.null(self$params$mult_by)) {
           list_of_x <- list()
           for(column in c(self$params$mult_by)) {
@@ -51,15 +60,21 @@ Lrnr_fourier <- R6Class(
         }
         Y <- task$Y
 
-        fit <- speedglm::speedglm.wfit(Y, as.matrix(x_basis), family = outcome_type, weights = weights, offset = offset, intercept = F)
 
-        coefs <- fit$coef
 
+        fit <- glm.fit( as.matrix(x_basis), Y, family = outcome_type, weights = weights, offset = offset, intercept = F)
+
+        #coefs <- fit$coef
+        coefs <- coef(fit)
         coefs[is.na(coefs)] <- 0
+        if(length(coefs)!= ncol(x_basis)) {
+          coefs <- coefs[-1]
+        }
+
         fit$coef <- coefs
         fit$linkinv_fun <- linkinv_fun
         fit$link_fun <- link_fun
-        fit_object = list(has_offset = !is.null(offset), design_generator = design_generator, fit = fit)
+        fit_object = list(has_offset = !is.null(offset), design_generator = design_generator, fit = fit, keep = keep)
       }
 
       stratify <- self$params$stratify_by
@@ -81,23 +96,28 @@ Lrnr_fourier <- R6Class(
       return(list(fit_objects = fit_objects, levels = levels))
     },
     .predict = function(task) {
+      print(task$nrow)
       fit_objects <- self$fit_object
       levels <- fit_objects$levels
       fit_objects <- fit_objects$fit_objects
       predict_once <- function(task, fit_object) {
+        print(task$nrow)
         fit <- fit_object$fit
         has_offset <- fit_object$has_offset
         design_generator <- fit_object$design_generator
         has_offset <- fit_object$has_offset
-
+        keep <- fit_object$keep
         covariates <- c(task$nodes$covariates, self$params$covariates_to_add)
         X <- as.matrix(task$get_data(, covariates))
+        x_basis <- design_generator(X)
 
 
-        x_basis  <- design_generator(X)
 
         if(!is.null(self$params$subset_basis)) {
           x_basis <- x_basis[, self$params$subset_basis]
+        }
+        if(!is.null(keep)) {
+          x_basis  <-x_basis[,keep,drop = F]
         }
 
         if(!is.null(self$params$mult_by)) {
@@ -116,12 +136,12 @@ Lrnr_fourier <- R6Class(
 
 
 
-
-        link <- x_basis %*% as.vector(coefs)
-
+        link <- as.matrix(x_basis) %*% as.vector(coefs)
+        print(length(link))
         if(has_offset) {
           link <- link + task$offset_transformed(fit$link_fun, for_prediction = T)
         }
+
         pred <- fit$linkinv_fun(link)
 
 

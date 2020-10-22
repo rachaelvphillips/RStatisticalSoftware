@@ -12,8 +12,9 @@ tmle3_Spec_Threshold <- R6Class(
   inherit = tmle3_Spec,
   public = list(
     initialize = function(method = c("Psi_W", "cond_mean"), threshold_function = function(A) {as.vector(quantile(A, seq(0.1, 0.9, length.out = 10)))}
-                          , cdf_bins = 10, data_adaptive = F, cv = data_adaptive, ...) {
+                          , cdf_bins = 10, cv = F, ...) {
       method <- match.arg(method)
+      data_adaptive <- F
       super$initialize(
         method = method, weights = weights, threshold_function = threshold_function,
         cdf_bins = cdf_bins, data_adaptive = data_adaptive, cv = cv, ...

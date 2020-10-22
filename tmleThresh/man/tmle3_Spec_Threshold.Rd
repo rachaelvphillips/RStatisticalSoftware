@@ -39,8 +39,7 @@ Defines a TML Estimator (except for the data)
   threshold_function = function(A) {     as.vector(quantile(A, seq(0.1, 0.9, length.out
     = 10))) },
   cdf_bins = 10,
-  data_adaptive = F,
-  cv = data_adaptive,
+  cv = F,
   ...
 )}\if{html}{\out{</div>}}
 }

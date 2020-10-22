@@ -88,7 +88,7 @@ Other Parameters:
   thresholds = NULL,
   threshold_end_quantiles = c(0.1, 0.9),
   num_bins = 100,
-  discretize_type = c("equal_mass", "mix", "equal_range"),
+  discretize_type = c("equal_range", "mix", "equal_range"),
   discretize_g = T
 )}\if{html}{\out{</div>}}
 }

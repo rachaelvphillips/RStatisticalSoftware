@@ -268,8 +268,7 @@ Lrnr_chainer <- R6Class(
 
         nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
         task <- sl3_Task$new(data, nodes = nodes)
-        print(task)
-        print(table(task$Y))
+
       }
 
       return(task)

@@ -36,11 +36,12 @@ Lrnr_LRR_hal9001 <- R6Class(
           weights <- weights[, weightsplugin]
           Y <- Y[, Yplugin]
         }
+        weights <- weights * task$weights
       } else {
         family <- binomial()
-        weights <- task$get_data(,"weights")
+        weights <- task$weights
       }
-      weights <- weights * task$weights
+
       smoothness <- self$params$smoothness_degree
       smoothness <- rep(c(smoothness)[[1]], ncol(X))
       basis_list <- hal9001fast::enumerate_basis(as.matrix(X), max_degree = self$params$max_degree, order_map = c(smoothness), bins = rep(350, ncol(X)), include_zero_order = F, include_lower_order = F)

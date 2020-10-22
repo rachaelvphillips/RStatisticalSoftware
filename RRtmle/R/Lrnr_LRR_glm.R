@@ -31,10 +31,11 @@ Lrnr_LRR_glm <- R6Class(
           weights <- weights[, weightsplugin]
           Y <- Y[, Yplugin]
         }
+        weights <- weights * task$weights
+
       } else {
-        weights <- task$get_data(,"weights")
+        weights <- task$weights
       }
-      weights <- weights * task$weights
       if(self$params$lasso) {
         fit_object <- glmnet::cv.glmnet(as.matrix(X), Y, family = binomial(), weights = weights, intercept = F)
         coefs <- coef(fit_object, s = "lambda.min")

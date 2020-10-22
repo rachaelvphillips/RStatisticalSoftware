@@ -26,6 +26,11 @@ A wrapper around any learner that generates cross-validate predictions
 }
 }
 
+\seealso{
+Other Learners: 
+\code{\link{Lrnr_hal9001}},
+\code{\link{Lrnr_xgboost}}
+}
 \concept{Learners}
 \keyword{data}
 \section{Super class}{

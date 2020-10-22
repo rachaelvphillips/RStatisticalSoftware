@@ -33,9 +33,9 @@ Lrnr_LRR_xgboost <- R6Class(
           Y <- Y[, Yplugin]
         }
       } else {
-        weights <- task$get_data(,"weights")
+        weights <- task$weights
       }
-      weights <- weights * task$weights
+      #weights <- weights * task$weights
       params <- list(verbose = 0, nrounds = self$params$nrounds, nthread = self$params$nthread, label = Y, data = as.matrix(X), weight = weights, max_depth = self$params$max_depth,
                      eta = self$params$eta, gamma = self$params$gamma, objective = "reg:logistic" )
 

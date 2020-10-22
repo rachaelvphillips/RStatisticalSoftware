@@ -46,7 +46,7 @@ Param_thresh_eff <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, threshold_end_quantiles = c(0.1, 0.9), num_bins = 100, discretize_type = c("equal_mass", "mix", "equal_range"), discretize_g = T) {
+    initialize = function(observed_likelihood, thresh_node = "A", outcome_node = "Y", type = 1, thresholds = NULL, threshold_end_quantiles = c(0.1, 0.9), num_bins = 100, discretize_type = c("equal_range", "mix", "equal_range"), discretize_g = T) {
 
       discretize_type <- match.arg(discretize_type)
       super$initialize(observed_likelihood, list(), outcome_node = outcome_node)
@@ -54,6 +54,11 @@ Param_thresh_eff <- R6Class(
 
 
       range <- (observed_likelihood$training_task$get_tmle_node("A"))
+      print(quantile(range))
+      print(length(unique(range)))
+      num_bins <- min(num_bins, length(unique(range)))
+
+      print(num_bins)
       variable_type <- observed_likelihood$training_task$npsem$A$variable_type$type
       if(variable_type!="continuous") {
         A_grid <- sort(unique(range))

@@ -258,10 +258,10 @@ Lrnr_thresh <- R6::R6Class(
       lrnr <- make_learner(Pipeline, make_learner(Lrnr_chainer, cutoffs, strata_variable), lrnr, make_learner(Lrnr_wrapper, length(cutoffs), pack =cv))
       if(cv) {
         if(family == "binomial"){
-          lrnr <- Lrnr_sl$new(lrnr, make_learner(Lrnr_solnp, metalearner_logistic_binomial_pooled, loss_loglik_binomial_pooled))
+          lrnr <- Lrnr_sl$new(lrnr, Lrnr_cv_selector$new(loss_loglik_binomial_pooled))
         }
         if(family == "gaussian"){
-          lrnr <- Lrnr_sl$new(lrnr, make_learner(Lrnr_solnp, metalearner_linear_multivariate, loss_squared_error_multivariate))
+          lrnr <- Lrnr_sl$new(lrnr,  Lrnr_cv_selector$new(loss_squared_error_multivariate))
         }
         #lrnr <- Lrnr_sl$new(lrnr, make_learner(Lrnr_solnp, metalearner_linear_multivariate, loss_squared_error_multivariate))
 
@@ -291,69 +291,70 @@ Lrnr_thresh <- R6::R6Class(
 
       return(delayed_learner_train(lrnr, task))
     },
-    .process_task = function(task, training = T) {
 
-      args <- self$params
-      cutoffs <- args$cutoffs
-
-      strata_variable <- args$strata_variable
-
-      if(inherits(task, "delayed")) {
-        task <- task$compute()
-      }
-      if(inherits(task, "sl3_revere_Task")) {
-        new_generator <- function(task, fold_number) {
-          task <- task$revere_fold_task(fold_number)
-          data <- task$data
-          cutoffs <- args$cutoffs
-          data_list <- list()
-
-          for(cutoff in cutoffs) {
-            Xcopy <- copy(data)
-            Xcopy$bin <- cutoff
-            Xcopy$Ind <- as.numeric(Xcopy[[strata_variable]] >= cutoff)
-            Xcopy[[strata_variable]] <- NULL
-            data_list[[as.character(cutoff)]] <- Xcopy
-          }
-          data <- rbindlist(data_list)
-
-          nodes <- task$nodes
-          #nodes$id <- NULL
-          #nodes$t <- NULL
-          nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
-          task <- sl3_Task$new(data, nodes = nodes)
-
-          return(task)
-        }
-        task <- sl3_revere_Task$new(new_generator, task)
-
-
-      } else {
-        args <- self$params
-        strata_variable <- args$strata_variable
-
-        data <- task$data
-        cutoffs <- args$cutoffs
-        data_list <- list()
-
-        for(cutoff in cutoffs) {
-          Xcopy <- copy(data)
-          Xcopy$bin <- cutoff
-          Xcopy$Ind <- as.numeric(Xcopy[[strata_variable]] >= cutoff)
-          Xcopy[[strata_variable]] <- NULL
-          data_list[[as.character(cutoff)]] <- Xcopy
-        }
-        data <- rbindlist(data_list)
-
-        nodes <- task$nodes
-        #nodes$id <- NULL
-        #nodes$t <- NULL
-        nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
-        task <- sl3_Task$new(data, nodes = nodes)
-
-      }
-      return(task)
-    },
+    # .process_task = function(task, training = T) {
+    #
+    #   args <- self$params
+    #   cutoffs <- args$cutoffs
+    #
+    #   strata_variable <- args$strata_variable
+    #
+    #   if(inherits(task, "delayed")) {
+    #     task <- task$compute()
+    #   }
+    #   if(inherits(task, "sl3_revere_Task")) {
+    #     new_generator <- function(task, fold_number) {
+    #       task <- task$revere_fold_task(fold_number)
+    #       data <- task$data
+    #       cutoffs <- args$cutoffs
+    #       data_list <- list()
+    #
+    #       for(cutoff in cutoffs) {
+    #         Xcopy <- copy(data)
+    #         Xcopy$bin <- cutoff
+    #         Xcopy$Ind <- as.numeric(Xcopy[[strata_variable]] >= cutoff)
+    #         Xcopy[[strata_variable]] <- NULL
+    #         data_list[[as.character(cutoff)]] <- Xcopy
+    #       }
+    #       data <- rbindlist(data_list)
+    #
+    #       nodes <- task$nodes
+    #       #nodes$id <- NULL
+    #       #nodes$t <- NULL
+    #       nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
+    #       task <- sl3_Task$new(data, nodes = nodes)
+    #
+    #       return(task)
+    #     }
+    #     task <- sl3_revere_Task$new(new_generator, task)
+    #
+    #
+    #   } else {
+    #     args <- self$params
+    #     strata_variable <- args$strata_variable
+    #
+    #     data <- task$data
+    #     cutoffs <- args$cutoffs
+    #     data_list <- list()
+    #
+    #     for(cutoff in cutoffs) {
+    #       Xcopy <- copy(data)
+    #       Xcopy$bin <- cutoff
+    #       Xcopy$Ind <- as.numeric(Xcopy[[strata_variable]] >= cutoff)
+    #       Xcopy[[strata_variable]] <- NULL
+    #       data_list[[as.character(cutoff)]] <- Xcopy
+    #     }
+    #     data <- rbindlist(data_list)
+    #
+    #     nodes <- task$nodes
+    #     #nodes$id <- NULL
+    #     #nodes$t <- NULL
+    #     nodes$covariates <- union(setdiff(task$nodes$covariates, strata_variable), c("Ind", "bin"))
+    #     task <- sl3_Task$new(data, nodes = nodes)
+    #
+    #   }
+    #   return(task)
+    # },
     .train = function(task, fit) {
 
       return(list(lrnr = fit))
@@ -383,28 +384,28 @@ Lrnr_thresh <- R6::R6Class(
       return(predictions)
     },
     .predict = function(task = NULL) {
-      (stop("k"))
-
-      args <- self$params
-      cutoffs <- args$cutoffs
-
-      strata_variable <- args$strata_variable
-      #task <- private$.process_task(task, F)
-      if(!("cv" %in% self$fit_object$lrnr$properties)) {
-        task <- task$revere_fold_task("full")
-        predictions <- self$fit_object$lrnr$predict(task)
-        predictions <- unlist(predictions)
-      } else {
-        predictions <- self$fit_object$lrnr$predict_fold(task, "full")
+     return(self$predict_fold(task, "full"))
+#
+#       args <- self$params
+#       cutoffs <- args$cutoffs
+#
+#       strata_variable <- args$strata_variable
+#       #task <- private$.process_task(task, F)
+#       if(!("cv" %in% self$fit_object$lrnr$properties)) {
+#         task <- task$revere_fold_task("full")
+#         predictions <- self$fit_object$lrnr$predict(task)
+#         predictions <- unlist(predictions)
+#       } else {
+#         predictions <- self$fit_object$lrnr$predict_fold(task, "full")
+#       }
+#
+#
+#       if(self$params$cv) {
+#         predictions <- sl3::unpack_predictions(predictions)
+#       }
+#       predictions <- as.vector(predictions)
+#       return(predictions)
       }
-
-
-      if(self$params$cv) {
-        predictions <- sl3::unpack_predictions(predictions)
-      }
-      predictions <- as.vector(predictions)
-      return(predictions)
-    }
   )
 )
 #' @export
@@ -446,11 +447,10 @@ Lrnr_CDF <- R6::R6Class(
       cutoffs <- out$cutoffs
 
       if(args$cv) {
-        lrnr <- Lrnr_sl$new(lrnr, sl3:::default_metalearner(list(type = "binomial")), folds = folds)
+        lrnr <- Lrnr_sl$new(lrnr, Lrnr_cv_selector$new(loss_loglik_binomial), folds = folds)
        # lrnr <- Lrnr_cv$new(lrnr, folds = folds)
 
       }
-
 
 
       lrnr <- delayed_learner_train(lrnr, task)
@@ -504,7 +504,7 @@ Lrnr_CDF <- R6::R6Class(
           data <- task$data
           Y <- task$Y
           all.inside = T
-          if(sum(Y == max(Y)) > 5) {
+          if(sum(Y == max(Y)) > 2) {
             all.inside = F
           }
 
@@ -542,8 +542,8 @@ Lrnr_CDF <- R6::R6Class(
 
             data <- data[keep]
             new_folds <- subset_folds(new_folds, which(keep))
-            print(data)
-            #data <- data[keep]
+
+
           } else {
 
 
@@ -632,9 +632,14 @@ Lrnr_CDF <- R6::R6Class(
         pooled_task <- pooled_task$revere_fold_task("full")
       }
       predictions <- matrix(lrnr$predict_fold(pooled_task, fold_number), nrow = task$revere_fold_task("validation")$nrow)
-      predictions <- cbind(rep(0, task$revere_fold_task("validation")$nrow), 1 - t(apply(1-predictions, 1, cumprod)))
-      #Interpolate to get values at desired cutoffs
 
+      if(ncol(predictions) == 1) {
+        predictions <- cbind(rep(0, task$revere_fold_task("validation")$nrow), 1 - as.vector(apply(1-predictions, 1, cumprod)))
+      } else {
+        predictions <- cbind(rep(0, task$revere_fold_task("validation")$nrow), 1 - t(apply(1-predictions, 1, cumprod)))
+      }
+
+      #Interpolate to get values at desired cutoffs
       predictions <- do.call(rbind, lapply(1:nrow(predictions), function(i){
 
         approx(orig_cutoffs, as.vector(predictions[i,]), xout = as.vector(threshs), rule = 2, yright = 1, yleft = 0 )[[2]]

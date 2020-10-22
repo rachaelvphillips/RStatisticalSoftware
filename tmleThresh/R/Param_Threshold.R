@@ -72,7 +72,7 @@ Param_thresh <- R6Class(
 
       cdfS <- as.vector(self$observed_likelihood$get_likelihood(tmle_task, thresh_node, fold_number))
 
-      cdfS <- bound(cdfS, c(0.0005, .9995))
+      cdfS <- bound(cdfS, 0.01)
       if("A_learned" %in% names(tmle_task$npsem)) {
         S <- self$observed_likelihood$get_likelihood(tmle_task, "A_learned", fold_number)
       } else {
@@ -98,6 +98,7 @@ Param_thresh <- R6Class(
       n = tmle_task$nrow
       k = length(cutoffs)
       H <- matrix(0, nrow = length(HA), ncol = k)
+      H <- bound(H, c(-40, 40))
       for(i in 1:k){
         first <- (i-1)*n + 1
         last <- (i)*n
