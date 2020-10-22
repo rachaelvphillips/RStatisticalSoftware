@@ -77,7 +77,6 @@ The Highly Adaptive Lasso is an estimation procedure that generates a design
 
 \seealso{
 Other Learners: 
-\code{\link{Lrnr_cv}},
 \code{\link{Lrnr_xgboost}}
 }
 \concept{Learners}

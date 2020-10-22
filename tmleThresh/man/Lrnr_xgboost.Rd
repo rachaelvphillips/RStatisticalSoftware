@@ -29,7 +29,6 @@ the \code{xgboost} package.
 
 \seealso{
 Other Learners: 
-\code{\link{Lrnr_cv}},
 \code{\link{Lrnr_hal9001}}
 }
 \concept{Learners}

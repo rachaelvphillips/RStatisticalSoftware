@@ -19,19 +19,24 @@ markers <- c("Day57bindSpike" , "Day57bindRBD"  , "Day57pseudoneut" , "Day57live
 ```
 
 
-
+```{r}
+#load("dat.mock.rda")
+#data <- read.csv("COVID_VEtrial_practicedata.csv")
+#data
+dat.mock.vacc.seroneg
+```
 
 
 ```{r, include = F}
 
-data <- read.csv("COVID_VEtrial_practicedata.csv")
+data <-dat.mock.vacc.seroneg
 
 keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
 baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
 marker <- "Day57bindSpike"
 
 outcome <- "EventInd"
-data <- data[keep, c(outcome, marker, baseline)]
+data <- data[keep, c(outcome, marker, baseline, "wt")]
 data <- na.omit(data)
 sum(is.na(data))
 
@@ -51,7 +56,7 @@ lrnr_A <-  Lrnr_glmnet$new()
 tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function = thresholds, cv = F)
 
 learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
-node_list <- list("W" = baseline, "A" = marker, "Y" = outcome)
+node_list <- list("W" = baseline, "A" = marker, "Y" = outcome, "weights" = "wt")
 
 
 tmle_task <- tmle_spec$make_tmle_task(data, node_list)

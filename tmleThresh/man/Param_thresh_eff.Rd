@@ -69,9 +69,7 @@ Other Parameters:
 \if{html}{
 \out{<details open ><summary>Inherited methods</summary>}
 \itemize{
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Param_base" data-id="empirical_mean">}\href{../../tmle3/html/Param_base.html#method-empirical_mean}{\code{tmle3::Param_base$empirical_mean()}}\out{</span>}
 \item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Param_base" data-id="print">}\href{../../tmle3/html/Param_base.html#method-print}{\code{tmle3::Param_base$print()}}\out{</span>}
-\item \out{<span class="pkg-link" data-pkg="tmle3" data-topic="Param_base" data-id="supports_submodel_type">}\href{../../tmle3/html/Param_base.html#method-supports_submodel_type}{\code{tmle3::Param_base$supports_submodel_type()}}\out{</span>}
 }
 \out{</details>}
 }
