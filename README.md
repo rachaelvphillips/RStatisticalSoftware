@@ -1,5 +1,5 @@
 # RStatisticalSoftware
-A repository to hold statistical software I've developed.
+A repository to hold statistical software.
 Better documentation for this software is coming.
 
 DistCorScreen:
