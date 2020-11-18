@@ -15,8 +15,8 @@ devtools::document()
 ```{r}
 n = 1000
 X = cbind(rnorm(n), rnorm(n), rnorm(n),  rnorm(n),  rnorm(n),  rnorm(n))
-colnames(X) = paste0("X",1:ncol(X))
-
+colnames(X) = paste0("W",1:ncol(X))
+colnames(X)[6] <- "A"
 Y = rowSums(X)^2 
 data =cbind(Y,X)
 colnames(data) = c("y", colnames(X))
@@ -24,25 +24,30 @@ colnames(data) = c("y", colnames(X))
 
 
 ```{r}
-
+head(data)
 t = proc.time()
-form = formula_hal("y ~  h(X1) + h(X2) + h(X3) + h(X1,X2)", smoothness_orders = 0, data, bins = c(50,15), screen_cor_pval = NULL)
-form
-fit_hal(form)
+form = formula_hal("y ~  h(.) + h(A,.)", smoothness_orders = 0, data, bins = c(50,15), screen_cor_pval = NULL)
+print(form, expand = T)
+
+form = formula_hal("y ~  h(.)", smoothness_orders = 0, data, bins = c(50,15), screen_cor_pval = NULL)
+print(form, expand = T)
+
+form = formula_hal("y ~  .^2", smoothness_orders = 0, data, bins = c(50,15), screen_cor_pval = NULL)
+print(form, expand = T)
+fit <- fit_hal(form)
 proc.time() - t
-
+#
 ```
-
-
-
-
 
 ```{r}
-n=10
-x = runif(n,0,1)
-z = runif(n,0,1)
-y = 
+new_preds <- predict(fit, new_data = form$X)
+plot(new_preds, form$Y)
+
 ```
+
+
+
+
 
 
 

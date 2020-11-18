@@ -246,7 +246,7 @@ formula_hal <-
 
         type = monotone_type[i]
         monotone_type_new <<- c(monotone_type_new, rep(type, length(cols_left)) )
-        print(term)
+
         return(stringr::str_replace(term, paste0("[", dot, "]"), cols_left))
       })
 
@@ -464,7 +464,6 @@ formula_hal <-
     basis_list = list()
 
     # Generate basis functions
-print(interactions_index)
     add_basis = function(i){
 
       if (length(interactions_index) == 0){
@@ -476,7 +475,7 @@ print(interactions_index)
       col_index <- interactions_index[[i]]
       num_bins <- bins[length(col_index)]
       X <- quantizer(X, num_bins)
-      print(num_bins)
+
       new_basis = basis_list_cols_order(col_index, X, order_map, include_zero_order, F)
       if (monotone_type[i] == "i") {
         lower.limits <<- c(lower.limits, rep(0, length(new_basis)))
