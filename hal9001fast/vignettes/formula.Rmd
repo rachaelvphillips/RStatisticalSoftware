@@ -15,7 +15,7 @@ devtools::document()
 ```{r}
 n = 1000
 X = cbind(rnorm(n), rnorm(n), rnorm(n),  rnorm(n),  rnorm(n),  rnorm(n))
-colnames(X) = 1:ncol(X)
+colnames(X) = paste0("X",1:ncol(X))
 
 Y = rowSums(X)^2 
 data =cbind(Y,X)
@@ -26,9 +26,9 @@ colnames(data) = c("y", colnames(X))
 ```{r}
 
 t = proc.time()
-form = formula_hal("y ~  h(1,2)", smoothness_orders = 1, data, bins = c(100,5), screen_cor_pval = 0.1)
+form = formula_hal("y ~  h(X1) + h(X2) + h(X3) + h(X1,X2)", smoothness_orders = 0, data, bins = c(50,15), screen_cor_pval = NULL)
 form
-
+fit_hal(form)
 proc.time() - t
 
 ```

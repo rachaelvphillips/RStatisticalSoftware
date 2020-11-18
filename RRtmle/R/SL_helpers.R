@@ -20,8 +20,8 @@ make_generator <- function(likelihood, type = "IPW") {
     g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
     A <- tmle_task$get_tmle_node("A", format = T)[[1]]
     Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
-    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A= rep(1, length(g))))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=rep(0, length(g))))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
 
@@ -40,8 +40,8 @@ make_generator <- function(likelihood, type = "IPW") {
     g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
     A <- tmle_task$get_tmle_node("A", format = T)$A
     Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
-    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A= rep(1, length(g))))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=rep(0, length(g))))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
 
@@ -60,8 +60,8 @@ make_generator <- function(likelihood, type = "IPW") {
     A <- tmle_task$get_tmle_node("A", format = T)$A
     g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
     Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
-    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A= rep(1, length(g))))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=rep(0, length(g))))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
     weights <- R/g
@@ -80,8 +80,8 @@ make_generator <- function(likelihood, type = "IPW") {
     A <- tmle_task$get_tmle_node("A", format = T)$A
     g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
     Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
-    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A= rep(1, length(g))))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=rep(0, length(g))))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
     weights <- (ER1 + ER0)
@@ -101,8 +101,8 @@ make_generator <- function(likelihood, type = "IPW") {
     A <- tmle_task$get_tmle_node("A", format = T)$A
     g <- likelihood$get_likelihood(tmle_task, "A", fold_number)
     Q <- likelihood$get_likelihood(tmle_task, "R", fold_number)
-    cf_task1 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(UUIDgenerate(), data.table(A=0))
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A= rep(1, length(g))))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=rep(0, length(g))))
     ER1 <- likelihood$get_likelihood(cf_task1, "R", fold_number)
     ER0 <- likelihood$get_likelihood(cf_task0, "R", fold_number)
     weightsIPW <- R/g * task$weights
@@ -153,8 +153,8 @@ make_eff_loss <- function(tmle_task, likelihood) {
     g <- likelihood$get_likelihood(tmle_task, "A", "validation")
     lik <- likelihood
 
-    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=1))
-    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=0))
+    cf_task1 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A= rep(1, length(g))))
+    cf_task0 <- tmle_task$generate_counterfactual_task(uuid::UUIDgenerate(), data.table::data.table(A=rep(0, length(g))))
     ER1 <- lik$get_likelihood(cf_task1, "R", "validation")
     ER0 <- lik$get_likelihood(cf_task0, "R", "validation")
     ER <- lik$get_likelihood(tmle_task, "R", "validation")

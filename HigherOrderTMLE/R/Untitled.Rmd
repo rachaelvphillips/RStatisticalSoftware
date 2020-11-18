@@ -1,0 +1,121 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(simcausal)
+sim_data <- function(n, bias = F) {
+bound <- Vectorize(tmle3::bound)
+D <- DAG.empty()
+D <- D +
+  node("Wcont", distr = "runif", min = -2 , max = 2) +
+   node("W", distr = "rconst", const = round(Wcont, 1)/2) +
+  node("W1cont", distr = "runif", min = -2, max = 2) +
+   node("W1", distr = "rconst", const = round(W1cont, 1)/2) +
+  node("g1", distr = "rconst", const =   bound(plogis( sin(W1) + W1^2 - W1/2 + W^2 - 0.5*0.5 + 0.5*W - W*W1), 0.25)) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+    node("EY", distr = "rconst", const = plogis(( sin(W) +A + W - A*W1/2 + W1*W - W^2 ))) +
+  node("Y", distr = "rbinom", size =1 , prob = EY) +
+
+  node ("EY1", distr = "rconst",  const = plogis((1 + W - 1*W1/2 + W1*W - W^2 )))
+setD <- set.DAG(D, vecfun = c("bound"))
+data <- sim(setD, n = n)
+data <- as.data.table(data)
+data
+}
+data <- sim_data(1000 , F)
+npsem <- list(
+  define_node("W", c("W", "W1"), c()),
+  define_node("A", "A",  c("W")),
+  define_node("Y",  "Y", c("A", "W"))
+)
+
+task <- tmle3_Task$new(data, npsem)
+
+```
+
+```{r}
+gen <- fourier_basis(5,2)
+basis_gen <- gen(X_q[,-1])
+X_q_unpenal <- basis_gen(X_q)
+fit <- cv.glmnet(X_q_unpenal, Y_q, family = "binomial")
+keep <- coef(fit)[-1] != 0
+X_q_unpenal <- X_q_unpenal[,keep, drop = F]
+
+basis_gen <- gen(X_g)
+X_g_unpenal <- basis_gen(X_g)
+fit <- cv.glmnet(X_g_unpenal, Y_g, family = "binomial")
+keep <- coef(fit)[-1] != 0
+X_g_unpenal <- X_g_unpenal[,keep, drop = F]
+
+```
+
+```{r}
+library(hal9001)
+taskY <- task$get_regression_task("Y")
+taskA <- task$get_regression_task("A")
+
+X_q <- as.matrix(taskY$X)
+Y_q <- taskY$Y
+X_g <- as.matrix(taskA$X)
+Y_g <- taskA$Y
+require(doMC)
+X_q_unpenal <- NULL
+X_g_unpenal <- NULL
+registerDoMC(cores = 4)
+Qtilde <- hal9001::fit_hal(X_q, Y_q, X_unpenalized = X_q_unpenal,  max_degree = 2, family = "binomial", cv_select = F, standardize = F)
+gtilde <- hal9001::fit_hal(X_g, Y_g, X_unpenalized = X_g_unpenal,max_degree = 2, family = "binomial", cv_select = F, standardize = F)
+Qtildecv <- hal9001::fit_hal(X_q, Y_q, X_unpenalized = X_q_unpenal, max_degree = 2, family = "binomial", cv_select = T, parallel = T, standardize = F)
+gtildecv <- hal9001::fit_hal(X_g, Y_g, X_unpenalized = X_g_unpenal, max_degree = 2, family = "binomial", cv_select = T, parallel = T, standardize = F)
+```
+
+```{r}
+cftask <- task$generate_counterfactual_task(UUIDgenerate(), data.table(A = 1))
+cfTaskY <- cftask$get_regression_task("Y")
+keepQ <- which(Qtildecv$glmnet_lasso$lambda <= Qtildecv$lambda_star)
+keepg <- which(gtildecv$glmnet_lasso$lambda <= gtildecv$lambda_star)
+```
+
+```{r}
+Qtildemat <- predict(Qtilde, new_X_unpenalized = X_q_unpenal, new_data = as.matrix(cfTaskY$X))[,keepQ]
+gtildemat <- predict(gtilde, new_X_unpenalized = X_g_unpenal,new_data = X_g)[,keepg]
+dim(Qtildemat)
+dim(gtildemat)
+min_dim <- min(ncol(Qtildemat), ncol(gtildemat))
+min_dim
+Qtildemat <- Qtildemat[, 1:min_dim]
+gtildemat <- gtildemat[, 1:min_dim]
+
+result <- data.table(gtildemat/data$g1* (Qtildemat - data$EY1))
+```
+
+```{r}
+data.table(Qtildemat[,11], Qtildemat[,1])
+data.table(gtildemat[,11], gtildemat[,1])
+
+```
+```{r}
+
+
+```
+
+```{r}
+result <- data.table(gtildemat/data$g1* (Qtildemat -  data$EY1))
+as.vector(colMeans(result))
+truth <- (data$A/data$g1 * (data$Y -  data$EY1))
+mean(truth)
+lrnr_q <- Lrnr_xgboost$new()$train(taskY)
+lrnr_g <- Lrnr_xgboost$new()$train(taskA)
+mean(lrnr_g$predict(taskA)/data$g1 * (lrnr_q$predict(cfTaskY) - data$EY1))
+```
+
+```{r}
+1/sqrt(1000)/log(1000)
+
+```
+

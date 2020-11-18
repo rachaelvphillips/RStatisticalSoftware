@@ -9,26 +9,110 @@ output:
 knitr::opts_chunk$set(echo = F)
 ```
 
-```{r, include = F}
-library(earth)
-library(sl3)
-library(tmleThresh)
-load("dat.mock.rda")
-markers <- c("Day57bindSpike" , "Day57bindRBD"  , "Day57pseudoneut" , "Day57liveneut" )
+
+```{r, include=F}
+library(kyotil)
+dat.mock=read.csv("https://raw.githubusercontent.com/youyifong/CovidCorrSAP/master/data_processing/COVID_VEtrial_practicedata_longerterm.csv?token=ACHPI45M232KLY7UUHHIWMC7TRFKQ")
+
+names(dat.mock)[1]="Ptid"
+times=c("B","Day57")
+assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+markers=c(outer(times, assays, "%.%"))
+
+
+dat.mock$age.geq.65=as.integer(dat.mock$Age>=65)
+
+
+###########################################################################
+# stratum and weights
+
+# Bstratum, 1-8, defines the 8 baseline strata within trt/serostatus
+dat.mock$Bstratum=1+strtoi(with(dat.mock, paste0(MinorityInd, HighRiskInd, as.integer(Age>=65))), base = 2)
+# tps stratum, 1-32, used in tps regression
+dat.mock$tps.stratum = 1+strtoi(with(dat.mock, paste0(Trt, Bserostatus, MinorityInd, HighRiskInd, as.integer(Age>=65))), base = 2)
+# Wstratum, 1-33. Differs from tps stratum in that case is a separate stratum. Used to compute sampling weights
+dat.mock$Wstratum = ifelse(dat.mock$EventIndLongterm==1, 1+max(dat.mock$tps.stratum), dat.mock$tps.stratum) 
+
+dat.mock$hasAllMarkers = complete.cases(dat.mock[markers])
+
+with(dat.mock, table(Wstratum, hasAllMarkers, TwophasesampIndLongterm))
+
+# compute inverse sampling prob weight, assuming that we will impute missing values for all in ph2
+tmp=with(dat.mock, table(Wstratum, TwophasesampIndLongterm))
+weights=rowSums(tmp)/tmp[,2]
+dat.mock$wt=weights[dat.mock$Wstratum]
+
+with(dat.mock, table(TwophasesampIndLongterm, Perprotocol))
+
+dat.mock.ph2=subset(dat.mock, TwophasesampIndLongterm==1 & Perprotocol)
+with(dat.mock.ph2, table(Wstratum, hasAllMarkers))
+ 
+
+###########################################################################
+# impute missing immune biomarkers in ph2
+#     impute vaccine and placebo separately
+#     use all assays
+#     use baseline and D57, but not Delta
+
+library(mice)
+set.seed(1)
+n.imp=10
+
+for (.trt in 0:1) {
+    imp=mice(dat.mock.ph2[dat.mock.ph2$Trt==.trt, markers],m=n.imp)
+    # use the first imputation by default
+    dat.mock.ph2[dat.mock.ph2$Trt==.trt, markers]=mice::complete(imp, action=1)
+    # keep n.imp imputations
+    for (i in 1:n.imp) dat.mock.ph2[dat.mock.ph2$Trt==.trt, markers%.%".imp"%.%i]=mice::complete(imp, action=i)
+}
+stopifnot(all(table(dat.mock.ph2$Wstratum, complete.cases(dat.mock.ph2[markers]))))
+
+# populate dat.mock markers with the imputed values
+dat.mock[markers]=dat.mock.ph2[markers][match(dat.mock$Ptid, dat.mock.ph2$Ptid),]
+for (i in 1:n.imp) dat.mock[markers%.%".imp"%.%i]=dat.mock.ph2[markers%.%".imp"%.%i][match(dat.mock$Ptid, dat.mock.ph2$Ptid),]
+
+
+###########################################################################
+# define delta for both dat.mock and dat.mock.ph2
+
+dat.mock    ["Delta"%.%assays]=dat.mock    ["Day57"%.%assays]-dat.mock    ["B"%.%assays]
+dat.mock.ph2["Delta"%.%assays]=dat.mock.ph2["Day57"%.%assays]-dat.mock.ph2["B"%.%assays]
+for (i in 1:n.imp) dat.mock    ["Delta"%.%assays%.%".imp"%.%i]=dat.mock    ["Day57"%.%assays%.%".imp"%.%i]-dat.mock    ["B"%.%assays%.%".imp"%.%i]
+for (i in 1:n.imp) dat.mock.ph2["Delta"%.%assays%.%".imp"%.%i]=dat.mock.ph2["Day57"%.%assays%.%".imp"%.%i]-dat.mock.ph2["B"%.%assays%.%".imp"%.%i]
+
+
+###########################################################################
+
+
 
 ```
-# 40
-```{r, include = F}
-data <- dat.mock.vacc.seroneg.40
-dim(data)
 
-keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
-baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
-marker <- "Day57bindRBD"
+
+
+```{r}
+
+dat.mock$Wstratum
+```
+
+```{r, include = F}
+dat.mock$grp <- dat.mock$Wstratum
+dat.mock <- dat.mock[order(dat.mock$Ptid),]
+data <- dat.mock
+
+dim(data)
+assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+keep <-   data$Trt ==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore", "age.geq.65")
+marker <- "Day57bindSpike"
 
 outcome <- "EventInd"
-data <- data[keep, c(outcome, marker, baseline)]
-data <- na.omit(data)
+data <- data[keep, c(outcome, marker, baseline, "wt", "TwophasesampInd", "grp", "Ptid")]
+data <- data[order(data$Ptid),]
+
+data_full <- data
+
+#data <- na.omit(data)
+data <- data[data$TwophasesampInd==1,]
 sum(is.na(data))
 
 #lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
@@ -36,18 +120,18 @@ sum(is.na(data))
 library(earth)
 
 
-thresholds <- sort(unique(quantile(data[[marker]], seq(0.09, 0.91, length.out = 10))))
+thresholds <- sort(unique(quantile(data[[marker]], 0.5 ))) -1
 
 
-lrnr_Y <- Lrnr_glm$new()
-lrnr_A <- Lrnr_glm$new()
+lrnr_Y <- Lrnr_glmnet$new()
+lrnr_A <- Lrnr_glmnet$new()
 
 
 
 tmle_spec <- tmle3_Spec_Threshold$new(method = "Psi_W", threshold_function = thresholds, cv = F)
 
 learner_list <- list("A" = lrnr_A, "Y" =lrnr_Y)
-node_list <- list("W" = baseline, "A" = marker, "Y" = outcome)
+node_list <- list("W" = baseline, "A" = marker, "Y" = outcome, weights = "wt")
 
 
 tmle_task <- tmle_spec$make_tmle_task(data, node_list)
@@ -62,7 +146,10 @@ tmle_params <- tmle_spec$make_params(tmle_task, targeted_likelihood)
 (targeted_likelihood$updater$update_step(targeted_likelihood, tmle_task))
 
 #Donvan estimator
+```
 
+
+```{r}
 weights <-1
 get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
   weights <- weights/sum(weights)
@@ -83,11 +170,28 @@ get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = r
   return(list(est = unlist(est_list),
              IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
 }
-out <- get_estimates(data, marker, outcome, thresholds)
+out <- get_estimates(data, marker, outcome, thresholds, weights = data$wt)
 est <- out$est
-IC <- out$IC * weights
-radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
-lower <- est - radius
+IC <- out$IC * data$wt
+
+# grp_data <- data.table(grp = data$grp, IC = out$IC)
+# merge_data1 <- grp_data[, lapply(.SD, mean), by = "grp"]
+# merge_data <- merge(data_full, merge_data1, by = "grp")[,c("TwophasesampInd", colnames(merge_data1), "wt", "Ptid")]
+# merge_data <- merge_data[order(merge_data$Ptid),]
+# wt <- merge_data$wt
+# merge_data2 <- merge_data[merge_data$TwophasesampInd == 0 , colnames(merge_data1)]
+# IC_add <- as.matrix(merge_data2[,-1])
+# merge_data2 <- merge_data[merge_data$TwophasesampInd == 1 , colnames(merge_data1)]
+# IC_sub <- as.matrix(merge_data2[,-1]) * (wt[merge_data$TwophasesampInd == 1] - 1)
+# IC <- IC - IC_sub
+# IC <- rbind(IC, IC_add)
+
+
+
+IC <- apply(IC, 2, function(v) {c(v, rep(0, nrow(data_full) - nrow(data)))})
+print(dim(IC))
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(IC))
+lower <- pmax(est - radius,0)
 upper <- est + radius
 donovan_est <- data.table(lower, est, upper )
 
@@ -97,26 +201,59 @@ estimates <- tmle_params[[1]]$estimates(tmle_task)
 estimates$psi
 
 # Estimates and confidence bounds
-sumry <- summary_from_estimates(tmle_task, list(estimates))[,-c(1,2,3)]
-lower <- sumry$lower
-upper <- sumry$upper
-est <- sumry$tmle_est
+
+IC <- estimates$IC * data$wt
+IC <- apply(IC, 2, function(v) {c(v, rep(0, nrow(data_full) - nrow(data)))})
+# grp_data <- data.table(grp = data$grp, IC = estimates$IC)
+# merge_data1 <- grp_data[, lapply(.SD, mean), by = "grp"]
+# merge_data <- merge(data_full, merge_data1, by = "grp")[,c("TwophasesampInd", colnames(merge_data1), "wt", "Ptid")]
+# 
+# merge_data <- merge_data[order(merge_data$Ptid),]
+# 
+# wt <- merge_data$wt
+# merge_data2 <- merge_data[merge_data$TwophasesampInd == 0 , colnames(merge_data1)]
+# 
+# IC_add <- as.matrix(merge_data2[,-1])
+# merge_data2 <- merge_data[merge_data$TwophasesampInd == 1 , colnames(merge_data1)]
+# IC_sub <- as.matrix(merge_data2[,-1]) * (wt[merge_data$TwophasesampInd == 1] - 1)
+# print(data.table(estimates$IC))
+# 
+# v = merge_data2[,-1] - IC
+# print(data.table(IC))
+# print(data.table(IC_sub))
+# print(data.table(data["wt"]))
+# IC <- IC - IC_sub
+# 
+# IC <- rbind(IC, IC_add)
+# dim(IC)
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(IC))
+est <- estimates$psi
+
+lower <- pmax(est - radius,0)
+upper <- est + radius
 cutoffs <- thresholds
+v
 ```
+
+
+
+
+
+
 
 ```{r, include = F}
 plot_data <- data.frame(est = est, lower = lower, upper = upper, cutoffs = round(targeted_likelihood$factor_list$Y$learner$cutoffs,3))
-
+plot_data2<-plot_data
 cutoffs <- round(targeted_likelihood$factor_list$Y$learner$cutoffs,3)
 library(ggplot2)
-
+ 
  g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
                               geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
                               geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
                               geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
-                              geom_smooth(aes(colour = "TMLE"),se = F)+
+                              geom_smooth(se = F)+
                               geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
-                              scale_x_continuous(breaks = plot_data$cutoffs)
+                              scale_x_continuous(breaks = round(plot_data$cutoffs,1)) + scale_y_continuous(n.breaks = 10) + xlab(paste0(marker, " threshold")) + ylab("TMLE")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))
  
 plot_data <-donovan_est
 
@@ -128,18 +265,32 @@ library(ggplot2)
                               geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
                               geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
                               geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
-                              geom_smooth(aes(colour = "Donovan"),se = F)+
+                              geom_smooth(se = F)+
                               geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
-                              scale_x_continuous(breaks = plot_data$cutoffs)
+                              scale_x_continuous(breaks = round(plot_data$cutoffs,1)) + scale_y_continuous(n.breaks = 10) + xlab(paste0(marker, " threshold")) + ylab("Donovan") + theme(axis.text.x = element_text(angle = 0, hjust = 1))
  
 
 
 ```
 
+
 ```{r}
+library(gridExtra)
 g1
 g2
+plt <- grid.arrange(g1, g2)
+plot_data2
+ggsave(paste0(marker,"_plotlong.png"), plt)
+```
 
+
+```{r}
+library(gridExtra)
+g1
+g2
+plt <- grid.arrange(g1, g2)
+plot_data2
+ggsave(paste0(marker,"_plotlong.png"), plt)
 ```
 
 # 30
@@ -209,7 +360,7 @@ get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = r
 out <- get_estimates(data, marker, outcome, thresholds)
 est <- out$est
 IC <- out$IC * weights
-radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
+radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(IC))
 lower <- est - radius
 upper <- est + radius
 donovan_est <- data.table(lower, est, upper )

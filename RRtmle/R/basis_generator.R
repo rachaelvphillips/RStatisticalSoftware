@@ -19,7 +19,7 @@ hal_basis <- function(max_degree = 2, bins = 350, smoothness_orders = 0, include
 }
 class(hal_basis) <- "basis_config"
 
-fourier_basis <- function(nbasis = 50, max_degree = 2, unpenalized = NULL, ...) {
+fourier_basis <- function(nbasis = 5, max_degree = 2, unpenalized = NULL, ...) {
   nbasis <- nbasis
   max_degree <- max_degree
   generator <- function(X) {

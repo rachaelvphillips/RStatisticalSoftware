@@ -1,0 +1,317 @@
+---
+title: "results"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+# design 3
+#thresh <-  0.1742766
+results_list <- list()
+ns = sort(c(16800, 12600, 8400, 4200))
+for(n in ns) {
+  print(n)
+if(n == 16800){
+  truth <- 0.02209518
+} else{
+  truth <- 0.02198518
+}
+SL_CI <- read.csv( paste0("../new_nointer_jump_CI_SL_", n, ".csv"))[,-1]
+SL_cov <- read.csv( paste0("../new_nointer_jump_covers_SL_", n, ".csv"))[,-1]
+glm_CI<- read.csv( paste0("../new_nointer_jump_CI_glmnet_", n, ".csv"))[,-1]
+glm_cov<-read.csv( paste0("../new_nointer_jump_covers_glmnet_", n, ".csv"))[,-1]
+don_CI<-read.csv( paste0("../new_nointer_jump_CI_donovan_", n, ".csv"))[,-1]
+don_cov<-read.csv( paste0("../new_nointer_jump_covers_donovan_", n, ".csv"))[,-1]
+
+
+residual_SL <- as.vector(unlist(SL_CI[,2])) - truth
+residual_glm <- as.vector(unlist(glm_CI[,2])) - truth
+residual_don <- as.vector(unlist(don_CI[,2])) - truth
+data.table(residual_SL, residual_glm,residual_don )
+bias <- c(mean(residual_SL), mean(residual_glm), mean(residual_don))
+se <- c(sd(residual_SL), sd(residual_glm), sd(residual_don))
+mse <- sqrt(bias^2 + se^2)
+bias <- sqrt(n) * abs(bias)
+se <- sqrt(n) * se
+mse <- sqrt(n) * mse
+cov <- c(mean(SL_cov), mean(glm_cov), mean(don_cov))
+width <- c(mean(SL_CI[,3] - SL_CI[,2]), mean(glm_CI[,3] - glm_CI[,2]), mean(don_CI[,3] - don_CI[,2]))
+width <- sqrt(n)*width
+results <- as.data.frame(do.call(rbind, list(bias, se, mse, cov, width)))
+#results <- round(results,3)
+rownames(results) <- c("bias", "se", "mse", "coverage", "width")
+colnames(results) <- c("HAL", "Parametric", "Donovan")
+results <- data.table(t(results))
+results$est <- c("HAL", "Parametric", "Donovan")
+results$n <- n
+results_list <- c(results_list, list(results))
+print(results)
+}
+```
+
+
+```{r}
+library(ggplot2)
+data <- rbindlist(results_list)
+data
+ggplot(data, aes(x = n, y = bias, color = est)) + geom_point() + ylab("sqrt(n) * Absolute Bias") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim3_bias.png")
+ggplot(data, aes(x = n, y = se, color = est)) + geom_point() + ylab("sqrt(n) * Standard Error") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim3_se.png")
+ggplot(data, aes(x = n, y = mse, color = est)) + geom_point()+ ylab("sqrt(n * Mean Squared Error) ") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim3_mse.png")
+
+
+
+library(kableExtra)
+data_less <- data[, c("est", "coverage", "n")]
+
+coverage_dat <- reshape(as.data.frame(data_less), timevar = "est",idvar = "n",
+direction = "wide")
+rownames(coverage_dat) <- NULL
+colnames(coverage_dat) <- c("Sample Size (n)", c("HAL", "Parametric", "Donovan"))
+coverage_dat
+plt <- kable(coverage_dat, format="latex", booktabs=TRUE) %>% kable_styling(latex_options = "striped")%>%
+  save_kable(file = "sim3_coverage.png")
+data_less <- data[, c("est", "width", "n")]
+
+coverage_dat <- round(reshape(as.data.frame(data_less), timevar = "est",idvar = "n",
+direction = "wide"),3)
+rownames(coverage_dat) <- NULL
+colnames(coverage_dat) <- c("Sample Size (n)", c("HAL", "Parametric", "Donovan"))
+coverage_dat
+plt <- kable(coverage_dat, format="latex", booktabs=TRUE) %>% kable_styling(latex_options = "striped")%>%
+  save_kable(file = "sim3_width.png")
+```
+
+
+
+
+
+
+
+
+```{r}
+library(data.table)
+# design 3
+#thresh <- 0.2056574
+results_list <- list()
+ns = sort(c(16000, 12000, 8000, 4000))
+for(n in ns) {
+  print(n)
+truth <- 0.0315825
+
+SL_CI <- read.csv( paste0("../unconf_CI_SL_", n, ".csv"))[,-1]
+SL_cov <- read.csv( paste0("../unconf_covers_SL_", n, ".csv"))[,-1]
+glm_CI<- read.csv( paste0("../unconf_CI_glmnet_", n, ".csv"))[,-1]
+glm_cov<-read.csv( paste0("../unconf_covers_glmnet_", n, ".csv"))[,-1]
+don_CI<-read.csv( paste0("../unconf_CI_donovan_", n, ".csv"))[,-1]
+don_cov<-read.csv( paste0("../unconf_covers_donovan_", n, ".csv"))[,-1]
+
+
+residual_SL <- as.vector(unlist(SL_CI[,2])) - truth
+residual_glm <- as.vector(unlist(glm_CI[,2])) - truth
+residual_don <- as.vector(unlist(don_CI[,2])) - truth
+data.table(residual_SL, residual_glm,residual_don )
+bias <- c(mean(residual_SL), mean(residual_glm), mean(residual_don))
+se <- c(sd(residual_SL), sd(residual_glm), sd(residual_don))
+mse <- sqrt(bias^2 + se^2)
+bias <- sqrt(n) * abs(bias)
+se <- sqrt(n) * se
+mse <- sqrt(n) * mse
+cov <- c(mean(SL_cov), mean(glm_cov), mean(don_cov))
+width <- c(mean(SL_CI[,3] - SL_CI[,2]), mean(glm_CI[,3] - glm_CI[,2]), mean(don_CI[,3] - don_CI[,2]))
+width <- sqrt(n)*width
+results <- as.data.frame(do.call(rbind, list(bias, se, mse, cov, width)))
+#results <- round(results,3)
+rownames(results) <- c("bias", "se", "mse", "coverage", "width")
+colnames(results) <- c("HAL", "Parametric", "Donovan")
+results <- data.table(t(results))
+results$est <- c("HAL", "Parametric", "Donovan")
+results$n <- n
+results_list <- c(results_list, list(results))
+print(results)
+}
+```
+
+
+```{r}
+library(ggplot2)
+data <- rbindlist(results_list)
+data
+ggplot(data, aes(x = n, y = bias, color = est)) + geom_point() + ylab("sqrt(n) * Absolute Bias") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim1_bias.png")
+ggplot(data, aes(x = n, y = se, color = est)) + geom_point() + ylab("sqrt(n) * Standard Error") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim1_se.png")
+ggplot(data, aes(x = n, y = mse, color = est)) + geom_point()+ ylab("sqrt(n * Mean Squared Error) ") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim1_mse.png")
+
+
+
+library(kableExtra)
+data_less <- data[, c("est", "coverage", "n")]
+
+coverage_dat <- reshape(as.data.frame(data_less), timevar = "est",idvar = "n",
+direction = "wide")
+rownames(coverage_dat) <- NULL
+colnames(coverage_dat) <- c("Sample Size (n)", c("HAL", "Parametric", "Donovan"))
+coverage_dat
+plt <- kable(coverage_dat, format="latex", booktabs=TRUE) %>% kable_styling(latex_options = "striped")%>%
+  save_kable(file = "sim1_coverage.png")
+data_less <- data[, c("est", "width", "n")]
+
+coverage_dat <- round(reshape(as.data.frame(data_less), timevar = "est",idvar = "n",
+direction = "wide"),3)
+rownames(coverage_dat) <- NULL
+colnames(coverage_dat) <- c("Sample Size (n)", c("HAL", "Parametric", "Donovan"))
+coverage_dat
+plt <- kable(coverage_dat, format="latex", booktabs=TRUE) %>% kable_styling(latex_options = "striped")%>%
+  save_kable(file = "sim1_width.png")
+```
+
+
+
+
+```{r}
+library(data.table)
+# design 3
+#thresh <-  0.1521466
+results_list <- list()
+ns = sort(c(4000, 8000, 12000, 16000))
+for(n in ns) {
+  print(n)
+truth <- 0.03110812
+SL_CI <- read.csv( paste0("../CI_SL_", n, ".csv"))[,-1]
+SL_cov <- read.csv( paste0("../covers_SL_", n, ".csv"))[,-1]
+glm_CI<- read.csv( paste0("../CI_glmnet_", n, ".csv"))[,-1]
+glm_cov<-read.csv( paste0("../covers_glmnet_", n, ".csv"))[,-1]
+don_CI<-read.csv( paste0("../CI_donovan_", n, ".csv"))[,-1]
+don_cov<-read.csv( paste0("../covers_donovan_", n, ".csv"))[,-1]
+
+
+residual_SL <- as.vector(unlist(SL_CI[,2])) - truth
+residual_glm <- as.vector(unlist(glm_CI[,2])) - truth
+residual_don <- as.vector(unlist(don_CI[,2])) - truth
+data.table(residual_SL, residual_glm,residual_don )
+bias <- c(mean(residual_SL), mean(residual_glm), mean(residual_don))
+se <- c(sd(residual_SL), sd(residual_glm), sd(residual_don))
+mse <- sqrt(bias^2 + se^2)
+bias <- sqrt(n) * abs(bias)
+se <- sqrt(n) * se
+mse <- sqrt(n) * mse
+cov <- c(mean(SL_cov), mean(glm_cov), mean(don_cov))
+width <- c(mean(SL_CI[,3] - SL_CI[,2]), mean(glm_CI[,3] - glm_CI[,2]), mean(don_CI[,3] - don_CI[,2]))
+width <- sqrt(n)*width
+results <- as.data.frame(do.call(rbind, list(bias, se, mse, cov, width)))
+#results <- round(results,3)
+rownames(results) <- c("bias", "se", "mse", "coverage", "width")
+colnames(results) <- c("HAL", "Parametric", "Donovan")
+results <- data.table(t(results))
+results$est <- c("HAL", "Parametric", "Donovan")
+results$n <- n
+results_list <- c(results_list, list(results))
+print(results)
+}
+```
+
+
+```{r}
+library(ggplot2)
+data <- rbindlist(results_list)
+data
+ggplot(data, aes(x = n, y = bias, color = est)) + geom_point() + ylab("sqrt(n) * Absolute Bias") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim2_bias.png")
+ggplot(data, aes(x = n, y = se, color = est)) + geom_point() + ylab("sqrt(n) * Standard Error") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim2_se.png")
+ggplot(data, aes(x = n, y = mse, color = est)) + geom_point()+ ylab("sqrt(n * Mean Squared Error) ") + xlab("Sample size (n)") + geom_line()+ labs(color='Estimator type') 
+ggsave("sim2_mse.png")
+
+
+library(kableExtra)
+data_less <- data[, c("est", "coverage", "n")]
+
+coverage_dat <- reshape(as.data.frame(data_less), timevar = "est",idvar = "n",
+direction = "wide")
+rownames(coverage_dat) <- NULL
+colnames(coverage_dat) <- c("Sample Size (n)", c("HAL", "Parametric", "Donovan"))
+coverage_dat
+plt <- kable(coverage_dat, format="latex", booktabs=TRUE) %>% kable_styling(latex_options = "striped")%>%
+  save_kable(file = "sim2_coverage.png")
+data_less <- data[, c("est", "width", "n")]
+
+coverage_dat <- round(reshape(as.data.frame(data_less), timevar = "est",idvar = "n",
+direction = "wide"),3)
+rownames(coverage_dat) <- NULL
+colnames(coverage_dat) <- c("Sample Size (n)", c("HAL", "Parametric", "Donovan"))
+coverage_dat
+plt <- kable(coverage_dat, format="latex", booktabs=TRUE) %>% kable_styling(latex_options = "striped")%>%
+  save_kable(file = "sim2_width.png")
+```
+
+
+
+
+```{r}
+
+n <- 16000*2
+D <- DAG.empty()
+D <- D +
+  node("W1full", distr = "runif", min = -1, max = 1) +
+  node("W2full", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W1", distr = "rconst", const = round(W1full,1))+
+  node("W2", distr = "rconst", const = 2*round(W2full/2,1))+
+  node("W3", distr = "rconst", const = round(0.3*min(W3full,3),1)/0.3)+
+  node("S", distr = "rgamma",  shape = 5,rate=  13 ) +
+     node("g", distr = "rconst", const = dgamma(S,  shape = 5,rate=  8 + 3*W1 + W2 + 7*W3 )) +
+  node("PY", distr = "rconst", const = 0.05 * plogis(0.7*(0.5-1.5*S + W1+W2+ W3 + 2*W1*sin(3*W2) + 2*W2*sin(3*W1) + W3*sin(3*W1) + W3 * ((S)-0.4) + W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+setD <- set.DAG(D, vecfun = "dgamma")
+
+data_full <- sim(setD, n = n)
+
+
+
+mean(data_full$PY)
+table(data_full$Y)
+p1 = 1
+p0= 0.05
+keep <- union(sample(which(data_full$Y==0), round(length(which(data_full$Y==0))*p0), replace = F) , sample(which(data_full$Y==1), round(length(which(data_full$Y==1))*p1), replace = F)  )
+print(length(keep))
+data_full$select = as.numeric(seq_len(nrow(data_full)) %in% keep)
+print(table(data_full[data_full$select==1, "Y"]))
+data_full$wt <- 1/p0
+data_full[data_full$Y==1, "wt"] <- 1/p1
+
+baseline <- c("W1", "W2", "W3")
+marker = "S"
+outcome = "Y"
+
+thresh <- median(data_full[[marker]]) 
+data <- data_full[data_full[["select"]] ==1,]
+
+
+print("Donovan")
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = Lrnr_mean$new(), lrnr_Y = Lrnr_mean$new())
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+
+
+ci
+
+
+```
+
+
+
+
+
+
+

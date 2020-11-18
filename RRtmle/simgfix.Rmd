@@ -142,44 +142,50 @@ se_list_reg <- list()
 se_list_eff <- list()
 score_list_reg <- list()
 score_list_eff <- list()
-for(k in 1:6) {
-  for(n in c(1000,2500,5000,10000,15000)) {
+for(k in 1:5) {
+  print(k)
+  for(n in c(1000,2500,5000,10000)) {
     key = paste0(k, "%", n)
 print(n)
-scores <- read.csv( paste0("ffixg_sieve_scores_",n,".csv"))[,-1]
-initscores <- read.csv(paste0("ffixg_initial_scores_",n,".csv"))[,-1]
-risks <- read.csv(paste0("ffixg_risk_estimates",n,".csv"))[,-1]
-risks10000 <- read.csv(paste0("ffixg_risk_estimates",15000,".csv"))[,-1]
+scores <- read.csv( paste0("GG_sieve_scores_",n,".csv"))[,-1]
+initscores <- read.csv(paste0("GG_initial_scores_",n,".csv"))[,-1]
+risks <- read.csv(paste0("GG_risk_estimates",n,".csv"))[,-1]
+risks10000 <- read.csv(paste0("GG_risk_estimates",10000,".csv"))[,-1]
 print("scores")
 score_list_reg[[key]] <- (sqrt(n)*as.vector(colMeans(abs(initscores), na.rm = T))[k])
 score_list_eff[[key]] <- (sqrt(n)*as.vector(colMeans(abs(scores), na.rm = T))[k])
 risks1 <- as.vector(apply(risks,2,mean, na.rm = T))
 risks1b <- as.vector(apply(risks10000,2,mean, na.rm = T))
 
-splitrisks <- split(risks1, (1:18) %%3)
-splitrisksb <- split(risks1b, (1:18) %%3)
+splitrisks <- split(risks1, (1:length(risks1)) %%4)
+splitrisksb <- split(risks1b, (1:length(risks1)) %%4)
 
 
   print("bias")
-v1 <- as.vector(apply((risks[,3*(k-1) +1, drop = F] - splitrisksb$`0`[k])^2,2,mean, na.rm = T))
-v1 <- as.vector(apply((risks[,3*(k-1) + 1, drop = F]- splitrisksb$`0`[k]),2,mean, na.rm = T))
+
+v1 <- as.vector(apply((risks[,4*(k-1) + 1, drop = F]- splitrisksb$`3`[k]),2,mean, na.rm = T))
 bias_list_reg[[key]] <- v1 * sqrt(n)
 
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F] - splitrisksb$`0`[k])^2,2,mean, na.rm = T))
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F]- splitrisksb$`0`[k]),2,mean, na.rm = T))
+v2 <- as.vector(apply((risks[,4*(k-1) + 2, drop = F]- splitrisksb$`3`[k]),2,mean, na.rm = T))
+v3 <- as.vector(apply((risks[,4*(k-1) + 4, drop = F]- splitrisksb$`3`[k]),2,mean, na.rm = T))
+
 bias_list_eff[[key]] <- v2* sqrt(n)
-print(sqrt(n)*c(v1,v2))
+print(sqrt(n)*c(v1,v2, v3))
 
 print("se")
 
-v1 <- as.vector(apply((risks[,3*(k-1) +1, drop = F] - splitrisksb$`0`[k])^2,2,sd, na.rm = T))
-v1 <- as.vector(apply((risks[,3*(k-1) + 1, drop = F]- splitrisksb$`0`[k]),2,sd, na.rm = T))
+v1 <- as.vector(apply((risks[,4*(k-1) + 1, drop = F]- splitrisksb$`3`[k]),2,sd, na.rm = T))
+bias_list_reg[[key]] <- v1 * sqrt(n)
+
+v2 <- as.vector(apply((risks[,4*(k-1) + 2, drop = F]- splitrisksb$`3`[k]),2,sd, na.rm = T))
+v3 <- as.vector(apply((risks[,4*(k-1) + 4, drop = F]- splitrisksb$`3`[k]),2,sd, na.rm = T))
+
+
 se_list_reg[[key]] <- v1 * sqrt(n)
 
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F] - splitrisksb$`0`[k])^2,2,sd, na.rm = T))
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F]- splitrisksb$`0`[k]),2,sd, na.rm = T))
+
 se_list_eff[[key]] <- v2* sqrt(n)
-print(sqrt(n)*c(v1,v2))
+print(sqrt(n)*c(v1,v2, v3))
 }}
 
 
@@ -204,10 +210,10 @@ results_xg <- data.frame(matrix(NA, nrow = 1000, ncol = 15))
 results_sieve <- data.frame(matrix(NA, nrow = 1000, ncol = 15))
 risk_estimates <- data.frame(matrix(NA, nrow = 1000, ncol = 5*4))
 
-for(i in 1:1){
+for(i in 1:1000){
   try({
   print(i)
-  n = 1000
+  n = 15000
 library(simcausal)
 library(data.table)
 bound <- Vectorize(tmle3::bound)
@@ -324,12 +330,7 @@ lrnr_fourier <- make_learner(Pipeline, Lrnr_cv$new(list(
    #Lrnr_fourier$new(fourier_basis(2, 1), stratify_by = "A", mult_by = "g")
 ), full_fit = T), Lrnr_cv_selector$new(loss_loglik_binomial))
 }  else if(n==15000){
-lrnr_fourier <- make_learner(Pipeline, Lrnr_cv$new(list(
-       Lrnr_fourier$new(fourier_basis(9, 1), mult_by = c("Qg1", "Qg0")),
-    Lrnr_fourier$new(fourier_basis(10, 1), mult_by = c("Qg1", "Qg0")),
-  Lrnr_fourier$new(fourier_basis(11, 1),  mult_by = c("Qg1", "Qg0"))
-   #Lrnr_fourier$new(fourier_basis(2, 1), stratify_by = "A", mult_by = "g")
-), full_fit = T), Lrnr_cv_selector$new(loss_loglik_binomial))
+lrnr_fourier <- Lrnr_fourier$new(fourier_basis(10, 1), mult_by = c("Qg1", "Qg0"))
 }
 
 full_task <- rev_univ(task, "full")

@@ -16,11 +16,16 @@ Lrnr_LRR_glm <- R6Class(
     .properties = c("binomial"),
 
     .train = function(task) {
-      print("here")
+      print("filter")
+      keep <- task$weights!=0
+
+      task <- task[task$weights!=0]
+      print(task$nrow)
       method <- self$params$method
       X <- cbind(1,task$X)
 
-      Y <- task$Y
+      print(data.table(task$Y))
+      Y <- (task$Y)
       if(!is.null(method)) {
         weights <- task$get_data(,c("weightsIPW", "weightsplugin"))
         if(method == "IPW") {
@@ -36,11 +41,21 @@ Lrnr_LRR_glm <- R6Class(
       } else {
         weights <- task$weights
       }
+      Y <- as.vector(Y)
+      X <- as.matrix(X)
       if(self$params$lasso) {
-        fit_object <- glmnet::cv.glmnet(as.matrix(X), Y, family = binomial(), weights = weights, intercept = F)
-        coefs <- coef(fit_object, s = "lambda.min")
+        print("lasso")
+
+        family <-  "binomial"
+        family <-   binomial()
+        fit_object <- cv.glmnet(as.matrix(X), Y, family =  family, weights = weights, intercept = F)
+        print(fit_object)
+        print("Done")
+        coefs <- coef(fit_object, s = "lambda.min")[-1]
+        print(length(coefs))
+        print("Done")
        } else {
-         print("k")
+
         fit_object <- speedglm::speedglm.wfit(Y, as.matrix(X), family = binomial(), weights = weights, intercept = F)
         coefs <- fit_object$coef
        }
@@ -50,13 +65,15 @@ Lrnr_LRR_glm <- R6Class(
       return(fit_object)
     },
     .predict = function(task = NULL) {
+      print("predict")
       fit_obj <- self$fit_object
       coef <- as.vector(fit_obj$coef)
       X <- as.matrix(cbind(1,task$X))
 
       predictions <- X %*% coef
+
       return(predictions)
     },
-    .required_packages = c("glmnet", "speedglm")
+    .required_packages = c("speedglm")
   )
 )

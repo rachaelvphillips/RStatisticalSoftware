@@ -1,0 +1,230 @@
+---
+title: "RareEventsCOVID"
+output: html_document
+---
+
+
+```{r}
+remove <- sample(which(data$EventInd==1), sum(data$EventInd) - endpoints, replace = F)
+keep <- setdiff(seq_len(nrow(data)), remove)
+data <- data[keep, ]
+```
+
+
+```{r}
+library(data.table)
+library(origami)
+library(sl3)
+library(SuperLearner)
+
+for(i in 1:5) {
+  print(i)
+endpoints_list <- c(5, 10, 20, 30, 40)
+endpoints <- endpoints_list[i]
+load("dat.mock.rda")
+dat.mock$grp <- dat.mock$Wstratum
+dat.mock <- dat.mock[order(dat.mock$Ptid),]
+data <- dat.mock
+
+dim(data)
+assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+marker <- assays[1]
+keep <-   data$Trt ==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd",  "BRiskScore", "Age")
+marker <- paste0("Day57", marker) 
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline, "wt", "TwophasesampInd", "grp", "Ptid")]
+data <- data[order(data$Ptid),]
+print(table(data$EventInd))
+remove <- sample(which(data$EventInd==1), sum(data$EventInd) - endpoints, replace = F)
+keep <- setdiff(seq_len(nrow(data)), remove)
+data <- data[keep, ]
+print(table(data$EventInd))
+
+data_full <- data
+
+#data <- na.omit(data)
+#data <- data[data$TwophasesampInd==1,]
+
+
+print(table( data[data$TwophasesampInd==1, "EventInd"])
+)
+
+
+
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+sl_list <- list( bayesglm_sl_lrnr, lrnr_SL.inter, Lrnr_glmnet$new(), Lrnr_glm$new(), Lrnr_mean$new() )
+
+lrnr <- Lrnr_sl$new(Stack$new(sl_list), Lrnr_cv_selector$new(loss_loglik_binomial))
+#lrnr <- bayesglm_sl_lrnr
+thresh <- unique(quantile(data[[marker]], seq(0.05, 0.95, length.out = 20), na.rm = T))
+esttmle <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "grp",  biased_sampling_indicator = "TwophasesampInd", lrnr_A = lrnr, lrnr_Y =lrnr)
+
+estDonovan <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "grp",  biased_sampling_indicator = "TwophasesampInd", lrnr_A = Lrnr_mean$new(), lrnr_Y = Lrnr_mean$new())
+
+
+
+ident <- function(x) x
+ylims <- seq(0, 0.0045, 0.0005)
+library(cowplot)
+library(mvtnorm)
+library(cowplot)
+library(scales)
+library(mvtnorm)
+wald_ci <- function(est, se, level = 0.95, q = NULL) {
+  if (is.null(q)) {
+    q <- abs(stats::qnorm(p = (1 - level) / 2))
+  }
+
+  ci_low <- est - q * se
+  ci_high <- est + q * se
+  return(cbind(ci_low, ci_high))
+}
+
+plot_data <- data.frame(matrix(0, nrow = length(thresh), ncol = 3))
+plot_data
+psi <- sapply(esttmle$upper, `[[`, "psi")
+IC <- do.call(cbind, lapply(esttmle$upper, `[[`, "IC"))
+
+var_D <- cov(IC)
+n <- nrow(IC)
+se <- sqrt(diag(var_D) / n)
+level <- 0.95
+
+rho_D <- var_D / sqrt(tcrossprod(diag(var_D)))
+q <- qmvnorm(level, tail = "both", corr = rho_D)$quantile
+ci <- as.matrix(wald_ci(psi, se, q = q))
+  ci
+  plot_data[,1] <- ci[,1]
+      plot_data[,2] <-psi
+
+    plot_data[,3] <- ci[,2]
+
+
+plot_data$cutoffs <- round(thresh,3)
+colnames(plot_data) <- c("lower", "est", "upper", "cutoffs")
+plot_data$lower <- pmax(plot_data$lower , 0)
+
+
+cutoffs <- round(thresh,3)
+library(ggplot2)
+
+# times=c("B","Day57","Foldrise57")
+# assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+#  
+# labels.axis=outer(c("D1 ", "D57 ", "Fold-rise "), c("Anti-Spike IgG (EU/ml)", "Anti-RBD IgG (EU/ml)", "Pseudo nAb ID80", "Live nAb ID80"), "%.%")
+# rownames(labels.axis)=times
+# colnames(labels.axis)=assays
+#  
+# labels.title=outer(c("Baseline ", "Day 57 ", "Fold-rise "), c("Binding Antibody to Spike", "Binding Antibody to RBD", "Pseudo Neutralization 80% Titer", "Live Neutralization 80% Titer"), "%.%")
+# rownames(labels.title)=times
+# colnames(labels.title)=assays
+
+main <- paste0("Threshold CoP, endpoints: ", endpoints)
+if(marker == "Day57liveneut") {
+subtitle_main <- paste0("Day 57", " Live Neutralization 80% Titer")
+labx <- paste0("D57", " Live nAb ID80")
+}
+
+if(marker == "Day57pseudoneut") {
+subtitle_main <- paste0("Day 57", "Pseudo Neutralization 80% Titer")
+labx <- paste0("D57", " Pseudo nAb ID80")
+
+}
+
+if(marker == "Day57bindRBD") {
+subtitle_main <- paste0("Day 57", " Binding Antibody to RBD")
+labx <- paste0("D57", " Anti-RBD IgG (EU/ml)")
+
+}
+
+if(marker == "Day57bindSpike") {
+subtitle_main <- paste0("Day 57", " Binding Antibody to Spike")
+labx <- paste0("D57", " Anti-Spike IgG (EU/ml)")
+
+}
+
+
+g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_line()+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                               scale_x_continuous(
+                               
+                                labels = trans_format("ident", math_format(10^.x))) + scale_y_continuous(breaks = ylims, limits = c(0, max(ylims))) + xlab(paste0(marker, " threshold")) +ylab("Probability of COVID")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))
+ 
+ g1 <- g1  + xlab(labx) +
+    theme(text = element_text(size=22),
+        axis.text.x = element_text(angle=0, hjust=1))  +ggtitle(paste0("Threshold TMLE CoP, endpoints: ", endpoints))
+ 
+ g1
+ 
+ 
+ 
+plot_data <- data.frame(matrix(0, nrow = length(thresh), ncol = 3))
+plot_data
+psi <- sapply(estDonovan$upper, `[[`, "psi")
+IC <- do.call(cbind, lapply(estDonovan$upper, `[[`, "IC"))
+
+var_D <- cov(IC)
+n <- nrow(IC)
+se <- sqrt(diag(var_D) / n)
+level <- 0.95
+
+rho_D <- var_D / sqrt(tcrossprod(diag(var_D)))
+q <- qmvnorm(level, tail = "both", corr = rho_D)$quantile
+ci <- as.matrix(wald_ci(psi, se, q = q))
+  ci
+  plot_data[,1] <- ci[,1]
+      plot_data[,2] <-psi
+
+    plot_data[,3] <- ci[,2]
+
+
+plot_data$cutoffs <- round(thresh,3)
+colnames(plot_data) <- c("lower", "est", "upper", "cutoffs")
+plot_data$lower <- pmax(plot_data$lower , 0)
+
+
+cutoffs <- round(thresh,3)
+library(ggplot2)
+
+ g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_line()+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                               scale_x_continuous(
+                               
+                                labels = trans_format("ident", math_format(10^.x))) + scale_y_continuous(breaks = ylims, limits = c(0, max(ylims))) + xlab(paste0(marker, " threshold")) + ylab("Probability of COVID")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))
+ 
+ g2 <- g2  + xlab(labx)+
+    theme(text = element_text(size=22),
+        axis.text.x = element_text(angle=0, hjust=1))  +ggtitle(paste0("Threshold Donovan CoP, endpoints: ", endpoints))
+ 
+ g2
+ 
+ 
+print(g1)
+print(g2)
+ggsave(paste0("TMLE_endpoints_", endpoints, "_marker_", marker, ".png"), g1)
+ggsave(paste0("DON_endpoints_", endpoints, "_marker_", marker, ".png"), g2)
+g3 <- g1 + scale_y_continuous() 
+g4 <- g2 + scale_y_continuous() 
+ggsave(paste0("TMLE_varyingrange_endpoints_", endpoints, "_marker_", marker, ".png"), g3)
+ggsave(paste0("DON_varyingrange_endpoints_", endpoints, "_marker_", marker, ".png"), g4)
+}
+```
+
+```{r}
+library(cowplot)
+ plt <- plot_grid(g1, g2,  nrow = 2, hjust = c(-1,-2))
+plt
+ggsave(paste0(marker,"_plot.png"), plt)
+ 
+```

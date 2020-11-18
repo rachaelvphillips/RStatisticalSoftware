@@ -4,7 +4,7 @@ Lrnr_LRR_xgboost <- R6Class(
   classname = "Lrnr_LRR_xgboost", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
-    initialize = function(nrounds = 20, nthread = 1, max_depth = 4, eta = 0.3, gamma = 0.1,
+    initialize = function(nrounds = 20, nthread = 1, max_depth = 6, eta = 0.3, gamma = 0,
                           method = NULL,...) {
       params <- args_to_list()
       super$initialize(params = params, ...)
@@ -35,6 +35,8 @@ Lrnr_LRR_xgboost <- R6Class(
       } else {
         weights <- task$weights
       }
+
+
       #weights <- weights * task$weights
       params <- list(verbose = 0, nrounds = self$params$nrounds, nthread = self$params$nthread, label = Y, data = as.matrix(X), weight = weights, max_depth = self$params$max_depth,
                      eta = self$params$eta, gamma = self$params$gamma, objective = "reg:logistic" )

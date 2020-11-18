@@ -1,0 +1,501 @@
+---
+title: "\"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(data.table)
+library(simcausal)
+sim_data <- function(n, bias = F) {
+bound <- Vectorize(tmle3::bound)
+D <- DAG.empty()
+D <- D +
+  node("Wcont", distr = "runif", min = -1 , max = 1) +
+   node("W", distr = "rconst", const = round(Wcont, 1)/1) +
+  node("Wcont2", distr = "runif", min = -1 , max = 1) +
+   node("W2", distr = "rconst", const = round(Wcont, 1)/1) +
+  node("g1", distr = "rconst", const =   bound(plogis(W + W2 - W * W2), 0.08)) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+    node("EY", distr = "rconst", const = plogis(W/2 + W2/2 + A/2 + 0.5* A*W - 0.5* A*W2)) +
+  node("Y", distr = "rbinom", size =1 , prob = EY) +
+
+  node ("EY1", distr = "rconst",  const =  plogis(W/2 + W2/2 + 1/2 + 0.5* 1*W - 0.5* 1*W2)) 
+setD <- set.DAG(D, vecfun = c("bound"))
+data <- sim(setD, n = n)
+data <- as.data.table(data)
+data
+}
+data <- sim_data(1000000 , F)
+```
+
+```{r}
+sd(data$A/data$g1* (data$Y - data$EY))
+
+```
+
+```{r}
+
+n = 400
+print(n)
+ests_second <- read.csv(paste0("Latest_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latest_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+n = 750
+print(n)
+ests_second <- read.csv(paste0("Latest_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latest_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+
+n = 1000
+print(n)
+ests_second <- read.csv(paste0("Latest_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latest_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+n = 1200
+print(n)
+ests_second <- read.csv(paste0("Latest_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latest_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+
+n = 1600
+print(n)
+ests_second <- read.csv(paste0("Latest_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latest_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+
+n = 2500
+print(n)
+ests_second <- read.csv(paste0("Latest_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latest_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+
+```
+
+```{r}
+sd(data$A/data$g1* (data$Y - data$EY))
+
+```
+
+```{r}
+
+n = 1000
+print(n)
+ests_second <- read.csv(paste0("Latestfix_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latestfix_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+n = 1500
+print(n)
+ests_second <- read.csv(paste0("Latestfix_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latestfix_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+
+n = 2500
+print(n)
+ests_second <- read.csv(paste0("Latestfix_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latestfix_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+sqrt(n) * sqrt(c(var1, var2))
+
+sqrt(n) * sqrt(bias1^2 + var1)
+sqrt(n) * sqrt(bias2^2 + var2)
+
+```
+
+```{r}
+  out <- list()
+ns = c( 1000, 1500, 2500, 4000)
+for (n in ns) {
+
+print(n)
+ests_second <- read.csv(paste0("Latestfix_init_second_",n ,".csv"))[,2]
+ests_old <- read.csv(paste0("Latestfix_init_old_", n,".csv"))[,2]
+
+truth <- mean(data$EY1)
+truth
+
+bias1 <- mean(ests_second - truth)
+bias2 <- mean(ests_old - truth)
+bias <- sqrt(n) * c(bias1, bias2)
+
+var1 <- var(ests_second - truth)
+var2 <- var(ests_old - truth)
+se <- sqrt(n) * sqrt(c(var1, var2))
+
+mse <- c(sqrt(n) * sqrt(bias1^2 + var1), sqrt(n) * sqrt(bias2^2 + var2) )
+df <- data.frame(bias = bias, se = se, sqrt_mse = mse)
+out[[as.character(n)]] <-df
+}
+out
+```
+
+```{r}
+library(data.table)
+df <- do.call(rbind, out)
+df0 <- df[seq_len(nrow(df))%%2 ==0, ]
+df1  <- df[seq_len(nrow(df))%%2 ==1, ]
+colnames(df0) <- paste0(colnames(df0)," first order")
+colnames(df1) <- paste0(colnames(df1)," second order")
+df <- as.data.table(cbind(df0, df1))
+
+df <- df[,sort(colnames(df)), with = F]
+df <- round(df,3)
+orders <- c(grep("^bias", colnames(df), value = T), grep("^se", colnames(df), value = T),
+            grep("sqrt_mse", colnames(df), value = T))
+orders
+library(kableExtra)
+df <- cbind(data.table(n = ns), df[, orders, with = F])
+df
+print(kable(df) %>% kable_styling())
+
+cell_spec(kable(df, format = "latex") %>% kable_styling())
+```
+
+```{r}
+n = 1000
+
+D <- DAG.empty()
+D <- D +
+  node("Wcont", distr = "runif", min = -1 , max = 1) +
+   node("W", distr = "rconst", const = round(Wcont, 1)/1) +
+  node("Wcont2", distr = "runif", min = -1 , max = 1) +
+   node("W2", distr = "rconst", const = round(Wcont2, 1)/1) +
+  node("g1", distr = "rconst", const =  0.2 +  0.6*plogis(sin(3*W) + cos(3*W2) + W*exp(W)*W2 + W2^2*cos(2*W) )) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+    node("EY", distr = "rconst", const = 0.05 + 0.85*plogis(-1 + A+ sin(3*W) + cos(2*W2) + A*cos(2*W) + A*sin(3*W2) + A*W2*W)) +
+  node("Y", distr = "rbinom", size =1 , prob = EY) +
+  node("EY1", distr = "rconst", const = 0.05 + 0.85*plogis(-1 + 1 + sin(3*W) + cos(2*W2) + 1*cos(2*W) + 1*sin(3*W2) + 1*W2*W)) 
+setD <- set.DAG(D, vecfun = c("bound"))
+data <- sim(setD, n = 100000)
+
+data <- as.data.table(data)
+data
+mean(data$EY1)
+```
+
+
+```{r}
+data.table(likelihood$get_likelihood(task, "Y"))
+data.table(likelihood$get_likelihood(task, "Ytilde"))
+data.table(likelihood$get_likelihood(task, "A"))
+data.table(likelihood$get_likelihood(task, "Atilde"))
+```
+
+
+```{r}
+ests_start <- c()
+ests_first <- c()
+ests_second <- c()
+ests_old <- c()
+for(i in 1:1000) {
+  print(i)
+n=1000
+library(simcausal)
+sim_data <- function(n, bias = F) {
+bound <- Vectorize(tmle3::bound)
+
+D <- DAG.empty()
+D <- D +
+  node("Wcont", distr = "runif", min = -1 , max = 1) +
+   node("W", distr = "rconst", const = round(Wcont, 1)/1) +
+  node("Wcont2", distr = "runif", min = -1 , max = 1) +
+   node("W2", distr = "rconst", const = round(Wcont2, 1)/1) +
+  node("g1", distr = "rconst", const =  0.2 +  0.6*plogis(sin(3*W) + cos(3*W2) + W*exp(W)*W2 + W2^2*cos(2*W) )) +
+  node("A", distr = "rbinom", size = 1,  prob = g1) +
+    node("EY", distr = "rconst", const = 0.05 + 0.85*plogis(-1 + A+ sin(3*W) + cos(2*W2) + A*cos(2*W) + A*sin(3*W2) + A*W2*W)) +
+  node("Y", distr = "rbinom", size =1 , prob = EY) +
+  node("EY1", distr = "rconst", const = 0.05 + 0.85*plogis(-1 + 1 + sin(3*W) + cos(2*W2) + 1*cos(2*W) + 1*sin(3*W2) + 1*W2*W)) 
+setD <- set.DAG(D, vecfun = c("bound"))
+data <- sim(setD, n = n)
+data <- as.data.table(data)
+
+
+}
+data <- sim_data(n , F)
+npsem <- list(
+  define_node("W", c("W", "W2"), c()),
+  define_node("A", "A",  c("W")),
+  define_node("Y",  "Y", c("A", "W")), 
+  define_node("Atilde", "A",  c("W")),
+  define_node("Ytilde",  "Y", c("A", "W"))
+)
+data
+task <- tmle3_Task$new(data, npsem)
+
+#lf_A_bias <- LF_fit$new("A", Lrnr_xgboost$new(), type = "mean")
+#lf_Y_bias <- LF_fit$new("Y", Lrnr_xgboost$new(), type = "mean")
+
+lrnr_undersmooth <- Lrnr_undersmooth$new()
+lrnr_undersmoothA <- lrnr_undersmooth
+lrnr_undersmoothY <- lrnr_undersmooth
+lrnr_undersmoothY <- lrnr_undersmoothY$train(task$get_regression_task("Y"))
+lrnr_undersmoothA <- lrnr_undersmoothA$train(task$get_regression_task("A"))
+
+lf_Y <- LF_known$new("Ytilde", mean_fun = function(task) {
+  pred <- as.matrix(lrnr_undersmoothY$predict(task))
+  #index <- min(12, ncol(pred))
+  index <- 10
+  print(index)
+  pred <- pred[,index]
+    return(as.vector(pred))
+  
+}, type = "mean")
+lf_A <- LF_known$new("Atilde", mean_fun = function(task) {
+  pred <- as.matrix(lrnr_undersmoothA$predict(task))
+    #index <- min(12, ncol(pred))
+  index <- 10
+      print(index)
+  pred <- pred[,index]
+  return(as.vector(pred))
+}, type = "mean")
+
+lf_Y1 <- LF_known$new("Y", mean_fun = function(task) {
+  pred <- as.matrix(lrnr_undersmoothY$predict(task))
+  #index <- min(12, ncol(pred))
+  X <- task$X
+  bias <- 0.5*(0.5 + abs(X$W + X$W2 + X$A))/n^(0.25)
+  index <- 1
+  print(index)
+  pred <- pred[,index] 
+    return(bound(as.vector(pred) + bias, 0.05))
+
+}, type = "mean")
+lf_A1 <- LF_known$new("A", mean_fun = function(task) {
+  pred <- as.matrix(lrnr_undersmoothA$predict(task))
+    #index <- min(12, ncol(pred)
+  X <- task$X
+  print(dim(X))
+  bias <-  0.5*(0.5 + abs(X$W + X$W2))/n^(0.25)
+  print(length(bias))
+  index <- 1
+  print(index)
+  pred <- pred[,index]
+  print(length(as.vector(pred) + bias))
+  return(bound(as.vector(pred) + bias, 0.1))
+}, type = "mean")
+
+factor_list <- list(
+  LF_emp$new("W"),
+  lf_Y1,
+  lf_A1,
+  lf_A, 
+  lf_Y
+)
+
+
+likelihood <- Likelihood$new(factor_list)
+likelihood <- likelihood$train(task)
+
+tlik <- Targeted_Likelihood$new(likelihood, updater = 
+                                  list(constrain_step = T, one_dimensional = T, delta_epsilon = 0.1, convergence_type = "scaled_var")
+                                )
+param <- Param_TSM_higher_order$new(tlik)
+
+out <- (param$clever_covariates(task, for_fitting = T))
+est1 <- param$estimates(task)
+
+print(colMeans(est1$ICtilde))
+print(colMeans(out$IC$Ytilde))
+print(colMeans(out$IC$Atilde))
+print(colMeans(out$IC$Y))
+print(colMeans(out$IC$A))
+
+print("k1111")
+tlik$updater$update(tlik, task)
+print("k2222")
+out <- (param$clever_covariates(task, for_fitting = T))
+est2 <- param$estimates(task)
+
+print(colMeans(est2$ICtilde))
+print(colMeans(out$IC$Ytilde))
+print(colMeans(out$IC$Atilde))
+print(colMeans(out$IC$Y))
+print(colMeans(out$IC$A))
+
+param$update_last(task)
+out <- (param$clever_covariates(task, for_fitting = T))
+est3 <- param$estimates(task)
+
+cf_task <- task$generate_counterfactual_task(UUIDgenerate(), data.table(Atilde = 1))
+gtilde <- tlik$get_likelihood(cf_task, "Atilde")
+Qtilde1 <- tlik$get_likelihood(cf_task, "Ytilde")
+g <- tlik$get_likelihood(cf_task, "A")
+Q1 <- tlik$get_likelihood(cf_task, "Y")
+Q <- tlik$get_likelihood(task, "Y")
+out <- (param$clever_covariates(task, for_fitting = T))
+estn <- param$estimates(task)
+
+print(colMeans(estn$ICtilde))
+print(colMeans(out$IC$Ytilde))
+print(colMeans(out$IC$Atilde))
+print(colMeans(out$IC$Y))
+print(colMeans(out$IC$A))
+
+print("D1")
+score <- (mean(gtilde/g * (Qtilde1 - Q1)))
+print(score)
+print(mean(task$get_tmle_node("A")/g * (task$get_tmle_node("Y") - Q)))
+
+if(abs(score) > 1/sqrt(n)/log(n)) {
+  print("second")
+tlik$updater$update(tlik, task)
+param$update_last(task)
+print(mean(gtilde/g * (Qtilde1 - Q1)))
+print(mean(task$get_tmle_node("A")/g * (task$get_tmle_node("Y") - Q)))
+}
+
+
+tlik_old <- Targeted_Likelihood$new(likelihood, updater = list(cvtmle = F))
+param_old <- tmle3::Param_TSM$new(tlik_old, list(LF_static$new("A", value = 1)))
+tlik_old$updater$update(tlik_old, task)
+est <- param_old$estimates(task, fold_number = "full")
+est4 <-  est$psi
+print(c(est1$psi, est2$psi, est3$psi, est4))
+
+ests_start <- c(ests_start, est1$psi)
+ests_first <- c(ests_first, est2$psi)
+ests_second <- c(ests_second,est3$psi)
+ests_old <- c(ests_old, est4)
+# 
+ write.csv(ests_start, paste0("Nov11_start_" ,n, ".csv"))
+ write.csv(ests_first, paste0("Nov11_first_" ,n, ".csv"))
+write.csv(ests_second, paste0("Nov11_second_" ,n, ".csv"))
+# 
+ write.csv(ests_old,paste0( "Nov11_old_",  n, ".csv"))
+}
+```
+
+```{r}
+
+tlik$updater$step_number
+
+```
+
+
+
+

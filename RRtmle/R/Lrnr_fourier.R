@@ -4,7 +4,7 @@ Lrnr_fourier <- R6Class(
   classname = "Lrnr_fourier", inherit = Lrnr_base,
   portable = TRUE, class = TRUE,
   public = list(
-    initialize = function(basis_generator = fourier_basis(), subset_basis = NULL, mult_by = NULL, stratify_by = NULL, covariates_to_add = NULL, ...) {
+    initialize = function(basis_generator = fourier_basis(), subset_basis = NULL, mult_by = NULL, stratify_by = NULL, covariates_to_add = NULL, screen_RR = F,  ...) {
       params <- args_to_list()
       super$initialize(params = params, ...)
     }
@@ -41,6 +41,7 @@ Lrnr_fourier <- R6Class(
           x_basis <- x_basis[, self$params$subset_basis]
         }
         keep <- NULL
+        if(self$params$screen_RR) {
         RR <- log(task$get_data(,"RR")[[1]])
         fit <- cv.glmnet( as.matrix(x_basis), RR, family = "gaussian", weights = weights, offset = offset, intercept = F)
         keep <- which(abs(coef(fit, s = "lambda.1se")[-1]) >= 1e-4)
@@ -48,6 +49,7 @@ Lrnr_fourier <- R6Class(
         print(ncol(x_basis))
         print(length(keep))
         x_basis <- x_basis[,keep, drop = F]
+        }
         if(!is.null(self$params$mult_by)) {
           list_of_x <- list()
           for(column in c(self$params$mult_by)) {

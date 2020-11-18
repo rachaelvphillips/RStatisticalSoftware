@@ -8,12 +8,80 @@ output:
 knitr::opts_chunk$set(echo = F)
 ```
 
-```{r, include = F}
-library(earth)
-library(sl3)
-library(tmleThresh)
-load("dat.mock.long.rda")
-markers <- c("Day57bindSpike" , "Day57bindRBD"  , "Day57pseudoneut" , "Day57liveneut" )
+```{r}
+library(kyotil)
+dat.mock=read.csv("https://raw.githubusercontent.com/youyifong/CovidCorrSAP/master/data_processing/COVID_VEtrial_practicedata_longerterm.csv?token=ACHPI424NLY5HHKZKDGGVKC7TMGAU")
+
+names(dat.mock)[1]="Ptid"
+times=c("B","Day57")
+assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+markers=c(outer(times, assays, "%.%"))
+
+
+dat.mock$age.geq.65=as.integer(dat.mock$Age>=65)
+
+
+###########################################################################
+# stratum and weights
+
+# Bstratum, 1-8, defines the 8 baseline strata within trt/serostatus
+dat.mock$Bstratum=1+strtoi(with(dat.mock, paste0(MinorityInd, HighRiskInd, as.integer(Age>=65))), base = 2)
+# tps stratum, 1-32, used in tps regression
+dat.mock$tps.stratum = 1+strtoi(with(dat.mock, paste0(Trt, Bserostatus, MinorityInd, HighRiskInd, as.integer(Age>=65))), base = 2)
+# Wstratum, 1-33. Differs from tps stratum in that case is a separate stratum. Used to compute sampling weights
+dat.mock$Wstratum = ifelse(dat.mock$EventIndLongterm==1, 1+max(dat.mock$tps.stratum), dat.mock$tps.stratum) 
+
+dat.mock$hasAllMarkers = complete.cases(dat.mock[markers])
+
+with(dat.mock, table(Wstratum, hasAllMarkers, TwophasesampIndLongterm))
+
+# compute inverse sampling prob weight, assuming that we will impute missing values for all in ph2
+tmp=with(dat.mock, table(Wstratum, TwophasesampIndLongterm))
+weights=rowSums(tmp)/tmp[,2]
+dat.mock$wt=weights[dat.mock$Wstratum]
+
+with(dat.mock, table(TwophasesampIndLongterm, Perprotocol))
+
+dat.mock.ph2=subset(dat.mock, TwophasesampIndLongterm==1 & Perprotocol)
+with(dat.mock.ph2, table(Wstratum, hasAllMarkers))
+ 
+
+###########################################################################
+# impute missing immune biomarkers in ph2
+#     impute vaccine and placebo separately
+#     use all assays
+#     use baseline and D57, but not Delta
+
+library(mice)
+set.seed(1)
+n.imp=10
+
+for (.trt in 0:1) {
+    imp=mice(dat.mock.ph2[dat.mock.ph2$Trt==.trt, markers],m=n.imp)
+    # use the first imputation by default
+    dat.mock.ph2[dat.mock.ph2$Trt==.trt, markers]=mice::complete(imp, action=1)
+    # keep n.imp imputations
+    for (i in 1:n.imp) dat.mock.ph2[dat.mock.ph2$Trt==.trt, markers%.%".imp"%.%i]=mice::complete(imp, action=i)
+}
+stopifnot(all(table(dat.mock.ph2$Wstratum, complete.cases(dat.mock.ph2[markers]))))
+
+# populate dat.mock markers with the imputed values
+dat.mock[markers]=dat.mock.ph2[markers][match(dat.mock$Ptid, dat.mock.ph2$Ptid),]
+for (i in 1:n.imp) dat.mock[markers%.%".imp"%.%i]=dat.mock.ph2[markers%.%".imp"%.%i][match(dat.mock$Ptid, dat.mock.ph2$Ptid),]
+
+
+###########################################################################
+# define delta for both dat.mock and dat.mock.ph2
+
+dat.mock    ["Delta"%.%assays]=dat.mock    ["Day57"%.%assays]-dat.mock    ["B"%.%assays]
+dat.mock.ph2["Delta"%.%assays]=dat.mock.ph2["Day57"%.%assays]-dat.mock.ph2["B"%.%assays]
+for (i in 1:n.imp) dat.mock    ["Delta"%.%assays%.%".imp"%.%i]=dat.mock    ["Day57"%.%assays%.%".imp"%.%i]-dat.mock    ["B"%.%assays%.%".imp"%.%i]
+for (i in 1:n.imp) dat.mock.ph2["Delta"%.%assays%.%".imp"%.%i]=dat.mock.ph2["Day57"%.%assays%.%".imp"%.%i]-dat.mock.ph2["B"%.%assays%.%".imp"%.%i]
+
+
+###########################################################################
+
+
 
 ```
 
@@ -24,14 +92,14 @@ dat.mock
 ```
 # 40
 ```{r, include = T}
-data <- dat.mock.vacc.seroneg.40
+data <- dat.mock
 dim(data)
 
 keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
 baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
 marker <- "Day57bindSpike"
 
-outcome <- "EventInd"
+outcome <- "EventIndLongterm"
 data <- data[keep, c(outcome, marker, baseline)]
 data <- na.omit(data)
 sum(is.na(data))
@@ -145,7 +213,7 @@ keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
 baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
 
 
-outcome <- "EventInd"
+outcome <- "EventIndLongterm"
 data <- data[keep, c(outcome, marker, baseline)]
 data <- na.omit(data)
 sum(is.na(data))
@@ -260,7 +328,7 @@ keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
 baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
 
 
-outcome <- "EventInd"
+outcome <- "EventIndLongterm"
 data <- data[keep, c(outcome, marker, baseline)]
 data <- na.omit(data)
 sum(is.na(data))
@@ -374,7 +442,7 @@ keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
 baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
 
 
-outcome <- "EventInd"
+outcome <- "EventIndLongterm"
 data <- data[keep, c(outcome, marker, baseline)]
 data <- na.omit(data)
 sum(is.na(data))

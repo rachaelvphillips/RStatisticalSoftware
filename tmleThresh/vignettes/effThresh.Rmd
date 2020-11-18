@@ -13,6 +13,23 @@ devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
 ```
 
 ```{r}
+load("confound_case.rds")
+confound_case
+```
+
+```{r}
+0.0013 / sqrt(0.0014)
+0.037 / sqrt(0.0008356663)
+
+ sqrt(0.0014)
+ sqrt(0.0008356663)
+ 
+0.037^2 + 0.0008356663
+
+0.0013^2 + 0.0014
+```
+
+```{r}
 library(tmle3)
 library(simcausal)
 D <- DAG.empty()

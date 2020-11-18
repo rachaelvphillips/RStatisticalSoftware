@@ -30,7 +30,13 @@ Lrnr_hal9001_fixed <- R6::R6Class(
         args$family <- args$family <- outcome_type$glm_family()
       }
 
-      args$X <- as.matrix(task$X)
+      X <- as.matrix(task$X)
+      # X <- apply(X, 2, function(v) {
+      #   vals <- sort(unique(quantile(v, seq(0,1, length.out = 10))))
+      #   v <- vals[findInterval(v, vals)]
+      #   return(v)
+      # })
+      args$X <- X
       args$Y <- outcome_type$format(task$Y)
       args$yolo <- FALSE
 

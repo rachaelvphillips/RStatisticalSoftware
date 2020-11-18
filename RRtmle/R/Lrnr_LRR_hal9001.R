@@ -6,7 +6,7 @@ Lrnr_LRR_hal9001 <- R6Class(
   portable = TRUE, class = TRUE,
   public = list(
     initialize = function(max_degree = 3,
-                          smoothness_degree = 0,
+
                           iter = 200,
                           method = NULL,
                           grad_desc = F,
@@ -38,21 +38,22 @@ Lrnr_LRR_hal9001 <- R6Class(
         }
         weights <- weights * task$weights
       } else {
-        family <- binomial()
+        family <-  binomial()
         weights <- task$weights
       }
 
-      smoothness <- self$params$smoothness_degree
-      smoothness <- rep(c(smoothness)[[1]], ncol(X))
-      basis_list <- hal9001fast::enumerate_basis(as.matrix(X), max_degree = self$params$max_degree, order_map = c(smoothness), bins = rep(350, ncol(X)), include_zero_order = F, include_lower_order = F)
-      x_basis <- hal9001fast::make_design_matrix(as.matrix(X), basis_list)
+      #smoothness <- self$params$smoothness_degree
+      #smoothness <- rep(c(smoothness)[[1]], ncol(X))
+      basis_list <- hal9001::enumerate_basis(as.matrix(X), max_degree = self$params$max_degree)
+      x_basis <- hal9001::make_design_matrix(as.matrix(X), basis_list)
+      print(dim(x_basis))
 
+      fit <- glmnet::cv.glmnet(x_basis, Y, family = family, weights = weights, standardize = F, nlambda = 100)
 
-      fit <- glmnet::cv.glmnet(x_basis, Y, family = family, weights = weights, standardize = F, nlambda = 125)
-      fit_object <- list(basis_list = basis_list, beta = as.vector(coef(fit)))
+      fit_object <- list(basis_list = basis_list, beta = as.vector(coef(fit, s = "lambda.min")))
 
       keep <- which(fit_object$beta[-1]!=0)
-
+      print(table(keep))
       basis_list <- basis_list[keep]
       beta <- fit_object$beta[c(1, keep+1)]
       fit_object$basis_list <- basis_list
@@ -88,10 +89,10 @@ Lrnr_LRR_hal9001 <- R6Class(
       basis_list <- fit_obj$basis_list
       beta <- fit_obj$beta
       X <- task$X
-      x_basis <- hal9001fast::make_design_matrix(as.matrix(X), basis_list)
+      x_basis <- hal9001::make_design_matrix(as.matrix(X), basis_list)
 
       if(length(beta) == 1){
-        predictions <- beta[1]
+        predictions <- rep(beta[1], nrow(x_basis))
 
       } else {
         predictions <- x_basis %*% beta[-1] + beta[1]

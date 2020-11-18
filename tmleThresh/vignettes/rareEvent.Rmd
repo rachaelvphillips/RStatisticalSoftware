@@ -1,0 +1,569 @@
+---
+title: "RareEvent"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+ 
+times=c("B","Day57","Foldrise57")
+assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+ 
+labels.axis=outer(c("D1 ", "D57 ", "Fold-rise "), c("Anti-Spike IgG (EU/ml)", "Anti-RBD IgG (EU/ml)", "Pseudo nAb ID80", "Live nAb ID80"), "%.%")
+rownames(labels.axis)=times
+colnames(labels.axis)=assays
+ 
+labels.title=outer(c("Baseline ", "Day 57 ", "Fold-rise "), c("Binding Antibody to Spike", "Binding Antibody to RBD", "Pseudo Neutralization 80% Titer", "Live Neutralization 80% Titer"), "%.%")
+rownames(labels.title)=times
+colnames(labels.title)=assays
+
+```
+
+
+
+
+```{r}
+library(data.table)
+library(SuperLearner)
+library(sl3)
+ load("dat.mock.rda")
+dat.mock$grp <- dat.mock$Wstratum
+dat.mock <- dat.mock[order(dat.mock$Ptid),]
+data <- dat.mock
+
+dim(data)
+assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+keep <-   data$Trt ==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore", "age.geq.65")
+marker <- "Day57pseudoneut"
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline, "wt", "TwophasesampInd", "grp", "Ptid")]
+data <- data[order(data$Ptid),]
+
+data_full <- data
+
+#data <- na.omit(data)
+data <- data[data$TwophasesampInd==1,]
+sum(is.na(data))
+
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+
+sl_list <- list( bayesglm_sl_lrnr, lrnr_SL.inter, Lrnr_glmnet$new(), Lrnr_glm$new(), Lrnr_mean$new() )
+
+lrnr <- Lrnr_sl$new(sl_list, Lrnr_cv_selector$new(loss_loglik_binomial))
+
+
+
+thresh <- unique(quantile(data[[marker]], seq(0.02, 0.95, length.out = 20)))
+if(length(unique(data[[marker]])) <15) {
+  print(thresh)
+  print(table(data[[marker]]))
+  thresh <- as.vector(sort(unique(data[[marker]])))
+  thresh <- as.vector(thresh[-1])
+}
+esttmle <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "grp",  biased_sampling_indicator = "TwophasesampInd", lrnr_A = lrnr, lrnr_Y = lrnr)
+
+estDonovan <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "grp",  biased_sampling_indicator = "TwophasesampInd", lrnr_A = Lrnr_mean$new(), lrnr_Y = Lrnr_mean$new())
+
+
+```
+
+
+```{r}
+library(cowplot)
+
+library(mvtnorm)
+wald_ci <- function(est, se, level = 0.95, q = NULL) {
+  if (is.null(q)) {
+    q <- abs(stats::qnorm(p = (1 - level) / 2))
+  }
+
+  ci_low <- est - q * se
+  ci_high <- est + q * se
+  return(cbind(ci_low, ci_high))
+}
+
+plot_data <- data.frame(matrix(0, nrow = length(thresh), ncol = 3))
+plot_data
+psi <- sapply(esttmle$upper, `[[`, "psi")
+IC <- do.call(cbind, lapply(esttmle$upper, `[[`, "IC"))
+
+var_D <- cov(IC)
+n <- nrow(IC)
+se <- sqrt(diag(var_D) / n)
+level <- 0.95
+
+rho_D <- var_D / sqrt(tcrossprod(diag(var_D)))
+q <- qmvnorm(level, tail = "both", corr = rho_D)$quantile
+ci <- as.matrix(wald_ci(psi, se, q = q))
+  ci
+  plot_data[,1] <- ci[,1]
+      plot_data[,2] <-psi
+
+    plot_data[,3] <- ci[,2]
+
+
+plot_data$cutoffs <- round(thresh,3)
+colnames(plot_data) <- c("lower", "est", "upper", "cutoffs")
+plot_data$lower <- pmax(plot_data$lower , 0)
+
+
+cutoffs <- round(thresh,3)
+library(ggplot2)
+
+# times=c("B","Day57","Foldrise57")
+# assays=c("bindSpike","bindRBD","pseudoneut","liveneut")
+#  
+# labels.axis=outer(c("D1 ", "D57 ", "Fold-rise "), c("Anti-Spike IgG (EU/ml)", "Anti-RBD IgG (EU/ml)", "Pseudo nAb ID80", "Live nAb ID80"), "%.%")
+# rownames(labels.axis)=times
+# colnames(labels.axis)=assays
+#  
+# labels.title=outer(c("Baseline ", "Day 57 ", "Fold-rise "), c("Binding Antibody to Spike", "Binding Antibody to RBD", "Pseudo Neutralization 80% Titer", "Live Neutralization 80% Titer"), "%.%")
+# rownames(labels.title)=times
+# colnames(labels.title)=assays
+
+main <- "Threshold-response function, "
+if(marker == "Day57liveneut") {
+subtitle_main <- paste0("Day 57", " Live Neutralization 80% Titer")
+labx <- paste0("D57", " Live nAb ID80")
+}
+
+if(marker == "Day57pseudoneut") {
+subtitle_main <- paste0("Day 57", "Pseudo Neutralization 80% Titer")
+labx <- paste0("D57", " Pseudo nAb ID80")
+
+}
+
+if(marker == "Day57bindRBD") {
+subtitle_main <- paste0("Day 57", " Binding Antibody to RBD")
+labx <- paste0("D57", " Anti-RBD IgG (EU/ml)")
+
+}
+
+if(marker == "Day57bindSpike") {
+subtitle_main <- paste0("Day 57", " Binding Antibody to Spike")
+labx <- paste0("D57", " Anti-Spike IgG (EU/ml)")
+
+}
+
+
+g1 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_line()+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                               scale_x_continuous(
+                               
+                                labels = trans_format("ident", math_format(10^.x))) + scale_y_continuous(n.breaks = 10) + scale_y_continuous(n.breaks = 10) + xlab(paste0(marker, " threshold")) +ylab("Probability of COVID")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))
+ 
+ g1 <- g1  + xlab(labx) +
+    theme(text = element_text(size=22),
+        axis.text.x = element_text(angle=0, hjust=1)) 
+ 
+ g1
+ 
+ 
+ 
+plot_data <- data.frame(matrix(0, nrow = length(thresh), ncol = 3))
+plot_data
+psi <- sapply(estDonovan$upper, `[[`, "psi")
+IC <- do.call(cbind, lapply(estDonovan$upper, `[[`, "IC"))
+
+var_D <- cov(IC)
+n <- nrow(IC)
+se <- sqrt(diag(var_D) / n)
+level <- 0.95
+
+rho_D <- var_D / sqrt(tcrossprod(diag(var_D)))
+q <- qmvnorm(level, tail = "both", corr = rho_D)$quantile
+ci <- as.matrix(wald_ci(psi, se, q = q))
+  ci
+  plot_data[,1] <- ci[,1]
+      plot_data[,2] <-psi
+
+    plot_data[,3] <- ci[,2]
+
+
+plot_data$cutoffs <- round(thresh,3)
+colnames(plot_data) <- c("lower", "est", "upper", "cutoffs")
+plot_data$lower <- pmax(plot_data$lower , 0)
+
+
+cutoffs <- round(thresh,3)
+library(ggplot2)
+
+ g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_line()+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                               scale_x_continuous(
+                               
+                                labels = trans_format("ident", math_format(10^.x))) + scale_y_continuous(n.breaks = 10) + scale_y_continuous(n.breaks = 10) + xlab(paste0(marker, " threshold")) + ylab("Probability of COVID")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))
+ 
+ g2 <- g2  + xlab(labx)+
+    theme(text = element_text(size=22),
+        axis.text.x = element_text(angle=0, hjust=1)) 
+ 
+ g2
+ 
+ 
+  plt <- plot_grid(g1, g2,  nrow = 2, hjust = c(-1,-2))
+plt
+ggsave(paste0(marker,"_plotpooled.png"), plt)
+ggsave(paste0(marker,"_plottmle.png"), g1)
+ggsave(paste0(marker,"_plotdon.png"), g2)
+```
+
+
+```{r}
+library(scales)
+ident <- function(x) x
+g2 <- ggplot2::ggplot(data =  plot_data, aes_string("cutoffs", "est"))+ scale_x_continuous(breaks = plot_data$cutoffs) +
+                              geom_point(aes_string(x = "cutoffs", y = "est"), legend=  F,   colour=alpha('red')) +
+                              geom_point(aes_string(x = "cutoffs", y ="lower"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_point(aes_string(x = "cutoffs", y = "upper"), legend=  F,  colour=alpha('red', 0.2)) +
+                              geom_line()+
+                              geom_ribbon(aes(ymin = lower, ymax = upper), alpha= 0.2, color = NA) +
+                              scale_x_continuous(
+                               
+                                labels = trans_format("ident", math_format(10^.x))) + scale_y_continuous(n.breaks = 10) + xlab(paste0(marker, " threshold")) + ylab("Probability of COVID")+ theme(axis.text.x = element_text(angle = 0, hjust = 1))
+ 
+ g2 <- g2  + xlab(labx)+
+    theme(text = element_text(size=22),
+        axis.text.x = element_text(angle=0, hjust=1)) 
+ 
+ g2
+ 
+ plot_data$cutoffs
+ 
+ log10( plot_data$cutoffs)
+```
+
+
+
+
+```{r}
+library(cowplot)
+ plt <- plot_grid(g1, g2,  nrow = 2, hjust = c(-1,-2))
+plt
+ggsave(paste0(marker,"_plot.png"), plt)
+ 
+```
+
+
+```{r}
+n <- 10000
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = abs(2.5),rate=13  ) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+D <- set.DAG(D)
+data_full <- sim(D, n = n)
+hist(data_full$S)
+plot(data_full$S, data_full$PY)
+truth <- mean(data_full$Y * (data_full$S >= thresh)) / mean(data_full$S >= thresh)
+
+truth
+
+n <- 100000
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = 2 + W1^2 + W2^2 + (W3/3)^2 ,rate= 12.5 + W1 + W2 + W3/3 ) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+D <- set.DAG(D)
+data_full <- sim(D, n = n)
+hist(data_full$S)
+truth <- mean(data_full$Y * (data_full$S >= thresh)) / mean(data_full$S >= thresh)
+
+truth
+
+
+n <- 100000
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = abs(2.5),rate=13  ) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+D <- set.DAG(D)
+data_full <- sim(D, n = n)
+hist(data_full$S)
+plot(data_full$S, data_full$PY)
+truth <- mean(data_full$Y * (data_full$S >= thresh)) / mean(data_full$S >= thresh)
+
+truth
+```
+
+```{r}
+covers
+truth
+
+```
+
+
+# unconfounding 
+```{r}
+
+n <- 500000
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = abs(2.5),rate=13  ) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+D <- set.DAG(D)
+data_full <- sim(D, n = n)
+hist(data_full$S)
+plot(data_full$S, data_full$PY)
+truth <- mean(data_full$Y * (data_full$S >= thresh)) / mean(data_full$S >= thresh)
+
+truth
+thresh <- median(data_full$S)
+library(SuperLearner)
+CI_SL <- data.frame(matrix(NA, nrow = 1000, ncol = 3))
+covers_SL <- rep(NA,1000)
+
+CI_glmnet <- data.frame(matrix(NA, nrow = 1000, ncol = 3))
+covers_glmnet <- rep(NA,1000)
+
+CI_donovan<- data.frame(matrix(NA, nrow = 1000, ncol = 3))
+covers_donovan <- rep(NA,1000)
+library(simcausal)
+for( i in 1:1000) {
+n <- 10000
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = abs(2.5),rate=13  ) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+D <- set.DAG(D)
+data_full <- sim(D, n = n)
+
+
+mean(data_full$PY)
+table(data_full$Y)
+p1 = 1
+p0= 0.15
+keep <- union(sample(which(data_full$Y==0), round(length(which(data_full$Y==0))*p0), replace = F) , sample(which(data_full$Y==1), round(length(which(data_full$Y==1))*p1), replace = F)  )
+
+data_full$select = as.numeric(seq_len(nrow(data_full)) %in% keep)
+table(data_full[data_full$Y==1, "Y"])
+data_full$wt <- 1/p0
+data_full[data_full$Y==1, "wt"] <- 1/p1
+data_full
+baseline <- c("W1", "W2", "W3")
+marker = "S"
+outcome = "Y"
+
+thresh <- median(data_full[[marker]]) 
+data <- data_full[data_full[["select"]] ==1,]
+
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+
+lrnr_SL.gam <-  make_learner(Lrnr_pkg_SuperLearner, "SL.gam", outcome_type = variable_type("binomial"))
+
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+
+sl_list <- list(Lrnr_xgboost$new(max_depth = 4), Lrnr_xgboost$new(max_depth = 3), bayesglm_sl_lrnr, lrnr_SL.inter, Lrnr_glmnet$new(), Lrnr_glm$new() )
+
+lrnr <- Lrnr_sl$new(sl_list, Lrnr_cv_selector$new(loss_loglik_binomial))
+
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = lrnr, lrnr_Y = lrnr)
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+CI_SL[i,] <- ci
+covers_SL[i] <- truth >= min(ci) &  truth <= max(ci)
+print(table(covers))
+print(mean(covers, na.rm = T))
+print(truth)
+print(ci)
+
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = Lrnr_glmnet$new(), lrnr_Y = Lrnr_glmnet$new())
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+CI_glmnet[i,] <- ci
+covers_glmnet[i] <- truth >= min(ci) &  truth <= max(ci)
+print(table(covers))
+print(mean(covers, na.rm = T))
+print(truth)
+print(ci)
+
+
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = Lrnr_mean$new(), lrnr_Y = Lrnr_mean$new())
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+CI_donovan[i,] <- ci
+covers_donovan[i] <- truth >= min(ci) &  truth <= max(ci)
+print(table(covers))
+print(mean(covers, na.rm = T))
+print(truth)
+print(ci)
+
+#mean(data_full$Y * (data_full$S >= thresh)) / mean(data_full$S >= thresh)
+#mean(data$wt * data$Y * (data$S >= thresh)) / mean(data$wt * (data$S >= thresh))
+}
+```
+
+
+0.005425500
+# confounding 
+```{r}
+library(simcausal)
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = 2 + (W1) + abs(W2) + W3/3 ,rate= 12.5 + W1 + W2 + W3/3 ) +
+  node("g", distr = "rconst", const = dgamma(S, shape = 2 + (W1) + abs(W2) + W3/3 ,rate= 12.5 + W1 + W2 + W3/3 )) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+setD <- set.DAG(D, vecfun = "dgamma")
+data <- sim(setD, n = 80000)
+data
+hist(data$S)
+thresh <-0.2131749
+truth <- 0.005379507
+
+library(SuperLearner)
+CI_SL <- data.frame(matrix(NA, nrow = 1000, ncol = 3))
+covers_SL <- rep(NA,1000)
+
+CI_glmnet <- data.frame(matrix(NA, nrow = 1000, ncol = 3))
+covers_glmnet <- rep(NA,1000)
+
+CI_donovan<- data.frame(matrix(NA, nrow = 1000, ncol = 3))
+covers_donovan <- rep(NA,1000)
+library(simcausal)
+for( i in 1:1000) {
+n <- 10000
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S", distr = "rgamma", shape = 2 + (W1) + abs(W2) + W3/3 ,rate= 12.5 + W1 + W2 + W3/3 ) +
+  node("g", distr = "rconst", const = dgamma(S, shape = 2 + (W1) + abs(W2) + W3/3 ,rate= 12.5 + W1 + W2 + W3/3 )) +
+  node("PY", distr = "rconst", const = 0.05 * logit(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+D <- set.DAG(D, vecfun = "dgamma")
+data_full <- sim(D, n = n)
+
+
+
+mean(data_full$PY)
+table(data_full$Y)
+p1 = 1
+p0= 0.15
+keep <- union(sample(which(data_full$Y==0), round(length(which(data_full$Y==0))*p0), replace = F) , sample(which(data_full$Y==1), round(length(which(data_full$Y==1))*p1), replace = F)  )
+
+data_full$select = as.numeric(seq_len(nrow(data_full)) %in% keep)
+table(data_full[data_full$Y==1, "Y"])
+data_full$wt <- 1/p0
+data_full[data_full$Y==1, "wt"] <- 1/p1
+data_full
+baseline <- c("W1", "W2", "W3")
+marker = "S"
+outcome = "Y"
+
+thresh <- median(data_full[[marker]]) 
+data <- data_full[data_full[["select"]] ==1,]
+
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+
+lrnr_SL.gam <-  make_learner(Lrnr_pkg_SuperLearner, "SL.gam", outcome_type = variable_type("binomial"))
+
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+
+sl_list <- list(Lrnr_xgboost$new(max_depth = 4), Lrnr_xgboost$new(max_depth = 3), Lrnr_xgboost$new(max_depth = 5), Lrnr_xgboost$new(max_depth = 7), Lrnr_xgboost$new(eta = 0.1, max_depth  = 4), Lrnr_xgboost$new(eta = 0.1, max_depth  = 3) )
+
+sl_list <- c(sl_list,  list( bayesglm_sl_lrnr, lrnr_SL.inter, Lrnr_glmnet$new(), Lrnr_glm$new() ))
+lrnr <- Lrnr_sl$new(sl_list, Lrnr_cv_selector$new(loss_loglik_binomial))
+
+print("SL")
+
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = lrnr, lrnr_Y = lrnr)
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+CI_SL[i,] <- ci
+covers_SL[i] <- truth >= min(ci) &  truth <= max(ci)
+print(table(covers_SL))
+print(mean(covers_SL, na.rm = T))
+print(truth)
+print(ci)
+
+print("glmnet")
+sl_list <- list( bayesglm_sl_lrnr, lrnr_SL.inter, Lrnr_glmnet$new(), Lrnr_glm$new() )
+
+lrnr <- Lrnr_sl$new(sl_list, Lrnr_cv_selector$new(loss_loglik_binomial))
+
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = lrnr, lrnr_Y = lrnr)
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+CI_glmnet[i,] <- ci
+covers_glmnet[i] <- truth >= min(ci) &  truth <= max(ci)
+print(table(covers_glmnet))
+print(mean(covers_glmnet, na.rm = T))
+print(truth)
+print(ci)
+
+print("Donovan")
+est <- thresholdTMLE(data_full, list(W = baseline, Y = outcome, A  = marker, weights = "wt"), thresh , NULL,  biased_sampling_strata = "Y",  biased_sampling_indicator = "select", lrnr_A = Lrnr_mean$new(), lrnr_Y = Lrnr_mean$new())
+
+se <- apply(est$upper[[1]]$IC_IPCW,2,sd)/sqrt(nrow(data_full))
+psi <- est$upper[[1]]$psi
+ci <- c(psi - 1.96*se, psi, psi + 1.96*se)
+CI_donovan[i,] <- ci
+covers_donovan[i] <- truth >= min(ci) &  truth <= max(ci)
+print(table(covers_donovan))
+print(mean(covers_donovan, na.rm = T))
+print(truth)
+print(ci)
+
+#mean(data_full$Y * (data_full$S >= thresh)) / mean(data_full$S >= thresh)
+#mean(data$wt * data$Y * (data$S >= thresh)) / mean(data$wt * (data$S >= thresh))
+}
+```

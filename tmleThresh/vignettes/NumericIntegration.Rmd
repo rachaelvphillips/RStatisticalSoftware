@@ -1,0 +1,126 @@
+---
+title: "sim"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# OLD example, scroll down
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = 0, max = 1) +
+  node("W2", distr = "runif", min = 0, max = 1) +
+  node("A", distr = "rnorm", mean = 1*W2 + 1*W1, sd = 0.5) + 
+  node("Y", distr = "rbinom", size =1 , prob = plogis(-2 + A + W1 + W2 - A*W1/2 - A*W2/2)) +
+    node("pY", distr = "rconst" , const = plogis(-2 + A + W1 + W2 - A*W1/2 - A*W2/2)) 
+  
+setD <- set.DAG(D, vecfun = "dgamma")
+data <- sim(setD, n = 80000)
+mean((data$A >= 1) * data$pY) / mean(data$A >= 1)
+mean((data$A >= 1) * data$Y)/ mean(data$A >= 1)
+```
+
+
+```{r}
+
+make_f <- function(W1, W2, v,maxA) {
+  g <- function(A) {
+    dnorm(A, mean = 1*W2 + 1*W1, sd=0.5)
+  }
+  cdf <- integrate(g, v, Inf)$value
+f <- function(A) {
+  dnorm(A, mean = 1*W2 + 1*W1, sd=0.5) * plogis(-2 + A + W1 + W2 - A*W1/2 - A*W2/2) * (A >= v)/cdf
+}
+return(f)
+}
+results <- rep(0, nrow(data))
+for(i in 1:nrow(data)) {
+  f <- make_f(data$W1[i], data$W2[i], 1, max(data$A) +5)
+  results[i] <- integrate(f, min(data$A), max(data$A))$value
+}
+mean(results)
+```
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+# COnfounding simulation do this one
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1full", distr = "runif", min = -1, max = 1) +
+  node("W2full", distr = "runif", min = -1, max = 1) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W1", distr = "rconst", const = 3*round(W1full/3,1))+
+  node("W2", distr = "rconst", const = 4*round(W2full/4,1))+
+  node("W3", distr = "rconst", const = round(0.2*min(W3full,3),1)/0.2)+
+ node("Sf", distr = "rgamma",  shape = 3,rate=  10+ 3*abs(W1) + 3*cos(5*W2 + 3)*sin(3*W1) + 2*abs(W2)*abs(W1) + 3*abs(W2) + 1*(W1 >=0)+ 2*sin(5*(W1 - 1)) * (W1<=0) + + (W1 >=0) * (W1 <= 0.5) - (W2 <=0.5) * (W2 >= -0.5)  + 2*(exp(-W3))*cos(W3) + 2*W3 *(W2 >=0) + 2*W2*(W1 <=0) ) +
+ node("S", distr = "rconst",  const = min(Sf, 0.65) ) +
+     node("g", distr = "rconst", const = dgamma(S,  shape = 3,rate=  14+ 3*W1 + (W2>0) + 3*W3 + W3 *(W2 >=0) + W2*(W1 <=0) )  ) +
+  node("PY", distr = "rconst", const =  plogis(-4.5+
+     0.7* (- S - S^2 + sin(5*(W1 - 1)) * (W1<=0) + (W1 >=0) * (W1 <= 0.5) - (W2 <=0.5) * (W2 >= -0.5) + sin(3*W1)*(W2 >=0) + 0.5*(exp(W1)*S + S*0.5*sin(W3) + S*abs(W1)) + 2*abs(W2)*abs(W1) + sin(5*(W1 + 0.5))*S + cos(5*W2 + 3)*sin(3*W1) + 1.5*abs(W1)*(W3 >= 1) - abs(W2)*(W3 >= 2) ))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+
+setD <- set.DAG(D, vecfun = "dgamma")
+data <- sim(setD, n = 100000)
+data
+hist(data$S)
+thresh <- median(data$S) 
+mean((data$S >= thresh) * data$PY) / mean(data$S >= thresh)
+
+```
+
+```{r}
+
+length(unique(data$W1))
+length(unique(data$W2))
+length(unique(data$W3))
+```
+
+```{r}
+
+make_f <- function(W1, W2, W3, v,maxA) {
+  g <- function(S) {
+      dgamma(S,  shape = 3,rate=  10+ 3*abs(W1) + 3*cos(5*W2 + 3)*sin(3*W1) + 2*abs(W2)*abs(W1) + 3*abs(W2) + 1*(W1 >=0)+ 2*sin(5*(W1 - 1)) * (W1<=0) + + (W1 >=0) * (W1 <= 0.5) - (W2 <=0.5) * (W2 >= -0.5)  + 2*(exp(-W3))*cos(W3) + 2*W3 *(W2 >=0) + 2*W2*(W1 <=0) )
+  }
+  cdf <- integrate(g, v, Inf)$value
+ 
+f <- function(S) {
+  Sfull <- S
+  S <- pmin(S, 0.65)
+  v <- g(Sfull)    *  plogis(-4.5+
+     0.7* (- S - S^2 + sin(5*(W1 - 1)) * (W1<=0) + (W1 >=0) * (W1 <= 0.5) - (W2 <=0.5) * (W2 >= -0.5) + sin(3*W1)*(W2 >=0) + 0.5*(exp(W1)*S + S*0.5*sin(W3) + S*abs(W1)) + 2*abs(W2)*abs(W1) + sin(5*(W1 + 0.5))*S + cos(5*W2 + 3)*sin(3*W1) + 1.5*abs(W1)*(W3 >= 1) - abs(W2)*(W3 >= 2) ))/cdf * (S >= v)
+  
+  v
+}
+return(f)
+}
+results <- rep(0, nrow(data))
+for(i in 1:nrow(data)) {
+  f <- make_f(data$W1[i], data$W2[i], data$W3[i],  thresh, max(data$S) )
+  results[i] <- integrate(f, 0, Inf)$value
+}
+#truth
+mean(results)
+```
+
+```{r}
+#Donovan
+thresh
+mean((data$S >= thresh) * data$PY) / mean(data$S >= thresh)
+
+
+```
+

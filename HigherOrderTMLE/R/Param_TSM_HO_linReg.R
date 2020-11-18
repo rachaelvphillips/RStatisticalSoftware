@@ -46,7 +46,7 @@ Param_TSM_higher_order <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, likelihood_tilde, outcome_node = "Y") {
+    initialize = function(observed_likelihood, likelihood_tilde, outcome_node = "Y", MLE_type = c("Pntilde", "Pn") ){
       super$initialize(observed_likelihood, list(), outcome_node)
       private$.likelihood_tilde <- likelihood_tilde
 
@@ -106,25 +106,28 @@ Param_TSM_higher_order <- R6Class(
       # First order TMLE
       #####
       if(for_fitting) {
-        observed <- Y
-        observed <-  Q_tilde1
-        offset <- stats::qlogis(Q1)
+        if(MLE_type == "PnTilde") {
+          observed <-  Q_tilde1
+          offset <- stats::qlogis(Q1)
 
-        weights <- g_tilde1/g1^2
-        if(any(weights > 10)){
-          warning("weights bounded")
-          weights <- bound(weights, c(0,10))
+          weights <- g_tilde1/g1
+          if(any(weights > 10)){
+            warning("weights bounded")
+            weights <- bound(weights, c(0,10))
+          }
+
+          H <- as.matrix(1/g1)
+          if(any(abs(H) > 50)) {
+            warning("bound H")
+            H <- bound(H, c(-50,50))
+          }
+          data <- list(H = H, observed = observed)
+        } else {
+          observed <- Y
+          offset <- stats::qlogis(Q)
+          H <- as.matrix(1/g1)
+          weights <- rep(1, nrow(H))
         }
-
-        H <- rep(1, length(weights))
-
-        if(any(abs(H) > 50)) {
-          warning("bound H")
-          H <- bound(H, c(-50,50))
-        }
-        data <- list(H = H, observed = observed)
-
-
 
 
 
@@ -258,14 +261,14 @@ Param_TSM_higher_order <- R6Class(
       Y <- tmle_task$get_tmle_node("Y", impute_censoring = TRUE)
       A <- tmle_task$get_tmle_node("A")
       Q <- self$observed_likelihood$get_likelihood(tmle_task, "Y", fold_number)
-      g <- self$observed_likelihood$get_likelihood(tmle_task, "A", fold_number)
+      g1 <- self$observed_likelihood$get_likelihood(cf_task1, "A", fold_number)
 
       EY1 <- self$observed_likelihood$get_likelihood(cf_task1, "Y", fold_number)
       # EY0 <- self$observed_likelihood$get_likelihood(cf_task0, self$outcome_node, fold_number)
       psi <- self$empirical_mean(tmle_task, EY1)
       #psi <- mean(EY1 - EY0)
 
-      IC <- HA$Y[,1] * (Y - Q) +  HA$A * (A - g) + EY1 - psi
+      IC <- HA$Y[,1] * (Y - Q) +  HA$A * (A - g1) + EY1 - psi
 
       if(any(is.infinite(IC))) {
         stop("unbounded")
@@ -278,28 +281,27 @@ Param_TSM_higher_order <- R6Class(
       result <- list(psi = psi, IC = as.matrix(IC), ICtilde = cbind(HA$ICtilde$A, HA$ICtilde$Y))
       return(result)
     }
-  ),
-  active = list(
-    name = function() {
-      param_form <- sprintf("ATE[%s_{%s}-%s_{%s}]", self$outcome_node, self$cf_likelihood_treatment$name, self$outcome_node, self$cf_likelihood_control$name)
-      return(param_form)
-    },
-    likelihood_tilde = function() {
-      return(private$.likelihood_tilde)
-    },
-    update_nodes = function() {
-      return(c("Y", "A"))
-    }
-  ),
-  private = list(
-    .type = "ATE",
-    .cf_likelihood_treatment = NULL,
-    .cf_likelihood_control = NULL,
-    .supports_outcome_censoring = TRUE,
-    .likelihood_tilde = NULL,
-    .first_epsilon = NULL,
-    .task_cache = new.env(),
-    .cf_tasks_uuid = c(),
-    .submodel_type_supported = c("gaussian")
+    ),
+    active = list(
+      name = function() {
+        param_form <- sprintf("ATE[%s_{%s}-%s_{%s}]", self$outcome_node, self$cf_likelihood_treatment$name, self$outcome_node, self$cf_likelihood_control$name)
+        return(param_form)
+      },
+      likelihood_tilde = function() {
+        return(private$.likelihood_tilde)
+      },
+      update_nodes = function() {
+        return(c("Y", "A"))
+      }
+    ),
+    private = list(
+      .type = "ATE",
+      .cf_likelihood_treatment = NULL,
+      .cf_likelihood_control = NULL,
+      .supports_outcome_censoring = TRUE,
+      .likelihood_tilde = NULL,
+      .first_epsilon = NULL,
+      .task_cache = new.env(),
+      .cf_tasks_uuid = c()
+    )
   )
-)

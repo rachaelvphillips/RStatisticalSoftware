@@ -9,13 +9,30 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r, include = F}
 library(sl3)
 library(tmleThresh)
+library(tmle3)
 markers <- c("Day57bindSpike" , "Day57bindRBD"  , "Day57pseudoneut" , "Day57liveneut" )
-#devtools::install_github("Larsvanderlaan/RStatisticalSoftware/tmleThresh")
+#devtools::install_github("Larsvanderlaan/tmle3", ref = "updating_updater")
 ```
 
 
@@ -23,28 +40,47 @@ markers <- c("Day57bindSpike" , "Day57bindRBD"  , "Day57pseudoneut" , "Day57live
 #load("dat.mock.rda")
 #data <- read.csv("COVID_VEtrial_practicedata.csv")
 #data
-dat.mock.vacc.seroneg
+wts <- unique(dat.mock.vacc.seroneg$wt)
+data <-dat.mock.vacc.seroneg
+
+keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
+baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
+marker <- "Day57liveneut"
+
+outcome <- "EventInd"
+data <- data[keep, c(outcome, marker, baseline, "wt", "TwophasesampInd")]
+data <- data.table(data)
+table(data$wt)
+data[, wtnew:= 1/mean(TwophasesampInd), by = wt]
+data
+data <- data.table(na.omit(data))
+data
 ```
 
 
 ```{r, include = F}
 
+wts <- unique(dat.mock.vacc.seroneg$wt)
 data <-dat.mock.vacc.seroneg
 
 keep <- data$Trt==1 & data$Bserostatus==0 & data$Perprotocol==1
 baseline <- c("MinorityInd", "HighRiskInd", "Age", "BRiskScore")
-marker <- "Day57bindSpike"
+marker <- "Day57pseudoneut"
 
 outcome <- "EventInd"
-data <- data[keep, c(outcome, marker, baseline, "wt")]
-data <- na.omit(data)
-sum(is.na(data))
+data <- data[keep, c(outcome, marker, baseline, "wt", "TwophasesampInd")]
+data <- data.table(data)
+table(data$wt)
+data[, wtnew:= 1/mean(TwophasesampInd), by = wt]
+data
+data <- data.table(na.omit(data))
 
 #lrnr <- Lrnr_pooled_hazards$new(Lrnr_xgboost$new())
 # To use machine learning
 library(earth)
 plot_data_list <- list()
-for(thresh in c(quantile(data[[marker]], c(0.05, 0.06, 0.07, 0.1,0.2, 0.3, 0.4,  0.5, 0.6,0.65, 0.7, 0.75, 0.8 , 0.85, 0.875, 0.9, 0.925, 0.95)))){
+choices <- c(0.05, 0.06, 0.07, 0.1,0.2, 0.3, 0.4,  0.5, 0.6,0.65, 0.7, 0.75, 0.8 , 0.85, 0.875, 0.9, 0.925, 0.95)
+for(thresh in c(quantile(data[[marker]], choices))){
 thresholds <- c(thresh)
 print(thresholds)
 
@@ -78,6 +114,7 @@ print("done")
 
 weights <-1
 get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = rep(1, nrow(data))) {
+  weights_unnorm <- weights
   weights <- weights/sum(weights)
   data <- as.data.table(data)
   IC_list <- list()
@@ -90,13 +127,13 @@ get_estimates <- function(data, marker_var, outcome_var, thresholds, weights = r
     EY <- weighted.mean(data[[outcome_var]] * meets_thresh, weights) / cdf
     thresh <- as.character(thresh)
     est_list[[thresh]] <- EY
-    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY)
+    IC_list[[thresh]] <- meets_thresh/cdf * (data[[outcome_var]] - EY) * weights_unnorm
     
   }
   return(list(est = unlist(est_list),
              IC = do.call(cbind, IC_list), cdf = 1-cdf_list ))
 }
-out <- get_estimates(data, marker, outcome, thresholds)
+out <- get_estimates(data, marker, outcome, thresholds, weights = data$wt)
 est <- out$est
 IC <- out$IC * weights
 radius <- 1.96 * sqrt(resample::colVars(IC))/sqrt(nrow(data))
@@ -124,12 +161,11 @@ plot_data2$cutoffs <- cutoffs
 plot_data$grp <- "TMLE"
 plot_data2$grp <- "Donovan"
 plot_data <- rbind(plot_data, plot_data2)
-print(plot_data)
+
 plot_data_list <- c(plot_data_list, list(plot_data))
 
 }
 ```
-
 
 
 
@@ -149,6 +185,7 @@ plot_data
 ```
 
 ```{r}
+plot_data
 g1 + xlab(paste0("Threshold value for ", marker)) + ylab("Threshold Resposne function")
 ```
 

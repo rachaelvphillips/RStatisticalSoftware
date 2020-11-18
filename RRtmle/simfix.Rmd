@@ -47,53 +47,109 @@ data
 
 ```{r}
 
-for(k in 1:6) {
-  for(n in c(1000,2500,5000,10000)) {
+bias_list_reg <- list()
+bias_list_eff <- list()
+se_list_reg <- list()
+se_list_eff <- list()
+score_list_reg <- list()
+score_list_eff <- list()
+dfs <- list()
+dfs1 <- list()
+for(k in 1:4) {
+  print(k)
+  for(n in c(15000)) {
+    key = paste0(k, "%n=", n)
 print(n)
-scores <- read.csv( paste0("newcomplex_sieve_scores_",n,".csv"))[,-1]
-initscores <- read.csv(paste0("newcomplex_initial_scores_",n,".csv"))[,-1]
-risks <- read.csv(paste0("newcomplex_risk_estimates",n,".csv"))[,-1]
-risks10000 <- read.csv(paste0("newcomplex_risk_estimates",10000,".csv"))[,-1]
+scores <- read.csv( paste0("Qlrnrc_scores_new",n,".csv"))[,-1]
+initscores <- read.csv(paste0("Qlrnrc_scores_old",n,".csv"))[,-1]
+risks <- read.csv(paste0("Qlrnrc_risk_estimates",n,".csv"))[,-1]
+risks10000 <- read.csv(paste0("Qlrnrb_risk_estimates",15000,".csv"))[,-1]
 print("scores")
-print(sqrt(n)*as.vector(colMeans(abs(initscores), na.rm = T)))
-print(sqrt(n)*as.vector(colMeans(abs(scores), na.rm = T)))
+print(sqrt(n)*as.vector(colMeans(abs(initscores), na.rm = T))[k])
+print(sqrt(n)*as.vector(colMeans(abs(scores), na.rm = T))[k])
 risks1 <- as.vector(apply(risks,2,mean, na.rm = T))
 risks1b <- as.vector(apply(risks10000,2,mean, na.rm = T))
 
-splitrisks <- split(risks1, (1:18) %%3)
-splitrisksb <- split(risks1b, (1:18) %%3)
+splitrisks <- split(risks1, (1:length(risks1)) %%4)
+splitrisksb <- split(risks1b, (1:length(risks1)) %%4)
 
 
   print("bias")
-v1 <- as.vector(apply((risks[,3*(k-1) +1, drop = F] - splitrisksb$`0`[k])^2,2,mean, na.rm = T))
-v1 <- as.vector(apply((risks[,3*(k-1) + 1, drop = F]- splitrisksb$`0`[k]),2,mean, na.rm = T))
 
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F] - splitrisksb$`0`[k])^2,2,mean, na.rm = T))
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F]- splitrisksb$`0`[k]),2,mean, na.rm = T))
-print(sqrt(n)*c(v1,v2))
+v1 <- as.vector(apply((risks[,4*(k-1) + 1, drop = F]- splitrisksb$`3`[k]),2,mean, na.rm = T))
+bias_list_reg[[key]] <- v1 * sqrt(n)
 
-print("var")
+v2 <- as.vector(apply((risks[,4*(k-1) + 2, drop = F]- splitrisksb$`3`[k]),2,mean, na.rm = T))
+v3 <- as.vector(apply((risks[,4*(k-1) + 4, drop = F]- splitrisksb$`3`[k]),2,mean, na.rm = T))
 
-v1 <- as.vector(apply((risks[,3*(k-1) +1, drop = F] - splitrisksb$`0`[k])^2,2,sd, na.rm = T))
-v1 <- as.vector(apply((risks[,3*(k-1) + 1, drop = F]- splitrisksb$`0`[k]),2,sd, na.rm = T))
+bias_list_eff[[key]] <- v2* sqrt(n)
+out1 <- (sqrt(n)*c(v1,v2, v3))
+print(out1)
+print("se")
 
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F] - splitrisksb$`0`[k])^2,2,sd, na.rm = T))
-v2 <- as.vector(apply((risks[,3*(k-1) + 2, drop = F]- splitrisksb$`0`[k]),2,sd, na.rm = T))
-print(sqrt(n)*c(v1,v2))
+v1 <- as.vector(apply((risks[,4*(k-1) + 1, drop = F]- splitrisksb$`3`[k]),2,sd, na.rm = T))
+bias_list_reg[[key]] <- v1 * sqrt(n)
+
+v2 <- as.vector(apply((risks[,4*(k-1) + 2, drop = F]- splitrisksb$`3`[k]),2,sd, na.rm = T))
+v3 <- as.vector(apply((risks[,4*(k-1) + 4, drop = F]- splitrisksb$`3`[k]),2,sd, na.rm = T))
+
+
+se_list_reg[[key]] <- v1 * sqrt(n)
+
+
+se_list_eff[[key]] <- v2* sqrt(n)
+out2 <- (sqrt(n)*c(v1,v2, v3))
+print(out2)
+df <- data.frame(t(data.frame(key = out1)))
+df1 <- data.frame(t(data.frame( key = out2)))
+
+rownames(df) <- c("bias")
+rownames(df1) <- c("se")
+colnames(df) <- rep(key,3)
+colnames(df1) <- rep(key,3)
+dfs <- c(dfs, list(df))
+dfs1 <- c(dfs1, list(df1))
 }}
-
-
 
 ```
 
+```{r}
+lst <- split(dfs, c(1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4))
+for(l in lst) {
 
+  v <- data.frame(data.table::rbindlist(l, use.names = F))
+  rownames(v) <- c(1000, 2500, 5000, 10000, 15000)
+  colnames(v) <- NULL
+  print(v)
+
+}
+
+lst <- split(dfs1, c(1,1,1,1,1,2,2,2,2,2,3,3,3,3,3,4,4,4,4,4))
+for(l in lst) {
+
+  v <- data.frame(data.table::rbindlist(l, use.names = F))
+  rownames(v) <- c(1000, 2500, 5000, 10000, 15000)
+  colnames(v) <- NULL
+  print(v)
+
+}
+```
 
 ```{r}
+risk_estimates
+results_xg
+results_sieve
+```
+
+
+```{r, include = F}
 results_xg <- data.frame(matrix(NA, nrow = 1000, ncol = 12))
 results_sieve <- data.frame(matrix(NA, nrow = 1000, ncol = 12))
 risk_estimates <- data.frame(matrix(NA, nrow = 1000, ncol = 4*4))
-
-for(i in 1:1000){
+# 5000, 4
+# 10000 6
+# 15000 8
+for(i in 1:500){
   try({
   print(i)
   n = 10000
@@ -132,11 +188,42 @@ data$t <- 0
 data$id <- as.factor(data$id)
 
 setkey(data, id ,t)
-print(data)
 #})}
 
 
+bound <- Vectorize(tmle3::bound)
+D <- DAG.empty()
+D <- D +
+  node("W1f", distr = "runif", min = -1, max = 1) +
+  node("W2f", distr = "runif", min = -1, max = 1) +
+  node("W3f", distr = "runif", min = -1, max = 1) +
+  node("W4f", distr = "runif", min = -1, max = 1) +
+  node("W5f", distr = "runif", min = -1, max = 1) +
+   node("W1", distr = "rconst", const = round(W1f,1)) +
+   node("W2", distr = "rconst", const = round(W2f,1)) +
+   node("W3", distr = "rconst", const = round(W3f,1)) +
+   node("W4", distr = "rconst", const = round(W4f,1)) +
+   node("W5", distr = "rconst", const = round(W5f,1)) +
+  
+  node("g", distr = "rconst", const = plogis(W1 + W2 +  W3 + W2*sin(W3) + W4 + W5  ) )+
+  node("A", distr = "rbinom", size = 1, prob = g )+
+    node("gRtilde", distr = "rconst",  const =  plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + A - A*cos(W3) + A*W1 - A*sin(W2))) +
+   node("gRtilde1", distr = "rconst",  const =   plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + 1 - 1*cos(W3) + 1*W1 - 1*sin(W2))) +
+   node("gRtilde0", distr = "rconst",  const =   plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + 0 - 0*cos(W3) + 0*W1 - 0*sin(W2))) +
+   node("gR", distr = "rconst",  const =  bound(gRtilde, 0.05) ) +
+  node("R", distr = "rbinom", size = 1, prob = gR)+
+  node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
 
+
+setD <- set.DAG(D, vecfun = c("bound", "round"))
+data_val <- sim(setD, n = n)
+data_val <- setDT(data_val)
+data_val$id <- data_val$ID
+data_val$ID <- NULL
+data_val$t <- 0
+data_val$id <- as.factor(data_val$id)
+
+setkey(data_val, id ,t)
 
 
 library(tmle3)
@@ -146,6 +233,9 @@ npsem <- list(define_node("W", c("W1", "W2", "W3", "W4", "W5"), time = 0, variab
              
               define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("binomial")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")))
 task <- tmle3_Task$new(data, npsem, long_format = F)
+
+task_val <- tmle3_Task$new(data_val, npsem, long_format = F)
+
 
 
 mean_fun_R_bias <- function(task) {
@@ -172,14 +262,18 @@ mean_fun_A_bias <- function(task) {
 LF_A_bias <- LF_known$new("A", density_fun  = mean_fun_A_bias)
 LF_R_bias <- LF_known$new("R", mean_fun = mean_fun_R_bias, type = "mean")
 
+LF_A_bias <- LF_fit$new("A", Lrnr_xgboost$new())
+LF_R_bias <- LF_fit$new("R", Lrnr_xgboost$new(), type = "mean")
+
 factor_list <- list(LF_emp$new("W"), 
                     LF_A_bias,
                      LF_R_bias
 )
 
 lik <- Likelihood$new(factor_list)
-lik <- lik$train(task)
+lik <- lik$train(task_val)
 rev <- make_revere(task, lik, "gen")
+rev_val <- make_revere(task_val, lik, "gen")
 library(fda)
 library(speedglm)
 library(glmnet)
@@ -187,16 +281,18 @@ library(stats)
 
 rev_univ <- make_generator(lik, "univ_Y")
 
-lrnr_fourier <- make_learner(Pipeline, Lrnr_cv$new(list(
-      Lrnr_fourier$new(fourier_basis(9, 1), stratify_by = "A", mult_by = "g"),
-    Lrnr_fourier$new(fourier_basis(10, 1), stratify_by = "A", mult_by = "g"),
-   Lrnr_fourier$new(fourier_basis(11, 1), stratify_by = "A", mult_by = "g")
-   #Lrnr_fourier$new(fourier_basis(2, 1), stratify_by = "A", mult_by = "g")
-), full_fit = T), Lrnr_cv_selector$new(loss_loglik_binomial))
+# lrnr_fourier <- make_learner(Pipeline, Lrnr_cv$new(list(
+#     Lrnr_fourier$new(fourier_basis(5, 1), stratify_by = "A", mult_by = "g"),
+#    Lrnr_fourier$new(fourier_basis(4, 1), stratify_by = "A", mult_by = "g")
+#    #Lrnr_fourier$new(fourier_basis(2, 1), stratify_by = "A", mult_by = "g")
+# ), full_fit = T), Lrnr_cv_selector$new(loss_loglik_binomial))
 
+
+lrnr_fourier <-   Lrnr_fourier$new(fourier_basis(5, 1), stratify_by = "A", mult_by = "g")
 full_task <- rev_univ(task, "full")
+full_task_val <- rev_univ(task_val, "full")
 
-
+print(colnames(full_task$get_data()))
 lrnr_fourier <- lrnr_fourier$train(full_task)
 
 cf_task1 <- task$generate_counterfactual_task(UUIDgenerate(), data.table(A=1))
@@ -312,11 +408,11 @@ risk_estimates[i,] <- risks
 results_sieve[i,] <- scores_eff
 results_xg[i,] <- scores_old
 
-write.csv(risk_estimates, paste0("Q_risk_estimates",n,".csv"))
+write.csv(risk_estimates, paste0("Qlrnrc_risk_estimates",n,".csv"))
 
-  write.csv(results_sieve, paste0("Q_scores_new",n,".csv"))
+  write.csv(results_sieve, paste0("Qlrnrc_scores_new",n,".csv"))
 
-write.csv(results_xg, paste0("Q_scores_old",n,".csv"))
+write.csv(results_xg, paste0("Qlrnrc_scores_old",n,".csv"))
 })
 
 }

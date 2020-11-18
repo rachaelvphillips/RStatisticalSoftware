@@ -46,7 +46,7 @@ Param_TSM_higher_order <- R6Class(
   class = TRUE,
   inherit = Param_base,
   public = list(
-    initialize = function(observed_likelihood, likelihood_tilde, outcome_node = "Y") {
+    initialize = function(observed_likelihood, likelihood_tilde = NULL, outcome_node = "Y", MLE_type = c("Pntilde", "Pn")) {
       super$initialize(observed_likelihood, list(), outcome_node)
       private$.likelihood_tilde <- likelihood_tilde
 
@@ -74,12 +74,12 @@ Param_TSM_higher_order <- R6Class(
       A <- tmle_task$get_tmle_node("A")
       Y <- tmle_task$get_tmle_node("Y")
       Y <-  tmle_task$scale(Y, "Y")
-      Q_tilde <- tmle_task$scale(self$likelihood_tilde$get_likelihood(tmle_task, "Y", fold_number), "Y")
-      Q_tilde1  <- tmle_task$scale(self$likelihood_tilde$get_likelihood(cf_task1, "Y", fold_number), "Y")
-      g_tilde <- self$likelihood_tilde$get_likelihood(tmle_task, "A", fold_number)
+      Q_tilde <- tmle_task$scale(self$observed_likelihood$get_likelihood(tmle_task, "Ytilde", fold_number), "Y")
+      Q_tilde1  <- tmle_task$scale(self$observed_likelihood$get_likelihood(cf_task1, "Ytilde", fold_number), "Y")
+      g_tilde <- self$observed_likelihood$get_likelihood(tmle_task, "Atilde", fold_number)
       g <- self$observed_likelihood$get_likelihood(tmle_task, "A", fold_number)
       g1 <- self$observed_likelihood$get_likelihood(cf_task1, "A", fold_number)
-      g_tilde1 <- self$likelihood_tilde$get_likelihood(cf_task1, "A", fold_number)
+      g_tilde1 <- self$observed_likelihood$get_likelihood(cf_task1, "Atilde", fold_number)
 
       Q <- tmle_task$scale(self$observed_likelihood$get_likelihoods(tmle_task, "Y", fold_number), "Y")
       Q1 <- tmle_task$scale(self$observed_likelihood$get_likelihoods(cf_task1, "Y", fold_number), "Y")
@@ -106,28 +106,37 @@ Param_TSM_higher_order <- R6Class(
       # First order TMLE
       #####
       if(for_fitting) {
-        observed <- Y
-        observed <-  Q_tilde1
-        offset <- stats::qlogis(Q1)
+        if(F ) {
+          observed <-  Q_tilde1
+          offset <- stats::qlogis(Q1)
 
-        weights <- g_tilde1/g1
-        if(any(weights > 10)){
-          warning("weights bounded")
-          weights <- bound(weights, c(0,10))
+          weights <- g_tilde1/g1
+          if(any(weights > 10)){
+            warning("weights bounded")
+            weights <- bound(weights, c(0,10))
+          }
+
+          H <- as.matrix(1/g1)
+          if(any(abs(H) > 50)) {
+            warning("bound H")
+            H <- bound(H, c(-50,50))
+          }
+
+          data <- list(H = H, observed = observed)
+        } else {
+
+          observed <- Y
+          offset <- stats::qlogis(Q)
+          H <- as.matrix(A/g1)
+          weights <- rep(1, nrow(H))
+          data <- list(H = H, observed = observed)
+
         }
-
-        H <- as.matrix(1/g1)
-        if(any(abs(H) > 50)) {
-          warning("bound H")
-          H <- bound(H, c(-50,50))
-        }
-        data <- list(H = H, observed = observed)
-
-
 
 
 
         suppressWarnings(epsilon <- coef(glm(observed ~ H -1, data, offset = offset, start = rep(0, ncol(data$H)), family = binomial(), weights = tmle_task$get_regression_task("Y")$weights * weights)))
+
         if(is.na(epsilon)) {
           epsilon <- 0
         }
@@ -163,7 +172,7 @@ Param_TSM_higher_order <- R6Class(
         stop("NA qtmle1")
       }
       if(any(is.na(Q_tmle))) {
-        stop("NA qtmle1")
+        stop("NA qtmle")
       }
       Q_tmle[is.na(Q_tmle)] <- 0
       Q_tmle1[is.na(Q_tmle1)] <- 0
@@ -182,8 +191,9 @@ Param_TSM_higher_order <- R6Class(
       #####
       # C_y <- A/g1 * Q1Q_1_tmle /Q1Q_1
       # - C_tilde_1 * C_g * (g_tilde1/g1) * (Q1Q_1_tmle)/Q1Q_1
+      C_y_tilde_update <- 1/g1 * Q1Q_1_tmle /Q1Q_1 * (1 - C_tilde_1 * g_tilde1/g1)
+      C_y <- A * C_y_tilde_update
 
-      C_y <- A/g1 * Q1Q_1_tmle /Q1Q_1 * (1 - C_tilde_1 * g_tilde1/g1)
       C_y_tilde <- g_tilde1/g1 * Q1Q_1_tmle /Q1Q_1 * (1 - C_tilde_1 * g_tilde1/g1)
       if(FALSE) {
         C_y <- cbind( C_y,A/g1)
@@ -194,16 +204,23 @@ Param_TSM_higher_order <- R6Class(
       #   (C_tilde_1 * g_tilde1/g1^2) * (Q_tilde1 - Q_tmle1) +
       #   (C_tilde_1 * g_tilde1/g1^3) * epsilon * Q1Q_1_tmle
 
+
       C_a <- -epsilon * Q1Q_1_tmle / g1^2 * (1 - C_tilde_1 * g_tilde1/g1) -
         C_tilde_1 * g_tilde1/g1^2 * (Q_tilde1 - Q_tmle1)
 
       C_a <- bound(C_a, c(-50,50))
 
       ICY <- as.matrix(C_y) * as.vector(Y - Q)
-      ICA <- C_a * (A - g)
+      ICA <- C_a * (A - g1)
 
       ICA_tilde <- C_a * (g_tilde1 - g1)
-      ICY_tilde <- C_y_tilde * (Q_tilde - Q)
+      ICY_tilde <- C_y_tilde * (Q_tilde1 - Q1)
+
+      H_a_tilde <- cbind((Q_tilde1 - Q1) * C_y_tilde_update, (Q_tilde1 - Q1)/g1, C_a)
+      H_y_tilde <- cbind(C_y, A/g1)
+
+      ICA2 <- H_a_tilde * as.vector(A - g_tilde1)
+      ICY2 <- H_y_tilde * as.vector(Y - Q_tilde)
       if(any(is.infinite(ICY))) {
         stop("unboundedyinf")
       }
@@ -218,8 +235,9 @@ Param_TSM_higher_order <- R6Class(
         stop("unboundedana")
       }
       #####
-      return(list(Y = as.matrix(C_y), A = as.matrix(C_a),
-                 IC= list(A = ICA, Y = ICY), new_Q = list(Q_tmle, Q_tmle1),
+      return(list(Y = as.matrix(C_y), A = as.matrix(C_a), Atilde = H_a_tilde, Ytilde = H_y_tilde,
+                 IC= list(A = ICA, Y = ICY, Atilde = ICA2, Ytilde = ICY2),
+                 new_Q = list(Q_tmle, Q_tmle1),
                  ICtilde = list(
                    A = ICA_tilde,
                    Y = ICY_tilde
@@ -273,6 +291,8 @@ Param_TSM_higher_order <- R6Class(
         stop("unbounded")
       }
 
+      IC <- do.call(cbind, HA$IC)
+
 
       result <- list(psi = psi, IC = as.matrix(IC), ICtilde = cbind(HA$ICtilde$A, HA$ICtilde$Y))
       return(result)
@@ -287,7 +307,7 @@ Param_TSM_higher_order <- R6Class(
       return(private$.likelihood_tilde)
     },
     update_nodes = function() {
-      return(c("Y", "A"))
+      return(c("Y", "A", "Ytilde", "Atilde"))
     }
   ),
   private = list(

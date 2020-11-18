@@ -7,11 +7,20 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+```{r}
+remotes::install_github("tlverse/sl3")
+
+```
+
 ```{r}
 n=5000
 library(simcausal)
+library(SuperLearner)
 library(data.table)
+library(sl3)
 bound <- Vectorize(tmle3::bound)
+D <- DAG.empty()
 D <- DAG.empty()
 D <- D +
   node("W1f", distr = "runif", min = -1, max = 1) +
@@ -25,12 +34,12 @@ D <- D +
    node("W4", distr = "rconst", const = round(W4f,1)) +
    node("W5", distr = "rconst", const = round(W5f,1)) +
   
-  node("g", distr = "rconst", const = plogis(W1 + W2 +  W3 + W2*sin(W3) + W4 + W5  ) )+
+  node("g", distr = "rconst", const = plogis(W1 + W2 +  W3 + W2*sin(2*W3) + W4 + W5  ) )+
   node("A", distr = "rbinom", size = 1, prob = g )+
-    node("gRtilde", distr = "rconst",  const =  plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + A - A*cos(W3) + A*W1 - A*sin(W2))) +
-   node("gRtilde1", distr = "rconst",  const =   plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + 1 - 1*cos(W3) + 1*W1 - 1*sin(W2))) +
-   node("gRtilde0", distr = "rconst",  const =   plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + 0 - 0*cos(W3) + 0*W1 - 0*sin(W2))) +
-   node("gR", distr = "rconst",  const =  bound(gRtilde, 0.05) ) +
+    node("gRtilde", distr = "rconst",  const =  plogis( -1.5 + 0.5 * (sin(3*W1) + W2 * cos(3*W1) + W2^3 + cos(3*W3) + W4 + W5*exp(W5)) + A + A*W4^3 + A*cos(3*W3) + A*W1 - A*sin(3*W2))) +
+   node("gRtilde1", distr = "rconst",  const =    plogis( -1.5 + 0.5 * (sin(3*W1) + W2 * cos(3*W1) + W2^3 + cos(3*W3) + W4 + W5*exp(W5)) + 1 + 1*W4^3 + 1*cos(3*W3) + 1*W1 - 1*sin(3*W2))) +
+   node("gRtilde0", distr = "rconst",  const =   plogis( -1.5 + 0.5 * (sin(3*W1) + W2 * cos(3*W1) + W2^3 + cos(3*W3) + W4 + W5*exp(W5)) + 0 + 0*W4^3 + 0*cos(W3*3) + 0*W1 - 0*sin(3*W2))) +
+   node("gR", distr = "rconst",  const =  bound(gRtilde, 0.01) ) +
   node("R", distr = "rbinom", size = 1, prob = gR)+
   node("RR", distr = "rconst", const = gRtilde1/gRtilde0)
 
@@ -47,50 +56,92 @@ setkey(data, id ,t)
 print(data)
 #})}
 
+```
 
+```{r}
+
+library(glmnet)
 
 
 
 library(tmle3)
 library(sl3)
 library(uuid)
-npsem <- list(define_node("W", c("W1", "W2", "W3", "W4", "W5"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0),
+npsem <- list(define_node("W", c("W1", "W2", "W3", "W4", "W5"), time = 0, variable_type = variable_type("continuous")), define_node("A", "A", c("W"), time = 0,  variable_type = variable_type("binomial")),
              
               define_node("R", "R", c("A", "W"), time = 0,  variable_type = variable_type("binomial")), define_node("RR", "R", c("W"), time = 0,  variable_type = variable_type("continuous")))
 task <- tmle3_Task$new(data, npsem, long_format = F)
 
 
-mean_fun_R_bias <- function(task) {
-  A <- task$data[["A"]]
-  W1 <- task$data[["W1"]]
-  W2 <- task$data[["W2"]]
-  W3 <- task$data[["W3"]]
-  W4 <- task$data[["W4"]]
-  W5 <- task$data[["W5"]]
-  truth <-  plogis( W1 + W2 * cos(W1) + W2^2 + W3 + W4 + W5 + A - A*cos(W3) + A*W1 - A*sin(W2))
-  return(bound(truth + abs( (W1 + W2 + W3 + W4 + W5)/5)/(n)^(0.33), 0.01))
-}
-mean_fun_A_bias <- function(task) {
-  W1 <- task$data[["W1"]]
-  W2 <- task$data[["W2"]]
-  W3 <- task$data[["W3"]]
-  W4 <- task$data[["W4"]]
-  W5 <- task$data[["W5"]]
-  truth <- plogis(W1 + W2 +  W3 + W2*sin(W3) + W4 + W5  ) 
-  g1 <- (bound(truth + abs( (W1 + W2 + W3 + W4 + W5)/5)/(n)^(0.33), 0.01))
-  return(g1)
-}
 
-LF_A_bias <- LF_known$new("A", density_fun  = mean_fun_A_bias)
-LF_R_bias <- LF_known$new("R", mean_fun = mean_fun_R_bias, type = "mean")
+
+
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+
+lrnr_SL.gam <-  make_learner(Lrnr_pkg_SuperLearner, "SL.gam", outcome_type = variable_type("binomial"))
+
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+
+lrnr_list2<- list(
+        Lrnr_hal9001$new(max_degree = 2),
+       Lrnr_glmnet$new(), 
+       Lrnr_xgboost$new(eta = 0.1, max_depth = 5), 
+        Lrnr_xgboost$new(eta = 0.1, max_depth = 6), 
+        Lrnr_xgboost$new(eta = 0.2, max_depth = 7), 
+       lrnr_SL.gam,
+       bayesglm_sl_lrnr,
+       lrnr_SL.inter
+       )
+
+lrnr_list2<- list(
+       # Lrnr_hal9001$new(max_degree = 2),
+       Lrnr_glmnet$new(), 
+       Lrnr_xgboost$new(eta = 0.1, max_depth = 5), 
+        Lrnr_xgboost$new(eta = 0.1, max_depth = 6), 
+        Lrnr_xgboost$new(eta = 0.2, max_depth = 7), 
+       lrnr_SL.gam,
+       bayesglm_sl_lrnr,
+       lrnr_SL.inter
+       )
+
+LF_A <- LF_fit$new("A", Lrnr_hal9001$new(max_degree = 2))
+
+LF_R <- LF_fit$new("R", Lrnr_hal9001$new(max_degree = 2), type = "mean")
+
+
+LF_A <- LF_known$new("A", density_fun = function(tmle_task) {
+  W1 <- tmle_task$data[["W1"]]
+  W2 <- tmle_task$data[["W2"]]
+  W3 <- tmle_task$data[["W3"]]
+  W4 <- tmle_task$data[["W4"]]
+  W5 <- tmle_task$data[["W5"]]
+  g1 <- plogis(W1 + W2 +  W3 + W2*sin(2*W3) + W4 + W5  ) 
+  
+})
+
+# LF_R <- LF_known$new("R", mean_fun = function(tmle_task) {
+#   W1 <- tmle_task$data[["W1"]]
+#   W2 <- tmle_task$data[["W2"]]
+#   W3 <- tmle_task$data[["W3"]]
+#   W4 <- tmle_task$data[["W4"]]
+#   W5 <- tmle_task$data[["W5"]]
+#   A <- tmle_task$data[["A"]]
+# 
+#   plogis( -1.5 + 0.5 * (sin(3*W1) + W2 * cos(3*W1) + W2^3 + cos(3*W3) + W4 + W5*exp(W5)) + A + A*W4^3 + A*cos(3*W3) + A*W1 - A*sin(3*W2))
+#   
+# }, type = "mean")
 
 factor_list <- list(LF_emp$new("W"), 
-                    LF_A_bias,
-                     LF_R_bias
+                    LF_A,
+                     LF_R
 )
 
 lik <- Likelihood$new(factor_list)
 lik <- lik$train(task)
+```
+
+```{r}
+
 rev <- make_revere(task, lik, "gen")
 library(fda)
 library(speedglm)
@@ -98,25 +149,155 @@ library(glmnet)
 library(stats)
 
 rev_univ <- make_generator(lik, "gen")
-task_full <- rev_univ(task, "full")
 
+task_full <- rev_univ(task, "validation")
+
+```
+
+```{r}
+task_full$get_data()
+
+```
+
+```{r}
+library(SuperLearner)
+library(glmnet)
+library(sl3)
+
+sieve_learner_plugin1 <-  Lrnr_fourier$new(fourier_basis(7,1), stratify_by = "A", mult_by = c("ginv"))
+sieve_learner_plugin2 <-  Lrnr_fourier$new(fourier_basis(3,1), stratify_by = "A", mult_by = c("ginv"))
+sieve_learner_plugin3 <-  Lrnr_fourier$new(fourier_basis(5,1), stratify_by = "A", mult_by = c("ginv"))
+sieve_learner_plugin4 <-  Lrnr_fourier$new(fourier_basis(9,1), stratify_by = "A", mult_by = c("ginv"))
+sieve_learner_plugin5 <-  Lrnr_fourier$new(fourier_basis(1,1), stratify_by = "A", mult_by = c("ginv"))
+
+sieve_learner_IPW1 <-  Lrnr_fourier$new(fourier_basis(3, 1),  mult_by = c("Qg1", "Qg0"))
+sieve_learner_IPW2 <-  Lrnr_fourier$new(fourier_basis(5, 1),  mult_by = c("Qg1", "Qg0"))
+sieve_learner_IPW3 <-  Lrnr_fourier$new(fourier_basis(7, 1),  mult_by = c("Qg1", "Qg0"))
+sieve_learner_IPW4 <-  Lrnr_fourier$new(fourier_basis(9, 1),  mult_by = c("Qg1", "Qg0"))
+sieve_learner_IPW5 <-  Lrnr_fourier$new(fourier_basis(1, 1),  mult_by = c("Qg1", "Qg0"))
+
+sieve_stack_plugin <- list(
+  "k=0" = NULL,
+  "k=7" = sieve_learner_plugin1,
+ # "k=3" = sieve_learner_plugin2,
+  "k=5" = sieve_learner_plugin3,
+  "k=9" = sieve_learner_plugin4
+)
+
+sieve_stack_IPW <- list(
+  "k=0" = NULL,
+  #"k=3" = sieve_learner_IPW1,
+  "k=5" = sieve_learner_IPW2
+  #"k=7" = sieve_learner_IPW3,
+  #"k=9" = sieve_learner_IPW4
+)
+sl_list <- list()
+
+bayesglm_sl_lrnr <- make_learner(Lrnr_pkg_SuperLearner, "SL.bayesglm", outcome_type = variable_type("binomial"))
+
+lrnr_SL.gam <-  make_learner(Lrnr_pkg_SuperLearner, "SL.gam", outcome_type = variable_type("binomial"))
+
+lrnr_SL.inter<-  make_learner(Lrnr_pkg_SuperLearner, "SL.glm.interaction", outcome_type = variable_type("binomial"))
+
+
+for(name in names(sieve_stack_plugin)[1]) {
+  sieve_learner <- sieve_stack_plugin[[name]]
+  lrnr_chain <- Lrnr_LRR_plugin_chainer$new(sieve_learner = sieve_learner, name = name)
+  lrnr <-  make_learner(Stack,
+                        Lrnr_LRR_xgboost$new(max_depth = 6),
+                     Lrnr_LRR_xgboost$new(max_depth = 6, eta = 0.1),
+                    Lrnr_LRR_xgboost$new(max_depth = 6, eta = 0.05),
+                    Lrnr_LRR_xgboost$new(max_depth = 6, eta = 0.2),
+                     Lrnr_LRR_xgboost$new(max_depth = 5, eta = 0.1),
+                     Lrnr_LRR_xgboost$new(max_depth = 7, eta = 0.1),
+                                         make_learner(Pipeline,Lrnr_mean$new(), Lrnr_chainer_link$new()), 
+
+                       make_learner(Pipeline,bayesglm_sl_lrnr, Lrnr_chainer_link$new()), 
+                        make_learner(Pipeline,lrnr_SL.gam, Lrnr_chainer_link$new()), 
+                        make_learner(Pipeline,lrnr_SL.inter, Lrnr_chainer_link$new())
+)
+  lrnr <- make_learner(Pipeline, lrnr_chain$clone(),lrnr)
+  sl_list <- c(sl_list, list(lrnr))
+}
+for(name in names(sieve_stack_IPW)) {
+    sieve_learner <- sieve_stack_IPW[[name]]
+  lrnr_chain <- Lrnr_LRR_IPW_chainer$new(sieve_learner = sieve_learner, name = name)
+ lrnr <-  make_learner(Stack,
+                       Lrnr_LRR_xgboost$new(max_depth = 3),
+                     Lrnr_LRR_xgboost$new(max_depth = 4, eta = 0.1),
+                    Lrnr_LRR_xgboost$new(max_depth = 3, eta = 0.05),
+                    Lrnr_LRR_xgboost$new(max_depth = 2, eta = 0.05),
+                     Lrnr_LRR_xgboost$new(max_depth = 5, eta = 0.1),
+                     Lrnr_LRR_xgboost$new(max_depth = 3, eta = 0.1),
+                       make_learner(Pipeline,bayesglm_sl_lrnr, Lrnr_chainer_link$new()), 
+                     make_learner(Pipeline,Lrnr_mean$new(), Lrnr_chainer_link$new()), 
+                        make_learner(Pipeline,lrnr_SL.gam, Lrnr_chainer_link$new()), 
+                        make_learner(Pipeline,lrnr_SL.inter, Lrnr_chainer_link$new())
+)
+  lrnr <- make_learner(Pipeline, lrnr_chain,lrnr)
+  sl_list <- c(sl_list, list(lrnr))
+}
+sl_list <- c(sl_list, list(Lrnr_LRR_subst$new()))
+
+lrr_sl <- make_super_learner(sl_list,task, lik )
+```
+
+```{r}
+
+lrn <- make_learner(Pipeline, 
+             Lrnr_LRR_IPW_chainer$new(sieve_learner = sieve_stack_plugin[[1]]),
+  Lrnr_LRR_xgboost$new(max_depth = 2, eta = 0.3)
+  )
+lrn <- lrn$train(task_full)
+plot(lrn$predict(task_full), log(data$RR))
+
+
+lrn <- make_learner(Pipeline, 
+             Lrnr_LRR_plugin_chainer$new(sieve_learner = sieve_stack_plugin[[1]]),
+  Lrnr_LRR_xgboost$new(max_depth =4, eta = 0.1)
+  
+  )
+lrn <- lrn$train(task_full)
+plot(lrn$predict(task_full), log(data$RR))
+```
+
+
+
+
+```{r, include = F}
+lrr_sl <- lrr_sl$train(task_full)
+print("done")
+risks <- lrr_sl$cv_risk(make_eff_loss(task, lik))
 ```
 
 
 ```{r}
-sieve_learner = Lrnr_fourier$new(fourier_basis(2,1), stratify_by = "A", mult_by = c("ginv"))
+data.table(lik$get_likelihoods(task), data$g, data$gR)
+task_full$get_data()
+ risks[order(risks$mean_risk),]
+```
 
-lrnr_chain <- Lrnr_LRR_plugin$new(sieve_learner = sieve_learner)
-lrnr_chain <- lrnr_chain$train(task_full)
+```{r}
 
-dat <- task_full$get_data()
-dat
-data.table(dat$ER1, dat$ER0)
+lik$factor_list$R$learner
+```
+```{r}
 
-lrnr_chain$chain(task_full)$data
+plot(lrr_sl$predict(task_full), log(data$RR))
+plot(exp(lrr_sl$predict(task_full)), (data$RR))
 
-
+plot(log(task_full$get_data(,"RR")[[1]]), log(data$RR))
+plot(task_full$get_data(,"ER1")[[1]], data$gRtilde1)
+plot(task_full$get_data(,"ER0")[[1]], data$gRtilde0)
+plot(task_full$get_data(,"ER1")[[1]]/task_full$get_data(,"ER0")[[1]], data$gRtilde1/data$gRtilde0)
 
 ```
+
+```{r}
+
+plot(task_full$get_data(,"g1")[[1]], data$g)
+
+```
+
 
 

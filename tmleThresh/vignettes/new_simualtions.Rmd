@@ -1,0 +1,108 @@
+---
+title: "sim"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+# OLD example, scroll down
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = 0, max = 1) +
+  node("W2", distr = "runif", min = 0, max = 1) +
+  node("A", distr = "rnorm", mean = 1*W2 + 1*W1, sd = 0.5) + 
+  node("Y", distr = "rbinom", size =1 , prob = plogis(-2 + A + W1 + W2 - A*W1/2 - A*W2/2)) +
+    node("pY", distr = "rconst" , const = plogis(-2 + A + W1 + W2 - A*W1/2 - A*W2/2)) 
+  
+setD <- set.DAG(D, vecfun = "dgamma")
+data <- sim(setD, n = 80000)
+mean((data$A >= 1) * data$pY) / mean(data$A >= 1)
+mean((data$A >= 1) * data$Y)/ mean(data$A >= 1)
+```
+
+
+```{r}
+
+make_f <- function(W1, W2, v,maxA) {
+  g <- function(A) {
+    dnorm(A, mean = 1*W2 + 1*W1, sd=0.5)
+  }
+  cdf <- integrate(g, v, Inf)$value
+f <- function(A) {
+  dnorm(A, mean = 1*W2 + 1*W1, sd=0.5) * plogis(-2 + A + W1 + W2 - A*W1/2 - A*W2/2) * (A >= v)/cdf
+}
+return(f)
+}
+results <- rep(0, nrow(data))
+for(i in 1:nrow(data)) {
+  f <- make_f(data$W1[i], data$W2[i], 1, max(data$A) +5)
+  results[i] <- integrate(f, min(data$A), max(data$A))$value
+}
+mean(results)
+```
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(simcausal)
+D <- DAG.empty()
+D <- D +
+  node("W1", distr = "runif", min = -1, max = 1) +
+  node("W2", distr = "rnorm", mean = 0) +
+  node("W3full", distr = "rexp", rate = 1) +
+  node("W3", distr = "rconst", const = min(W3full,3))+
+  node("S1", distr = "rgamma", shape =  5 ,rate= max(3 + 4*W1 + 4*W2 + 1.5*W3, 1)) +
+   node("S", distr = "rconst", const = S1/8)+
+  node("g", distr = "rconst", const = dgamma(S, shape = 2 + (W1) + abs(W2) + W3/3 ,rate= 12.5 + W1 + W2 + W3/3 )) +
+  node("PY", distr = "rconst", const = 0.05 * plogis(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))) +
+  node("Y", distr = "rbinom", size =1, prob = PY)
+setD <- set.DAG(D, vecfun = "dgamma")
+data <- sim(setD, n = 80000)
+data
+hist(data$S)
+thresh <- median(data$S)
+```
+
+
+```{r}
+
+make_f <- function(W1, W2, W3, v,maxA) {
+  g <- function(S) {
+     dgamma(S,  shape =  5 ,rate= max(3 + 4*W1 + 4*W2 + 1.5*W3, 1)) 
+  }
+  cdf <- integrate(g, v, Inf)$value
+  
+f <- function(S) {
+  v <- g(S)    *  0.05 * plogis(0.7*(0.5-7*S -2*(S >0.2) + W1+W2+2*W1*(W2 >0) - 2*W2*(W1>0) + W2*sin(3*W1) + W3 * (S-0.1) - W3*cos(3*W1)))/cdf * (S >= v)
+  
+  v
+}
+return(f)
+}
+results <- rep(0, nrow(data))
+for(i in 1:nrow(data)) {
+  f <- make_f(data$W1[i], data$W2[i], data$W3[i],  thresh, max(data$S) )
+  results[i] <- integrate(f, min(data$S), max(data$S))$value
+}
+mean(results)
+```
+
+```{r}
+thresh
+mean((data$S >= thresh) * data$PY) / mean(data$S >= thresh)
+
+
+```
+

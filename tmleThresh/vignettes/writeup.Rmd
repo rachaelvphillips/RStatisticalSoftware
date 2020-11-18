@@ -1,0 +1,92 @@
+---
+title: "Threshold-searching CoPs of risk"
+header-includes:
+   - \usepackage{float}
+ 
+output:
+  pdf_document: 
+    extra_dependencies: ["caption", "subcaption", "graphicx"]
+
+---
+
+
+## Threshold-searching CoPs
+
+Using the unadjusted nonparametric threshold-searching approach developed by Donovan, Hudgens, Gilbert et al (2019) and covariate-adjusted TMLE-based approach developed by van der Laan, Zhang, Gilbert (in progress), the so-called threshold-response function $E_W P(Y|S \geq v, W)$ is estimated for a range of thresholds v. Here, $W$ is a set of baseline characteristics, $S$ is the biomarker/correlate of interest, and $Y$ is the indicator of disease. From the threshold-response function (assuming monotonicity) and its 95\% simultaneous confidence band, one can obtain a 95\% confidence interval for the threshold corresponding with near zero risk (defined as the risk level 0.00005). 
+
+### Receptor binding domain (RBD) binding antibody
+
+\begin{figure}[H]
+\centering
+
+\begin{subfigure}{.5\textwidth}
+  \centering
+\includegraphics[width=1\textwidth]{Day57bindRBD_plotdon}
+  \caption{Unadjusted threshold-response function}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+\includegraphics[width=1\textwidth]{Day57bindRBD_plottmle}
+  \caption{Adjusted threshold-response function}
+  \label{fig:sub2}
+\end{subfigure}
+  \caption{Adjusted and unadjusted threshold-response function for a range of thresholds of the RBD binding antibody activity levels with simultaneous confidence band. A conservative 95\% confidence interval for the threshold corresponding with near zero covariate-adjusted risk is (3.6, infinity).}
+
+\end{figure}
+
+### Spike protein antibody
+
+\begin{figure}[H]
+
+   \begin{subfigure}{.5\textwidth}
+  \centering
+    \includegraphics[width=1\textwidth]{Day57bindSpike_plotdon.png}
+  \caption{Unadjusted threshold-response function}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+        \includegraphics[width=1\textwidth]{Day57bindSpike_plottmle.png}
+  \caption{Adjusted threshold-response function}
+  \label{fig:sub2}
+\end{subfigure}
+  \caption{Adjusted and unadjusted threshold-response function for a range of thresholds of the Spike protein antibody activity levels with simultaneous 95\% confidence band. A conservative 95\% confidence interval for the threshold corresponding with near zero covariate-adjusted risk is (3.9, infinity).}
+\end{figure}
+
+### Live virus-neutralizing antibody
+
+\begin{figure}[H]
+    \begin{subfigure}{.5\textwidth}
+  \centering
+      \includegraphics[width=1\textwidth]{Day57liveneut_plotdon.png}
+  \caption{Unadjusted threshold-response function}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+        \includegraphics[width=1\textwidth]{Day57liveneut_plottmle.png}
+  \caption{Adjusted threshold-response function}
+  \label{fig:sub2}
+\end{subfigure}
+ \caption{Adjusted and unadjusted threshold-response function for a range of thresholds of the Live virus-neutralizing antibody activity levels with simultaneous 95\% confidence band. A conservative 95\% confidence interval for the threshold corresponding with near zero covariate-adjusted risk is (4.0, infinity).}
+\end{figure}
+
+### Pseudo-neutralizing antibody
+
+\begin{figure}[H]
+ 
+    \begin{subfigure}{.5\textwidth}
+  \centering
+     \includegraphics[width=1\textwidth]{Day57pseudoneut_plotdon.png}
+  \caption{Unadjusted threshold-response function}
+  \label{fig:sub1}
+\end{subfigure}%
+\begin{subfigure}{.5\textwidth}
+  \centering
+        \includegraphics[width=1\textwidth]{Day57pseudoneut_plottmle.png}
+  \caption{Adjusted threshold-response function}
+  \label{fig:sub2}
+\end{subfigure}
+ \caption{Adjusted and unadjusted threshold-response function for a range of thresholds of the Live virus-neutralizing antibody activity levels with simultaneous 95\% confidence band. A conservative 95\% confidence interval for the threshold corresponding with near zero covariate-adjusted risk is (3.7, infinity).}
+\end{figure}

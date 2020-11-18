@@ -117,8 +117,9 @@ Other Parameters:
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Param_TSM_higher_order$new(
   observed_likelihood,
-  likelihood_tilde,
-  outcome_node = "Y"
+  likelihood_tilde = NULL,
+  outcome_node = "Y",
+  MLE_type = c("Pntilde", "Pn")
 )}\if{html}{\out{</div>}}
 }
 
@@ -201,8 +202,9 @@ The objects of this class are cloneable with this method.
 \subsection{Usage}{
 \if{html}{\out{<div class="r">}}\preformatted{Param_TSM_higher_order$new(
   observed_likelihood,
-  likelihood_tilde,
-  outcome_node = "Y"
+  likelihood_tilde = NULL,
+  outcome_node = "Y",
+  MLE_type = c("Pntilde", "Pn")
 )}\if{html}{\out{</div>}}
 }
 
